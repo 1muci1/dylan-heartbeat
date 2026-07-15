@@ -1,0 +1,94 @@
+"use strict";
+
+const crypto = require("node:crypto");
+const { StructuredMemoryError } = require("./structured-memory-store");
+
+function safeEqual(actual, expected) {
+  const left = Buffer.from(String(actual));
+  const right = Buffer.from(String(expected));
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
+}
+
+function envelope(data, meta = {}) {
+  return { data, meta, error: null };
+}
+
+function sendError(req, reply, error) {
+  const statusCode = error.statusCode || 500;
+  if (statusCode >= 500) req.log.error({ errorName: error.name, errorCode: error.code }, "memory API failed");
+  return reply.code(statusCode).send({
+    data: null,
+    meta: {},
+    error: {
+      code: error.code || "INTERNAL_ERROR",
+      message: statusCode >= 500 ? "记忆服务暂时不可用" : error.message
+    }
+  });
+}
+
+function registerMemoryRoutes(app, options) {
+  const store = options.store;
+  const apiKey = options.apiKey || process.env.GATEWAY_API_KEY;
+  if (!store) throw new TypeError("store 必填");
+
+  function bearerAuth(req, reply, done) {
+    const auth = req.headers.authorization || "";
+    if (!apiKey) {
+      reply.code(503).send({ data: null, meta: {}, error: { code: "GATEWAY_KEY_MISSING", message: "GATEWAY_API_KEY 未配置" } });
+      return;
+    }
+    if (!safeEqual(auth, `Bearer ${apiKey}`)) {
+      reply.code(401).header("WWW-Authenticate", "Bearer")
+        .send({ data: null, meta: {}, error: { code: "UNAUTHORIZED", message: "Invalid gateway API key" } });
+      return;
+    }
+    done();
+  }
+
+  const route = handler => async (req, reply) => {
+    try { return await handler(req, reply); } catch (error) { return sendError(req, reply, error); }
+  };
+
+  app.get("/api/v1/memories", { preHandler: bearerAuth }, route(req => {
+    const result = store.list(req.query || {});
+    return envelope(result.items, result.meta);
+  }));
+
+  app.post("/api/v1/memories", { preHandler: bearerAuth }, route((req, reply) => (
+    reply.code(201).send(envelope(store.create(req.body)))
+  )));
+
+  app.get("/api/v1/memories/stats", { preHandler: bearerAuth }, route(() => envelope(store.stats())));
+
+  app.get("/api/v1/memories/:id", { preHandler: bearerAuth }, route(req => envelope(
+    store.get(req.params.id, { includeDeleted: req.query?.includeDeleted === "true" })
+  )));
+
+  app.patch("/api/v1/memories/:id", { preHandler: bearerAuth }, route(req => envelope(store.update(req.params.id, req.body))));
+
+  app.delete("/api/v1/memories/:id", { preHandler: bearerAuth }, route(req => {
+    store.softDelete(req.params.id);
+    return envelope({ id: req.params.id, status: "deleted" });
+  }));
+
+  app.post("/api/v1/memories/:id/restore", { preHandler: bearerAuth }, route(req => envelope(store.restore(req.params.id))));
+
+  app.get("/api/v1/memories/:id/comments", { preHandler: bearerAuth }, route(req => envelope(store.listComments(req.params.id))));
+
+  app.post("/api/v1/memories/:id/comments", { preHandler: bearerAuth }, route((req, reply) => (
+    reply.code(201).send(envelope(store.createComment(req.params.id, req.body)))
+  )));
+
+  app.patch("/api/v1/memories/:id/comments/:commentId", { preHandler: bearerAuth }, route(req => envelope(
+    store.updateComment(req.params.id, req.params.commentId, req.body)
+  )));
+
+  app.delete("/api/v1/memories/:id/comments/:commentId", { preHandler: bearerAuth }, route(req => {
+    store.deleteComment(req.params.id, req.params.commentId);
+    return envelope({ id: req.params.commentId, status: "deleted" });
+  }));
+
+  return { bearerAuth };
+}
+
+module.exports = { envelope, registerMemoryRoutes };

@@ -6,4 +6,34 @@ enhanced_messages.json*
 *bak*
 .DS_Store
 presets.json
+chat-sessions.sqlite*
 wake_prompt.txt
+
+# Runtime data
+uploads/
+memory-backups/
+audit-backups/
+
+# Database
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Environment
+.env
+
+# Logs
+*.log
+
+# Backups
+*.backup*
+*.bak
+*.broken*
+
+# Generated memory files
+memory.json
+message_timestamps.json*
+
+# Temporary before-change backups
+*.before-*
+frontend-p2/

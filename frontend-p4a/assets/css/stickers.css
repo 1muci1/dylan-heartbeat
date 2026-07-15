@@ -1,0 +1,12 @@
+body { overflow-x: hidden; background: var(--bg); color: #514956; }
+.sticker-manager { width: min(100%, 760px); min-height: 100vh; margin: auto; padding: 18px 16px 40px; }
+.sticker-manager header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.sticker-manager header a { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 50%; color: #6f5c7d; background: white; font-size: 28px; }
+.sticker-manager h1 { font-size: 22px; }.sticker-manager header p,.manager-status { color: #948999; font-size: 11px; }
+.sticker-upload { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; padding: 14px; border-radius: 16px; background: white; }
+.sticker-upload input,.manager-tools input,.manager-tools select { min-width: 0; padding: 10px; border: 1px solid #e8e1eb; border-radius: 10px; }
+.sticker-upload input[type=file],.sticker-upload button,.manager-status { grid-column: 1/-1; }.sticker-upload button { padding: 11px; border: 0; border-radius: 11px; color: white; background: #725d82; }
+.manager-tools { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; margin: 16px 0; }
+.manager-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
+.manager-card { min-width: 0; padding: 9px; border-radius: 14px; background: white; }.manager-card img { width: 100%; aspect-ratio: 1; object-fit: contain; }.manager-card strong,.manager-card small { display:block; overflow-wrap:anywhere; }.manager-card small { color:#998f9d; }.manager-actions { display:flex; gap:5px; margin-top:8px; }.manager-actions button { flex:1; border:0; padding:7px 3px; border-radius:8px; }
+@media(max-width:359px){.sticker-manager{padding-inline:10px}.sticker-upload{grid-template-columns:minmax(0,1fr)}.sticker-upload>*{grid-column:1}.manager-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

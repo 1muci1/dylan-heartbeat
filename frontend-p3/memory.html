@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f8f6fb">
+  <meta name="description" content="心伴结构化记忆库">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/common.css">
+  <link rel="stylesheet" href="assets/css/memory.css">
+  <title>心伴 · 记忆库</title>
+</head>
+<body class="memory-page" data-page="memory">
+  <main class="app-shell memory-shell">
+    <header class="memory-header">
+      <a class="memory-back" href="index.html" aria-label="返回首页">‹</a>
+      <div><p>MEMORY LIBRARY</p><h1>我们的记忆</h1></div>
+      <button class="memory-create" type="button" data-create-memory aria-label="新建记忆">＋</button>
+    </header>
+
+    <section class="memory-stats" aria-label="记忆统计">
+      <div><strong data-memory-total>—</strong><span>全部记忆</span></div>
+      <div><strong data-moment-total>—</strong><span>Moments</span></div>
+      <div><strong data-deleted-total>—</strong><span>回收站</span></div>
+    </section>
+
+    <form class="memory-filters" aria-label="筛选记忆">
+      <label><span>搜索</span><input name="keyword" type="search" maxlength="200" placeholder="标题或正文关键词"></label>
+      <div class="memory-filter-row">
+        <label><span>类型</span><select name="type"><option value="">全部</option><option>MEMORY</option><option>EVENT</option><option>MOMENT</option><option>PROMISE</option><option>WISHLIST</option><option>NOTE</option></select></label>
+        <label><span>状态</span><select name="status"><option value="active">有效</option><option value="archived">已归档</option><option value="deleted">已删除</option></select></label>
+      </div>
+      <div class="memory-filter-row">
+        <label><span>开始日期</span><input name="dateFrom" type="date"></label>
+        <label><span>结束日期</span><input name="dateTo" type="date"></label>
+      </div>
+      <div class="memory-filter-actions">
+        <button type="submit">筛选</button>
+        <button type="button" data-moments-only>只看 Moments</button>
+        <button type="reset">清除</button>
+      </div>
+    </form>
+
+    <p class="memory-error" role="alert" data-memory-error hidden></p>
+    <section class="memory-list" aria-live="polite" data-memory-list></section>
+    <button class="memory-more" type="button" data-load-more hidden>加载更多</button>
+    <p class="memory-empty" data-memory-empty hidden>这里还没有符合条件的记忆。</p>
+  </main>
+
+  <dialog class="memory-dialog" data-memory-dialog>
+    <form method="dialog" class="memory-dialog__card" data-memory-form>
+      <div class="memory-dialog__heading"><h2 data-dialog-title>新建记忆</h2><button value="cancel" aria-label="关闭">×</button></div>
+      <input name="id" type="hidden">
+      <label>类型<select name="type" required><option>MEMORY</option><option>EVENT</option><option>MOMENT</option><option>PROMISE</option><option>WISHLIST</option><option>NOTE</option></select></label>
+      <label>标题<input name="title" maxlength="200" placeholder="可选"></label>
+      <label>正文<textarea name="content" maxlength="20000" rows="7" required></textarea></label>
+      <div class="memory-filter-row">
+        <label>发生时间<input name="occurredAt" type="datetime-local"></label>
+        <label>重要度<select name="importance"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></label>
+      </div>
+      <div class="memory-dialog__actions"><button value="cancel">取消</button><button type="submit" value="">保存</button></div>
+    </form>
+  </dialog>
+
+  <dialog class="memory-dialog memory-detail" data-detail-dialog>
+    <article class="memory-dialog__card">
+      <div class="memory-dialog__heading"><h2 data-detail-title>记忆详情</h2><button type="button" data-close-detail aria-label="关闭">×</button></div>
+      <div data-detail-body></div>
+      <div class="memory-detail__actions" data-detail-actions></div>
+      <section class="memory-comments">
+        <h3>评论</h3>
+        <div data-comment-list></div>
+        <form data-comment-form><input name="content" maxlength="5000" placeholder="写下一条评论" required><button type="submit">添加</button></form>
+      </section>
+    </article>
+  </dialog>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/common.js"></script>
+  <script src="assets/js/memory.js"></script>
+</body>
+</html>

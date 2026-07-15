@@ -1,0 +1,26 @@
+{
+  "name": "心伴 - 私人 AI 陪伴",
+  "short_name": "心伴",
+  "description": "一个温暖、安静的私人 AI 陪伴空间",
+  "lang": "zh-CN",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f8f6fb",
+  "theme_color": "#f6f1ff",
+  "icons": [
+    {
+      "src": "assets/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/maskable-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

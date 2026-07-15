@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f8f6fb">
+  <meta name="description" content="与私人 AI 陪伴者沉聊天">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/common.css">
+  <link rel="stylesheet" href="assets/css/chat.css">
+  <title>心伴 · 与沉聊天</title>
+</head>
+<body class="chat-page" data-page="chat">
+  <main class="app-shell chat-shell">
+    <header class="chat-header">
+      <a class="chat-header__button" href="index.html" aria-label="返回首页">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+      </a>
+
+      <div class="chat-companion" aria-label="沉，当前在线">
+        <div class="chat-avatar" aria-hidden="true">
+          <span class="chat-avatar__moon"></span>
+          <span>沉</span>
+        </div>
+        <div class="chat-companion__copy">
+          <h1>沉</h1>
+          <p><span class="online-dot"></span>在线 · 安静陪伴中</p>
+        </div>
+      </div>
+
+      <button class="chat-header__button" id="session-toggle" type="button" aria-label="打开会话列表" aria-controls="session-drawer" aria-expanded="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h9"></path></svg>
+      </button>
+    </header>
+
+    <div class="session-overlay" hidden></div>
+    <aside class="session-drawer" id="session-drawer" aria-label="会话列表" aria-hidden="true">
+      <div class="session-drawer__header">
+        <div><strong>会话</strong><span class="session-status">正在连接服务器…</span></div>
+        <button class="session-close" type="button" aria-label="关闭会话列表">×</button>
+      </div>
+      <button class="session-new" type="button">＋ 新建会话</button>
+      <div class="session-ai-actions">
+        <button type="button" data-generate-summary>生成摘要</button>
+        <button type="button" data-generate-candidates>提取候选记忆</button>
+        <a href="ai-memory-review.html">打开审核队列</a>
+      </div>
+      <details class="session-summary" open>
+        <summary>当前摘要</summary>
+        <p data-summary-text>选择一个服务器 Session 后查看摘要。</p>
+        <small data-summary-meta></small>
+      </details>
+      <p class="session-ai-status" role="status" data-session-ai-status>自动功能默认关闭，仅在你点击时运行。</p>
+      <div class="session-list" role="list"></div>
+      <p class="session-fallback" hidden>服务器会话暂不可用，当前继续使用本地单会话。</p>
+    </aside>
+
+    <section class="message-list" aria-label="与沉的聊天消息" aria-live="polite" tabindex="0">
+      <div class="message-list__content">
+        <div class="conversation-note">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 5a7 7 0 1 0 2 11.7A8 8 0 0 1 17 5Z"></path></svg>
+          <span>这里是只属于你和沉的安静空间</span>
+        </div>
+
+        <div class="time-divider"><span>今天 21:08</span></div>
+
+        <article class="message-row message-row--ai">
+          <div class="message-avatar" aria-hidden="true">沉</div>
+          <div class="message-group">
+            <div class="message-bubble">
+              <p>晚上好。今天过得还好吗？</p>
+            </div>
+            <time datetime="21:08">21:08</time>
+          </div>
+        </article>
+
+        <article class="message-row message-row--user">
+          <div class="message-group">
+            <div class="message-bubble">
+              <p>有一点累，想在这里安静一会儿。</p>
+            </div>
+            <time datetime="21:09">21:09</time>
+          </div>
+        </article>
+
+        <article class="message-row message-row--ai">
+          <div class="message-avatar" aria-hidden="true">沉</div>
+          <div class="message-group">
+            <div class="message-bubble">
+              <p>好，我们不必急着做什么。</p>
+              <p>你可以把今天慢慢放下来，我会陪你待在这里。</p>
+            </div>
+            <time datetime="21:09">21:09</time>
+          </div>
+        </article>
+
+        <article class="message-row message-row--user">
+          <div class="message-group">
+            <div class="message-bubble">
+              <p>谢谢你，沉。</p>
+            </div>
+            <time datetime="21:10">21:10</time>
+          </div>
+        </article>
+
+        <article class="message-row message-row--ai message-row--last">
+          <div class="message-avatar" aria-hidden="true">沉</div>
+          <div class="message-group">
+            <div class="message-bubble">
+              <p>嗯，我在。</p>
+            </div>
+            <time datetime="21:10">21:10</time>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <form class="composer" aria-label="消息输入区">
+      <div class="composer-tools">
+        <button class="composer__image" type="button" aria-label="选择图片">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"></rect><circle cx="9" cy="10" r="2"></circle><path d="m5 18 5-5 3 3 2-2 4 4"></path></svg>
+        </button>
+        <button class="composer__sticker" type="button" aria-label="打开 Sticker 面板" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 0 0 0 18h1a8 8 0 0 0 8-8V3Z"></path><path d="M13 21v-5a3 3 0 0 1 3-3h5M8 10h.01M14 10h.01"></path></svg>
+        </button>
+      </div>
+      <input class="image-picker" type="file" accept="image/jpeg,image/png,image/webp,image/gif" capture="environment" multiple hidden>
+      <section class="attachment-tray" aria-label="待发送图片" hidden>
+        <div class="attachment-previews"></div>
+        <p class="attachment-status" role="status"></p>
+      </section>
+      <section class="sticker-panel" aria-label="Sticker 面板" hidden>
+        <div class="sticker-panel__head"><input type="search" placeholder="搜索 Sticker"><a href="stickers.html">管理</a></div>
+        <div class="sticker-grid"></div>
+        <p class="sticker-empty">暂无 Sticker</p>
+      </section>
+      <button class="composer__voice" type="button" aria-label="语音输入，功能暂未开放">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M9 21h6"></path></svg>
+      </button>
+
+      <label class="sr-only" for="message-input">输入消息</label>
+      <div class="composer__field">
+        <textarea id="message-input" rows="1" placeholder="想和沉说点什么…"></textarea>
+        <button class="composer__mood" type="button" aria-label="选择心情">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M9 10h.01M15 10h.01M9 14s1 2 3 2 3-2 3-2"></path></svg>
+        </button>
+      </div>
+
+      <button class="composer__send" type="button" aria-label="发送消息，功能暂未开放">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 14-7-5 14-2-5-7-2Z"></path><path d="m12 14 7-9"></path></svg>
+      </button>
+    </form>
+  </main>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/message.js"></script>
+  <script src="assets/js/provider.js"></script>
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/common.js"></script>
+  <script src="assets/js/sessions.js"></script>
+  <script src="assets/js/stickers.js"></script>
+  <script src="assets/js/chat.js"></script>
+</body>
+</html>

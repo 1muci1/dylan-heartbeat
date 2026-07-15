@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>候选记忆审核 · 心伴</title>
+  <link rel="stylesheet" href="assets/css/common.css"><link rel="stylesheet" href="assets/css/ai-memory-review.css">
+</head>
+<body class="review-page" data-page="ai-memory-review">
+  <main class="app-shell review-shell">
+    <header class="review-header"><a href="memory.html" aria-label="返回记忆库">‹</a><div><small>AI MEMORY REVIEW</small><h1>候选记忆审核</h1></div></header>
+    <p class="review-notice">候选不会自动进入正式记忆库；每次批准都需要人工确认。</p>
+    <form class="review-filters">
+      <input name="keyword" placeholder="搜索标题或正文">
+      <select name="status"><option value="pending">待审核</option><option value="approved">已批准</option><option value="rejected">已拒绝</option><option value="duplicate">重复</option><option value="deleted">已删除</option></select>
+      <select name="type"><option value="">全部类型</option><option>MEMORY</option><option>EVENT</option><option>MOMENT</option><option>PROMISE</option><option>WISHLIST</option><option>NOTE</option></select>
+      <input name="sessionId" placeholder="Session ID（可选）">
+      <button type="submit">筛选</button>
+    </form>
+    <p class="review-status" role="status"></p><section class="review-list" aria-live="polite"></section>
+    <button class="review-more" type="button" hidden>加载更多</button>
+  </main>
+  <dialog class="review-dialog"><form method="dialog" class="review-card review-editor">
+    <header><h2>审核候选</h2><button value="cancel" aria-label="关闭">×</button></header>
+    <input type="hidden" name="id"><label>类型<select name="type"><option>MEMORY</option><option>EVENT</option><option>MOMENT</option><option>PROMISE</option><option>WISHLIST</option><option>NOTE</option></select></label>
+    <label>标题<input name="title" maxlength="200"></label><label>正文<textarea name="content" maxlength="20000" required></textarea></label>
+    <label>重要度<input name="importance" type="number" min="1" max="5" required></label><label>发生时间<input name="occurredAt" type="datetime-local"></label>
+    <p class="review-source"></p><div class="review-actions"><button value="cancel">取消</button><button type="button" data-approve>确认批准</button></div>
+  </form></dialog>
+  <script src="assets/js/data.js"></script><script src="assets/js/common.js"></script><script src="assets/js/ai-memory-review.js"></script>
+</body>
+</html>

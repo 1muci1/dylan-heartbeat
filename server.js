@@ -1,9 +1,36 @@
 require("dotenv").config();
 
 const Fastify = require("fastify");
+const cors = require("@fastify/cors");
 const fs = require("fs-extra");
+const { registerMemoryAdmin } = require("./memory-admin");
+const { registerSessionRoutes } = require("./session-routes");
+const { beginSessionTurn, createSseAccumulator } = require("./chat-session-persistence");
+const { openDatabase } = require("./database");
+const { SessionStore } = require("./session-store");
+const { StructuredMemoryStore } = require("./structured-memory-store");
+const { registerMemoryRoutes } = require("./memory-routes");
+const { MediaStore } = require("./media-store");
+const { registerMediaRoutes } = require("./media-routes");
+const { AiMemoryStore } = require("./ai-memory-store");
+const { ConversationSummaryService } = require("./conversation-summary-service");
+const { AiTaskRunner, readAiConfig } = require("./ai-task-runner");
+const { OpenAIJsonAdapter } = require("./model-adapter");
+const { registerAiRoutes } = require("./ai-routes");
 
 const DEFAULT_BODY_LIMIT_MB = 50;
+
+function readAllowedFrontendOrigins() {
+  const configured = process.env.CHAT_FRONTEND_ORIGINS || process.env.CHAT_FRONTEND_ORIGIN || "";
+  const defaults = [
+    "https://chat.xiaowo.homes",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000"
+  ];
+  return new Set(configured.split(",").map(value => value.trim()).filter(Boolean).concat(defaults));
+}
+
+const ALLOWED_FRONTEND_ORIGINS = readAllowedFrontendOrigins();
 
 function readBodyLimitBytes() {
   const configured = Number(process.env.REQUEST_BODY_LIMIT_MB);
@@ -13,15 +40,51 @@ function readBodyLimitBytes() {
 
 const app = Fastify({
   logger: true,
+  trustProxy: true,
   bodyLimit: readBodyLimitBytes()
 });
 
 app.register(require("@fastify/formbody"));
+app.register(require("@fastify/multipart"), {
+  limits: { files: 5, fileSize: 10 * 1024 * 1024, fields: 8, parts: 13 }
+});
+app.register(cors, {
+  origin(origin, callback) {
+    callback(null, !origin || ALLOWED_FRONTEND_ORIGINS.has(origin));
+  },
+  methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Session-Id"]
+});
+
+const databaseConnection = openDatabase(process.env.SESSION_DB_FILE || "./chat-sessions.sqlite");
+const sessionStore = new SessionStore({ database: databaseConnection.db, filename: databaseConnection.filename });
+const structuredMemoryStore = new StructuredMemoryStore({ database: databaseConnection.db, filename: databaseConnection.filename });
+const mediaStore = new MediaStore({
+  database: databaseConnection.db,
+  imageDir: process.env.CHAT_IMAGE_UPLOAD_DIR || "./uploads/chat-images",
+  stickerDir: process.env.STICKER_UPLOAD_DIR || "./uploads/stickers"
+});
+const aiConfig = readAiConfig();
+const aiMemoryStore = new AiMemoryStore({ database: databaseConnection.db, memoryStore: structuredMemoryStore });
+const aiAdapter = new OpenAIJsonAdapter();
+const conversationSummaryService = new ConversationSummaryService({ database: databaseConnection.db, store: aiMemoryStore,
+  adapter: aiAdapter, summaryModel: aiConfig.summaryModel, extractionModel: aiConfig.extractionModel });
+const aiTaskRunner = new AiTaskRunner({ store: aiMemoryStore, service: conversationSummaryService, config: aiConfig, logger: app.log });
+registerSessionRoutes(app, { store: sessionStore });
+registerMemoryRoutes(app, { store: structuredMemoryStore });
+registerMediaRoutes(app, { store: mediaStore, sessionStore });
+registerAiRoutes(app, { store: aiMemoryStore, runner: aiTaskRunner, config: aiConfig, adapter: aiAdapter });
+registerMemoryAdmin(app, {
+  structuredStore: structuredMemoryStore,
+  database: databaseConnection.db,
+  databaseFile: databaseConnection.filename
+});
+app.addHook("onClose", () => { aiTaskRunner.stop(); databaseConnection.db.close(); });
 
 const PORT = Number(process.env.PORT) || 3000;
 const TARGET_API_URL = process.env.TARGET_API_URL;
-const TIMELINE_FILE = "enhanced_messages.json";
-const TIMESTAMP_DB_FILE = "./message_timestamps.json";
+const TIMELINE_FILE = process.env.TIMELINE_FILE || "enhanced_messages.json";
+const TIMESTAMP_DB_FILE = process.env.TIMESTAMP_DB_FILE || "./message_timestamps.json";
 const DEFAULT_RESTART_COMMAND = "pm2 restart gateway wake-up";
 
 // ========================
@@ -98,8 +161,60 @@ function prepareMessageForLLM(msg) {
   return { ...msg, content: textContent };
 }
 
+const LOCAL_IMAGE_RE = /\/api\/v1\/chat\/media\/([0-9a-f-]{36})(?:[?#].*)?$/i;
+
+function imageUrlValue(part) {
+  return typeof part?.image_url === "string" ? part.image_url : part?.image_url?.url;
+}
+
+function readP4MessageMetadata(messages) {
+  const latest = [...messages].reverse().find(message => message?.role === "user");
+  const parts = Array.isArray(latest?.content) ? latest.content : [];
+  const attachmentIds = [];
+  let stickerId = null;
+  for (const part of parts) {
+    const match = String(imageUrlValue(part) || "").match(LOCAL_IMAGE_RE);
+    if (match) attachmentIds.push(match[1]);
+    if (part?.type === "sticker" && typeof part.sticker_id === "string") stickerId = part.sticker_id;
+  }
+  if (attachmentIds.length > 4) { const error = new Error("每条消息最多包含 4 张图片"); error.statusCode = 413; throw error; }
+  if (attachmentIds.length && !shouldForwardMultimodalContent()) {
+    const error = new Error("当前 MULTIMODAL_MODE 不支持图片，请启用 passthrough/vision 后重试");
+    error.statusCode = 400; error.code = "MULTIMODAL_NOT_ENABLED"; throw error;
+  }
+  let sticker = null;
+  if (stickerId) sticker = mediaStore.getSticker(stickerId);
+  return { attachmentIds, stickerId, sticker,
+    messageType: stickerId ? "sticker" : attachmentIds.length ? "image" : "text" };
+}
+
+function normalizeStickerParts(messages, metadata) {
+  return messages.map(message => {
+    if (!Array.isArray(message?.content)) return message;
+    const content = message.content.map(part => part?.type === "sticker"
+      ? { type: "text", text: `[Sticker: ${metadata.sticker?.label || "Sticker"}]` }
+      : part);
+    return { ...message, content };
+  });
+}
+
+function embedLocalImages(messages) {
+  return messages.map(message => {
+    if (!Array.isArray(message?.content)) return message;
+    const content = message.content.map(part => {
+      const match = String(imageUrlValue(part) || "").match(LOCAL_IMAGE_RE);
+      if (!match) return part;
+      const file = mediaStore.resolveFile("image", match[1]);
+      const dataUrl = `data:${file.mimeType};base64,${fs.readFileSync(file.filename).toString("base64")}`;
+      return { ...part, image_url: typeof part.image_url === "string" ? dataUrl : { ...part.image_url, url: dataUrl } };
+    });
+    return { ...message, content };
+  });
+}
+
 function sanitizeForLog(value) {
   if (typeof value === "string") {
+    if (value.includes("/api/v1/chat/media/") && value.includes("?")) return `${value.split("?")[0]}?[query omitted]`;
     if (isDataImageUrl(value)) {
       const commaIndex = value.indexOf(",");
       const prefix = commaIndex >= 0 ? value.slice(0, commaIndex + 1) : value.slice(0, 40);
@@ -427,13 +542,58 @@ function readRestartCommand() {
 }
 
 // ========================
-// 安全：放行 /admin，其他仅本地/局域网
+// 安全：
+// - /admin 使用 Basic Auth
+// - 本机/局域网请求直接允许
+// - 公网 /v1/* 必须携带 GATEWAY_API_KEY
+// - 其他公网路径拒绝
 // ========================
 app.addHook("onRequest", (req, reply, done) => {
+const auth = req.headers.authorization || "";
+
   if (req.url.startsWith("/admin")) return done();
-  const ip = req.ip || req.connection.remoteAddress;
-  if (ip === "127.0.0.1" || ip === "::1" || ip === "localhost") return done();
-  if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(ip)) return done();
+  if (req.url.startsWith("/api/v1/chat/sessions")) return done();
+  if (req.url.startsWith("/api/v1/chat/")) return done();
+  if (req.url.startsWith("/api/v1/stickers")) return done();
+  if (req.url.startsWith("/api/v1/memories")) return done();
+  if (req.url.startsWith("/api/v1/memory-candidates")) return done();
+  if (req.url.startsWith("/api/v1/ai-")) return done();
+
+const ip =
+  req.ip ||
+  req.socket?.remoteAddress ||
+  "";
+
+  const isLocal =
+    ip === "127.0.0.1" ||
+    ip === "::1" ||
+    ip === "localhost" ||
+    /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(ip);
+
+  if (isLocal) return done();
+
+  if (req.url.startsWith("/v1/")) {
+    const expectedKey = process.env.GATEWAY_API_KEY;
+    const auth = req.headers.authorization || "";
+
+    if (!expectedKey) {
+      return reply.code(503).send({
+        error: "GATEWAY_API_KEY 未配置"
+      });
+    }
+
+    if (auth === `Bearer ${expectedKey}`) {
+      return done();
+    }
+
+    return reply
+      .code(401)
+      .header("WWW-Authenticate", "Bearer")
+      .send({
+        error: "Invalid gateway API key"
+      });
+  }
+
   reply.code(403).send("Forbidden");
 });
 
@@ -451,6 +611,9 @@ app.get("/v1/models", async (req, reply) => {
 // Chat Completions
 // ========================
 app.post("/v1/chat/completions", async (req, reply) => {
+  let sessionTurn = null;
+  let streamedAssistantContent = "";
+  let streamedAssistantThinking = "";
   try {
     const body = req.body;
     console.log("\n============================");
@@ -458,7 +621,14 @@ app.post("/v1/chat/completions", async (req, reply) => {
     console.log(JSON.stringify(sanitizeForLog(body), null, 2));
     console.log("============================\n");
 
-    const kelivoMessages = body.messages || [];
+    const originalMessages = body.messages || [];
+    const p4Metadata = readP4MessageMetadata(originalMessages);
+    const kelivoMessages = normalizeStickerParts(originalMessages, p4Metadata);
+    const sessionId = String(req.headers["x-session-id"] || "").trim();
+    sessionTurn = beginSessionTurn(sessionStore, sessionId, kelivoMessages, normalizeContentToText, {
+      ...p4Metadata,
+      onCompleted: ({ sessionId: completedSessionId }) => aiTaskRunner.evaluateSession(completedSessionId)
+    });
     const oldTimeline = loadTimeline();
 
     const tsDB = loadTimestampDB();
@@ -480,7 +650,7 @@ app.post("/v1/chat/completions", async (req, reply) => {
 
     // Kelivo 发图时 content 常是数组。默认转为文本占位，避免非视觉模型/中转站报错。
     // 如上游支持 OpenAI 兼容视觉格式，可设置 MULTIMODAL_MODE=passthrough 原样转发。
-    const llmMessages = kelivoMessages
+    const llmMessages = embedLocalImages(kelivoMessages)
       .map(prepareMessageForLLM)
       .filter(Boolean);
 
@@ -598,26 +768,73 @@ app.post("/v1/chat/completions", async (req, reply) => {
     });
 
     if (!response.body) {
+      sessionTurn?.fail("", "UPSTREAM_BODY_MISSING");
       return reply.code(response.status).send({ error: "上游 API 没有返回可读取的响应体" });
     }
 
-    reply.raw.writeHead(response.status, {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive"
-    });
-
-    const reader = response.body.getReader();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      reply.raw.write(value);
-    }
-    reply.raw.end();
-  } catch (err) {
-    console.error(err);
-    reply.code(500).send({ error: err.message });
+if (body.stream) {
+const accumulator = sessionTurn ? createSseAccumulator() : null;
+const requestOrigin = req.headers.origin;
+reply.raw.writeHead(response.status, {
+  "Content-Type": response.headers.get("content-type") || "text/event-stream; charset=utf-8",
+  "Cache-Control": "no-cache",
+  Connection: "keep-alive",
+  ...(ALLOWED_FRONTEND_ORIGINS.has(requestOrigin) ? { "Access-Control-Allow-Origin": requestOrigin } : {}),
+  "Vary": "Origin"
+});
+  const reader = response.body.getReader();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    accumulator?.push(value);
+    reply.raw.write(value);
   }
+  if (accumulator) {
+    const observed = accumulator.finish();
+    streamedAssistantContent = observed.content;
+    streamedAssistantThinking = observed.thinking;
+    if (response.ok && observed.doneReceived && observed.content) {
+      sessionTurn.complete(observed.content, observed.thinking);
+    } else if (response.ok) {
+      sessionTurn.interrupt(observed.content, observed.thinking);
+    } else {
+      sessionTurn.fail(observed.content, `UPSTREAM_HTTP_${response.status}`, observed.thinking);
+    }
+  }
+  reply.raw.end();
+} else {
+
+  const json = await response.json();
+  const assistantContent = json?.choices?.[0]?.message?.content;
+  const assistantThinking = json?.choices?.[0]?.message?.reasoning_content
+    ?? json?.choices?.[0]?.message?.reasoning ?? json?.choices?.[0]?.message?.thinking ?? null;
+  if (sessionTurn) {
+    if (response.ok && typeof assistantContent === "string" && assistantContent) {
+      sessionTurn.complete(assistantContent, assistantThinking);
+    } else {
+      sessionTurn.fail(typeof assistantContent === "string" ? assistantContent : "", `UPSTREAM_HTTP_${response.status}`, assistantThinking);
+    }
+  }
+  return reply.code(response.status).send(json);
+
+}
+
+} catch (err) {
+
+  console.error(err);
+
+  if (sessionTurn) {
+    if (err?.name === "AbortError" || req.raw.aborted || reply.raw.destroyed) {
+      sessionTurn.interrupt(streamedAssistantContent, streamedAssistantThinking);
+    } else {
+      sessionTurn.fail(streamedAssistantContent, err?.code || "REQUEST_FAILED", streamedAssistantThinking);
+    }
+  }
+
+  if (!reply.sent) {
+    return reply.code(err.statusCode || 500).send({ error: err.message });
+ }
+}
 });
 
 // ========================
@@ -629,10 +846,13 @@ app.post("/internal/wake-event", async (req, reply) => {
     if (!content) return reply.code(400).send({ error: "content is required" });
     appendSpecialEvent(content);
     reply.send({ success: true });
-  } catch (err) {
-    console.error(err);
-    reply.code(500).send({ error: err.message });
+} catch (err) {
+  console.error(err);
+
+  if (!reply.sent) {
+    return reply.code(500).send({ error: err.message });
   }
+}
 });
 
 // ========================
@@ -729,7 +949,7 @@ app.get("/admin", { preHandler: basicAuth }, async (req, reply) => {
 
   const authToken = Buffer.from(`${process.env.ADMIN_USER}:${process.env.ADMIN_PASSWORD}`).toString("base64");
 
-  const presets = loadPresets();
+  const presets = loadPresets().map(({ target_key, ...preset }) => preset);
   const presetsJson = safeJsonForInlineScript(presets);
   const authHeaderJson = safeJsonForInlineScript(`Basic ${authToken}`);
 
@@ -1492,10 +1712,14 @@ app.get("/test-bark", async (req, reply) => {
 // ========================
 // 启动服务
 // ========================
-app.listen({ port: PORT, host: "0.0.0.0" }, (err, address) => {
-  if (err) {
-    console.error(err);
-    process.exit(1);
-  }
-  console.log(`✅ Gateway 运行在 ${address}`);
-});
+if (require.main === module) {
+  app.listen({ port: PORT, host: "0.0.0.0" }, (err, address) => {
+    if (err) {
+      console.error(err);
+      process.exit(1);
+    }
+    console.log(`✅ Gateway 运行在 ${address}`);
+  });
+}
+
+module.exports = { app, aiTaskRunner };

@@ -1,0 +1,57 @@
+.memory-page { overflow-x: hidden; background: radial-gradient(circle at 50% 0, rgba(218,205,234,.5), transparent 28%), var(--bg); }
+.memory-shell { overflow-x: hidden; padding-bottom: 40px; }
+.memory-header { display: grid; grid-template-columns: 42px minmax(0,1fr) 42px; align-items: center; gap: 12px; }
+.memory-header p { color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .14em; }
+.memory-header h1 { margin-top: 3px; font-size: 25px; }
+.memory-back,.memory-create { display: grid; width: 40px; height: 40px; padding: 0; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--primary-dark); background: rgba(255,255,255,.84); font-size: 24px; }
+.memory-stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin: 22px 0 16px; }
+.memory-stats div { min-width: 0; padding: 14px 8px; border: 1px solid rgba(105,83,121,.07); border-radius: 16px; background: rgba(255,255,255,.8); text-align: center; }
+.memory-stats strong,.memory-stats span { display: block; }
+.memory-stats strong { color: var(--primary-dark); font-size: 21px; }
+.memory-stats span { margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.memory-filters { padding: 14px; border: 1px solid rgba(105,83,121,.07); border-radius: 18px; background: rgba(255,255,255,.72); }
+.memory-filters label,.memory-dialog label { display: block; min-width: 0; color: #6e6375; font-size: 10px; }
+.memory-filters label > span { display: block; margin-bottom: 5px; }
+.memory-filters input,.memory-filters select,.memory-dialog input,.memory-dialog select,.memory-dialog textarea { width: 100%; min-width: 0; margin-top: 5px; padding: 10px; border: 1px solid var(--line); border-radius: 11px; outline: 0; color: var(--text); background: #fbfafc; font: inherit; }
+.memory-filter-row { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; margin-top: 10px; }
+.memory-filter-actions { display: grid; grid-template-columns: 1fr 1fr 70px; gap: 7px; margin-top: 12px; }
+.memory-filter-actions button,.memory-more { min-width: 0; padding: 10px 6px; border: 0; border-radius: 11px; color: #655573; background: #eee8f3; font-size: 10px; }
+.memory-filter-actions button:first-child { color: white; background: linear-gradient(145deg,#846c9b,#5d496d); }
+.memory-list { display: grid; gap: 10px; margin-top: 16px; }
+.memory-card { width: 100%; min-width: 0; padding: 15px; border: 1px solid rgba(105,83,121,.07); border-radius: 18px; color: inherit; background: rgba(255,255,255,.86); box-shadow: 0 8px 24px rgba(59,43,70,.04); text-align: left; }
+.memory-card__top { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; }
+.memory-card__type { flex: 0 0 auto; padding: 4px 8px; border-radius: 99px; color: var(--primary); background: var(--primary-light); font-size: 8px; font-weight: 700; }
+.memory-card time { overflow: hidden; color: var(--muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.memory-card h2 { margin-top: 10px; overflow-wrap: anywhere; font-size: 15px; }
+.memory-card p { display: -webkit-box; margin-top: 7px; overflow: hidden; color: #655d69; font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.memory-card__meta { display: flex; justify-content: space-between; margin-top: 10px; color: #9a909f; font-size: 8px; }
+.memory-error { margin-top: 14px; padding: 11px; border-radius: 12px; color: #9b4351; background: #fbe9ed; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.memory-empty { margin-top: 26px; color: var(--muted); font-size: 12px; text-align: center; }
+.memory-more { display: block; width: 100%; margin-top: 14px; }
+.memory-dialog { width: min(calc(100% - 24px),480px); max-height: calc(100dvh - 24px); padding: 0; overflow: hidden; border: 0; border-radius: 22px; background: transparent; }
+.memory-dialog::backdrop { background: rgba(37,27,44,.34); backdrop-filter: blur(3px); }
+.memory-dialog__card { max-height: calc(100dvh - 24px); margin: 0; padding: 18px; overflow-x: hidden; overflow-y: auto; border: 0; border-radius: 22px; background: #faf8fc; }
+.memory-dialog__heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.memory-dialog__heading h2 { font-size: 19px; overflow-wrap: anywhere; }
+.memory-dialog__heading button { flex: 0 0 auto; width: 34px; height: 34px; border: 0; border-radius: 50%; color: #796b80; background: #eee8f2; font-size: 20px; }
+.memory-dialog textarea { resize: vertical; }
+.memory-dialog__actions,.memory-detail__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; }
+.memory-dialog__actions button,.memory-detail__actions button,.memory-comments button { padding: 9px 13px; border: 0; border-radius: 10px; color: #655573; background: #eee8f3; }
+.memory-dialog__actions button[type="submit"] { margin-left: auto; color: white; background: var(--primary); }
+.memory-detail__content { color: #4e4653; font-size: 13px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
+.memory-detail__meta { display: grid; gap: 6px; margin-bottom: 12px; color: var(--muted); font-size: 10px; }
+.memory-comments { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.memory-comments h3 { margin: 0 0 10px; font-size: 14px; }
+.memory-comment { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.memory-comment p { font-size: 12px; overflow-wrap: anywhere; }
+.memory-comment small { color: var(--muted); font-size: 8px; }
+.memory-comment div { display: flex; gap: 5px; margin-top: 7px; }
+.memory-comment button { padding: 5px 8px; font-size: 9px; }
+.memory-comments form { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 7px; margin-top: 12px; }
+.memory-comments input { min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }
+@media (max-width:359px) {
+  .memory-shell { padding-right: 12px; padding-left: 12px; }
+  .memory-filter-row { grid-template-columns: 1fr; }
+  .memory-filter-actions { grid-template-columns: 1fr 1fr; }
+  .memory-filter-actions button:last-child { grid-column: 1/-1; }
+}

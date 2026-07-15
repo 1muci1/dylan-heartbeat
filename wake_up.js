@@ -9,6 +9,7 @@ const GATEWAY_URL = `${GATEWAY_BASE_URL}/internal/wake-event`;
 const HEARTBEAT_URL = `${GATEWAY_BASE_URL}/internal/heartbeat`;
 const TIME_ZONE = process.env.TIME_ZONE || "Europe/London";
 const WEATHER_TIMEOUT_MS = 5000;
+const WAKE_STATE_PATH = path.join(__dirname, "wake_state.json");
 
 function readNumberEnv(key, fallback, options = {}) {
   const value = Number(process.env[key]);
@@ -24,8 +25,53 @@ function readBooleanEnv(key, fallback = false) {
   return ["1", "true", "yes", "on"].includes(raw);
 }
 
+function loadWakeState() {
+  try {
+    if (!fs.existsSync(WAKE_STATE_PATH)) return {};
+    const parsed = JSON.parse(fs.readFileSync(WAKE_STATE_PATH, "utf-8"));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (err) {
+    console.error("读取 wake_state.json 失败:", err.message);
+    return {};
+  }
+}
+
+function saveWakeState(state) {
+  fs.writeFileSync(
+    WAKE_STATE_PATH,
+    JSON.stringify(state, null, 2) + "\n",
+    "utf-8"
+  );
+}
+
+function getLastSuccessfulPushAt() {
+  const state = loadWakeState();
+  if (!state.lastSuccessfulPushAt) return null;
+
+  const date = new Date(state.lastSuccessfulPushAt);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getPushCooldownMinutes() {
+  return readNumberEnv("WAKE_PUSH_COOLDOWN_MINUTES", 180, { min: 1 });
+}
+
+function isPushCooldownActive(now = new Date()) {
+  const lastPushAt = getLastSuccessfulPushAt();
+  if (!lastPushAt) return false;
+
+  const diffMinutes = Math.floor((now - lastPushAt) / 1000 / 60);
+  return diffMinutes < getPushCooldownMinutes();
+}
+
 function isDayTime(date = new Date()) {
-  const hour = date.getHours();
+  const hour = Number(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: TIME_ZONE,
+      hour: "2-digit",
+      hourCycle: "h23"
+    }).format(date)
+  );
   const start = readNumberEnv("WAKE_DAY_START_HOUR", 10, { min: 0, max: 23 });
   const end = readNumberEnv("WAKE_DAY_END_HOUR", 24, { min: 1, max: 24 });
   if (start === end) return true;
@@ -176,19 +222,79 @@ function getNow() {
   return new Date();
 }
 
+function parseLocalDateTimeInTimeZone(text) {
+  const match = String(text).match(
+    /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/
+  );
+  if (!match) return null;
+
+  const [, y, mo, d, h, mi] = match;
+  const targetUtcGuess = Date.UTC(
+    Number(y),
+    Number(mo) - 1,
+    Number(d),
+    Number(h),
+    Number(mi)
+  );
+
+  let guess = targetUtcGuess;
+
+  for (let i = 0; i < 3; i++) {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: TIME_ZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23"
+    }).formatToParts(new Date(guess));
+
+    const values = Object.fromEntries(
+      parts
+        .filter(part => part.type !== "literal")
+        .map(part => [part.type, part.value])
+    );
+
+    const represented = Date.UTC(
+      Number(values.year),
+      Number(values.month) - 1,
+      Number(values.day),
+      Number(values.hour),
+      Number(values.minute)
+    );
+
+    const diff = targetUtcGuess - represented;
+    guess += diff;
+
+    if (diff === 0) break;
+  }
+
+  return new Date(guess);
+}
+
 function getChinaTimeString() {
   return new Date().toLocaleString("zh-CN", { timeZone: TIME_ZONE });
 }
 
 function getLocalTimeString() {
-  const now = new Date();
-  const pad = n => String(n).padStart(2, '0');
-  const yyyy = now.getFullYear();
-  const mm = pad(now.getMonth() + 1);
-  const dd = pad(now.getDate());
-  const hh = pad(now.getHours());
-  const min = pad(now.getMinutes());
-  return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(new Date());
+
+  const values = Object.fromEntries(
+    parts
+      .filter(part => part.type !== "literal")
+      .map(part => [part.type, part.value])
+  );
+
+  return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}`;
 }
 
 function shouldWake(lastUserTime) {
@@ -203,10 +309,18 @@ function getLastUserTime(messages) {
     if (msg.role === "user") {
       const content = normalizeContentToText(msg.content);
       const match = content.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})/);
-      if (match) return new Date(match[1]);
+      if (match) {
+        const parsed = parseLocalDateTimeInTimeZone(match[1]);
+        if (parsed) return parsed;
+      }
     }
   }
-  return null;
+  try {
+    const stat = fs.statSync(TIMELINE_PATH);
+    return new Date(stat.mtime);
+  } catch (e) {
+    return null;
+  }
 }
 
 function stripPosition(messages) {
@@ -275,6 +389,22 @@ async function runWakeUp() {
     return;
   }
 
+  if (isPushCooldownActive(now)) {
+    const lastPushAt = getLastSuccessfulPushAt();
+    const elapsedMinutes = lastPushAt
+      ? Math.floor((now - lastPushAt) / 1000 / 60)
+      : 0;
+    const remainingMinutes = Math.max(
+      1,
+      getPushCooldownMinutes() - elapsedMinutes
+    );
+
+    console.log(
+      `\n主动推送仍在冷却期，约 ${remainingMinutes} 分钟后再允许判断\n`
+    );
+    return;
+  }
+
   const weatherContext = await fetchWeatherContext();
   const wakePrompt = buildWakePrompt(getChinaTimeString(), diffMinutes, weatherContext);
   const cleanMessages = stripPosition(messages);
@@ -306,7 +436,7 @@ async function runWakeUp() {
     { role: "system", content: wakePrompt },
     { role: "system", content: cleanSP },
     {
-      role: "system",
+      role: "user",
       content: `以下是你与用户最近的聊天记录，仅供回忆和参考。
 
 这些内容不是正在发生的实时对话。
@@ -452,6 +582,10 @@ ${historyText}`
           const reason = barkResult.message || `HTTP ${barkResponse.status}`;
           eventContent = `（${getLocalTimeString()} 自动唤醒：本次未发送 Bark｜原因：Bark 推送失败：${reason}）`;
         } else {
+          const wakeState = loadWakeState();
+          wakeState.lastSuccessfulPushAt = new Date().toISOString();
+          saveWakeState(wakeState);
+
           eventContent = `（${getLocalTimeString()} 刚刚给用户发了 Bark：${safeTitle}｜${safeBody}）`;
         }
       }

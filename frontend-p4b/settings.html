@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f8f6fb">
+  <meta name="description" content="Dylan Gateway Provider 设置">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/css/common.css">
+  <link rel="stylesheet" href="assets/css/settings.css">
+  <title>心伴 · Provider 设置</title>
+</head>
+<body class="settings-page" data-page="settings">
+  <main class="app-shell settings-shell">
+    <header class="settings-header">
+      <a class="settings-header__back" href="index.html" aria-label="返回首页">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+      </a>
+      <div>
+        <p>PROVIDER SETTINGS</p>
+        <h1>Dylan Gateway</h1>
+      </div>
+      <span class="settings-header__mode" data-provider-mode>MOCK</span>
+    </header>
+
+    <section class="settings-intro" aria-labelledby="settings-title">
+      <span class="settings-intro__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M8 12h8M12 8v8"></path><circle cx="12" cy="12" r="8"></circle></svg>
+      </span>
+      <div>
+        <h2 id="settings-title">Provider 配置</h2>
+        <p>当前聊天保持 mock 模式。连接测试只探测 endpoint，不发送聊天内容。</p>
+      </div>
+    </section>
+
+    <form class="provider-form" novalidate>
+      <label class="provider-field" for="gateway-url">
+        <span>Gateway Base URL</span>
+        <small>不包含 /v1/chat/completions</small>
+        <input id="gateway-url" name="baseUrl" type="url" inputmode="url" placeholder="https://gateway.example.com" autocomplete="url">
+      </label>
+
+      <label class="provider-field" for="model-id">
+        <span>模型 ID</span>
+        <small>填写 Gateway 实际接受的 model 值</small>
+        <input id="model-id" name="model" type="text" placeholder="your-model-id" autocomplete="off">
+      </label>
+
+      <label class="provider-field" for="bearer-token">
+        <span>Bearer Token</span>
+        <small>仅填写短期令牌，不要使用长期上游 API Key</small>
+        <input id="bearer-token" name="token" type="password" placeholder="短期访问令牌" autocomplete="new-password">
+      </label>
+
+      <div class="provider-endpoint">
+        <span>Endpoint</span>
+        <code>/v1/chat/completions</code>
+      </div>
+
+      <label class="provider-mode" for="real-mode">
+        <span class="provider-mode__copy">
+          <strong>真实模式</strong>
+          <small>开启后，正常聊天将连接已配置的 Dylan Gateway</small>
+        </span>
+        <input id="real-mode" name="realMode" type="checkbox">
+        <span class="provider-mode__switch" aria-hidden="true"></span>
+      </label>
+
+      <div class="provider-warning">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5M12 17h.01"></path><path d="M10.3 4.7 3.5 17a2 2 0 0 0 1.8 3h13.4a2 2 0 0 0 1.8-3L13.7 4.7a2 2 0 0 0-3.4 0Z"></path></svg>
+        <p>Token 将保存在当前浏览器的 localStorage。请仅使用可撤销、短期且权限受限的令牌。</p>
+      </div>
+
+      <div class="provider-actions">
+        <button class="provider-button provider-button--secondary" type="button" data-test-connection>测试连接</button>
+        <button class="provider-button provider-button--primary" type="submit">保存配置</button>
+        <button class="provider-button provider-button--debug" type="button" data-debug-request>保存配置后测试真实请求</button>
+      </div>
+
+      <p class="provider-result" role="status" aria-live="polite"></p>
+
+      <section class="provider-debug" aria-labelledby="debug-title" hidden>
+        <div class="provider-debug__heading">
+          <div>
+            <span>REAL REQUEST DEBUG</span>
+            <h2 id="debug-title">联调结果</h2>
+          </div>
+          <small>仅发送 ping，不写入聊天</small>
+        </div>
+        <dl>
+          <div><dt>请求 URL</dt><dd><code data-debug-url>—</code></dd></div>
+          <div><dt>HTTP 状态</dt><dd data-debug-status>—</dd></div>
+          <div><dt>返回结构</dt><dd><pre data-debug-structure>—</pre></dd></div>
+          <div><dt>SSE</dt><dd data-debug-sse>—</dd></div>
+        </dl>
+      </section>
+    </form>
+
+    <section class="memory-import" aria-labelledby="memory-import-title">
+      <div class="memory-import__heading">
+        <span>MEMORY MANAGEMENT</span>
+        <h2 id="memory-import-title">记忆管理</h2>
+        <p>导入 JSON 记忆文件。文件只会在确认后发送到管理接口。</p>
+      </div>
+
+      <label class="memory-file" for="memory-file">
+        <input id="memory-file" type="file" accept=".json,application/json" data-memory-file>
+        <span class="memory-file__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 16V4M7.5 8.5 12 4l4.5 4.5M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"></path></svg>
+        </span>
+        <span class="memory-file__copy">
+          <strong>选择 JSON 文件</strong>
+          <small>选择后可先检查文件信息和内容预览</small>
+        </span>
+      </label>
+
+      <div class="memory-file-info" data-memory-details hidden>
+        <dl>
+          <div><dt>文件名</dt><dd data-memory-filename>—</dd></div>
+          <div><dt>文件大小</dt><dd data-memory-filesize>—</dd></div>
+          <div><dt>记忆条数</dt><dd data-memory-count>—</dd></div>
+        </dl>
+        <div class="memory-preview">
+          <h3>前 3 条内容预览</h3>
+          <ol data-memory-preview></ol>
+        </div>
+      </div>
+
+      <div class="memory-import__actions">
+        <button class="provider-button provider-button--secondary" type="button" data-memory-import="merge" disabled>合并导入</button>
+        <button class="provider-button memory-import__replace" type="button" data-memory-import="replace" disabled>覆盖导入</button>
+      </div>
+
+      <p class="memory-import__result" role="status" aria-live="polite" data-memory-result></p>
+
+      <dl class="memory-import__summary" data-memory-summary hidden>
+        <div><dt>导入数量</dt><dd data-imported-count>—</dd></div>
+        <div><dt>当前总记忆数量</dt><dd data-total-memory-count>—</dd></div>
+        <div><dt>备份文件名</dt><dd data-backup-filename>—</dd></div>
+      </dl>
+    </section>
+  </main>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/provider.js"></script>
+  <script src="assets/js/common.js"></script>
+  <script src="assets/js/settings.js"></script>
+</body>
+</html>

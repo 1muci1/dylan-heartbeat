@@ -83,6 +83,11 @@ function registerAiRoutes(app,{store,runner,config,adapter=runner?.service?.adap
     if(!row)throw routeError("AI Job 不存在",404,"AI_JOB_NOT_FOUND");
     return envelope(adminJob(row));
   }));
+  app.post("/admin/ai/jobs/:id/cancel",{preHandler:adminAuth},route(req=>{
+    runner.cancel(req.params.id);
+    const row=store.db.prepare("SELECT * FROM ai_jobs WHERE id=?").get(String(req.params.id));
+    return envelope(adminJob(row));
+  }));
   app.get("/api/v1/ai-automation/status",{preHandler:auth},route(()=>{
     const queued=Number(store.db.prepare("SELECT COUNT(*) n FROM ai_jobs WHERE status='queued'").get().n);
     const running=Number(store.db.prepare("SELECT COUNT(*) n FROM ai_jobs WHERE status='running'").get().n);

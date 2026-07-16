@@ -153,7 +153,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const value = await response.json();
       if (!response.ok || value.error) throw new Error(value.error?.message || "Job 详情请求失败");
       renderAiJobDetail(value.data || {});
-      output.textContent = value.data?.status === "failed" ? "失败 Job 审计详情已加载。" : "Job 详情已加载。";
+      if (value.data?.status === "failed") {
+        output.textContent = "失败 Job 审计详情已加载。";
+      } else if (value.data?.status === "cancelled") {
+        output.textContent = "任务已取消。";
+      } else {
+        output.textContent = "Job 详情已加载。";
+      }
     } catch (error) {
       output.textContent = error.message;
     }
@@ -172,7 +178,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
       const value = await response.json();
       if (!response.ok || value.error) throw new Error(value.error?.message || "取消任务失败");
-      output.textContent = `${jobValue(value.data?.jobType || job.jobType)} 已取消，请手动刷新列表。`;
+      output.textContent = `操作成功：${jobValue(value.data?.jobType || job.jobType)} 当前任务已请求取消，需要刷新列表查看最终状态。`;
     } catch (error) {
       output.textContent = error.message;
     }

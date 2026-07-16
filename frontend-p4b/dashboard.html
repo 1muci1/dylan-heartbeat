@@ -130,12 +130,33 @@
     <section class="activity-section ai-jobs" aria-labelledby="ai-jobs-title">
       <div class="dashboard-section-heading">
         <div><p>RECENT AI JOBS</p><h2 id="ai-jobs-title">最近 AI Job</h2></div>
-        <button type="button" data-ai-jobs-load>加载任务</button>
+        <button type="button" data-ai-jobs-load>刷新任务</button>
+      </div>
+      <div class="status-card__detail status-card__detail--split">
+        <div>
+          <label for="ai-jobs-status">状态筛选</label>
+          <select id="ai-jobs-status" data-ai-jobs-status-filter>
+            <option value="">全部状态</option>
+            <option value="queued">queued</option>
+            <option value="running">running</option>
+            <option value="completed">completed</option>
+            <option value="failed">failed</option>
+            <option value="cancelled">cancelled</option>
+          </select>
+        </div>
+        <div>
+          <label for="ai-jobs-type">Job 类型筛选</label>
+          <select id="ai-jobs-type" data-ai-jobs-type-filter>
+            <option value="">全部类型</option>
+            <option value="session_summary">session_summary</option>
+            <option value="memory_extraction">memory_extraction</option>
+          </select>
+        </div>
       </div>
       <div class="status-cards" data-ai-jobs-list>
         <article class="status-card"><p class="status-card__label">任务记录</p><h3>等待管理员验证</h3></article>
       </div>
-      <p class="review-status" data-ai-jobs-status>点击加载最近任务，不会自动刷新。</p>
+      <p class="review-status" data-ai-jobs-status>点击刷新任务应用筛选，不会自动刷新。</p>
     </section>
 
     <dialog class="status-card" data-ai-job-detail aria-labelledby="ai-job-detail-title">

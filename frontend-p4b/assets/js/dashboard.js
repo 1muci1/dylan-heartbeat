@@ -195,7 +195,12 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const config = window.AppConfig?.getProviderConfig?.() || {};
       const base = String(config.baseUrl || "").replace(/\/+$/, "");
-      const response = await fetch(base + "/admin/ai/jobs?limit=6", { cache: "no-store", headers });
+      const status = document.querySelector("[data-ai-jobs-status-filter]")?.value || "";
+      const jobType = document.querySelector("[data-ai-jobs-type-filter]")?.value || "";
+      const query = new URLSearchParams({ page: "1", limit: "6" });
+      if (status) query.set("status", status);
+      if (jobType) query.set("jobType", jobType);
+      const response = await fetch(base + `/admin/ai/jobs?${query}`, { cache: "no-store", headers });
       const value = await response.json();
       if (!response.ok || value.error) throw new Error(value.error?.message || "任务请求失败");
       renderAiJobs(Array.isArray(value.data) ? value.data : []);

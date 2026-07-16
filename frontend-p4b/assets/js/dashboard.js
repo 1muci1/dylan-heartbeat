@@ -159,6 +159,25 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  const cancelAiJob = async job => {
+    const output = document.querySelector("[data-ai-jobs-status]");
+    const headers = requestAdminCredentials();
+    if (!headers) return;
+    output.textContent = `正在取消 ${jobValue(job.jobType)} 任务…`;
+    try {
+      const config = window.AppConfig?.getProviderConfig?.() || {};
+      const base = String(config.baseUrl || "").replace(/\/+$/, "");
+      const response = await fetch(base + `/admin/ai/jobs/${encodeURIComponent(job.id)}/cancel`, {
+        method: "POST", cache: "no-store", headers
+      });
+      const value = await response.json();
+      if (!response.ok || value.error) throw new Error(value.error?.message || "取消任务失败");
+      output.textContent = `${jobValue(value.data?.jobType || job.jobType)} 已取消，请手动刷新列表。`;
+    } catch (error) {
+      output.textContent = error.message;
+    }
+  };
+
   const renderAiJobs = jobs => {
     const list = document.querySelector("[data-ai-jobs-list]");
     list.replaceChildren();
@@ -172,12 +191,14 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     for (const job of jobs) {
-      const card = document.createElement("button");
-      card.type = "button";
+      const card = document.createElement("article");
       card.className = "status-card";
       if (job.status === "failed") card.classList.add("status-card--failed");
-      card.setAttribute("aria-label", `查看 ${jobValue(job.jobType)} Job 详情`);
-      card.addEventListener("click", () => loadAiJobDetail(job.id));
+      const detailButton = document.createElement("button");
+      detailButton.type = "button";
+      detailButton.className = "ai-job-card__detail";
+      detailButton.setAttribute("aria-label", `查看 ${jobValue(job.jobType)} Job 详情`);
+      detailButton.addEventListener("click", () => loadAiJobDetail(job.id));
       const label = document.createElement("p");
       label.className = "status-card__label";
       label.textContent = jobValue(job.jobType);
@@ -195,7 +216,17 @@ document.addEventListener("DOMContentLoaded", () => {
         addJobField(detail, "错误信息", job.errorMessage, true);
         addJobField(detail, "完成时间", job.completedAt, true);
       }
-      card.append(label, title, detail);
+      detailButton.append(label, title, detail);
+      card.append(detailButton);
+      if (job.status === "queued" || job.status === "running") {
+        const cancelButton = document.createElement("button");
+        cancelButton.type = "button";
+        cancelButton.className = "ai-job-card__cancel";
+        cancelButton.textContent = "取消任务";
+        cancelButton.setAttribute("aria-label", `取消 ${jobValue(job.jobType)} Job`);
+        cancelButton.addEventListener("click", () => cancelAiJob(job));
+        card.append(cancelButton);
+      }
       list.append(card);
     }
   };

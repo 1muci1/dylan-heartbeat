@@ -9,6 +9,13 @@
   <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/css/common.css">
   <link rel="stylesheet" href="assets/css/dashboard.css">
+  <style>
+    .status-card--failed { border-color: rgba(171,73,85,.3); background: rgba(255,244,245,.92); box-shadow: 0 14px 32px rgba(128,45,58,.1); }
+    .status-card--failed h3 { color: #a04452; }
+    .ai-job-error { margin-top: 8px; padding: 8px; border-radius: 10px; color: #8f3543; background: rgba(178,66,82,.08); }
+    .ai-job-detail--failed { border-color: rgba(171,73,85,.4); }
+    .ai-job-detail__error { color: #9d3e4c; font-weight: 700; }
+  </style>
   <title>心伴 · 沉的状态</title>
 </head>
 <body class="dashboard-page" data-page="dashboard">
@@ -164,7 +171,7 @@
         <div><p>AI JOB DETAIL</p><h2 id="ai-job-detail-title">Job 详情</h2></div>
         <button type="button" data-ai-job-detail-close>关闭</button>
       </div>
-      <p class="review-status" data-ai-job-detail-status></p>
+      <p class="review-status" data-ai-job-detail-status>选择 Job 后加载审计详情。</p>
       <dl data-ai-job-detail-fields></dl>
     </dialog>
 

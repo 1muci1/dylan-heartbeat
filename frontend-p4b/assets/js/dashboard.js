@@ -102,12 +102,13 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const jobValue = value => value == null || value === "" ? "—" : String(value);
-  const addJobField = (container, label, value) => {
+  const addJobField = (container, label, value, emphasized = false) => {
     const field = document.createElement("div");
     const name = document.createElement("span");
     const content = document.createElement("strong");
     name.textContent = label;
     content.textContent = jobValue(value);
+    if (emphasized) field.className = "ai-job-error";
     field.append(name, content);
     container.append(field);
   };
@@ -121,13 +122,19 @@ document.addEventListener("DOMContentLoaded", () => {
   ];
 
   const renderAiJobDetail = job => {
+    const dialog = document.querySelector("[data-ai-job-detail]");
     const fields = document.querySelector("[data-ai-job-detail-fields]");
+    dialog.classList.toggle("ai-job-detail--failed", job.status === "failed");
     fields.replaceChildren();
     for (const [key, label] of jobDetailFields) {
       const term = document.createElement("dt");
       const value = document.createElement("dd");
       term.textContent = label;
       value.textContent = jobValue(job[key]);
+      if (key === "errorCode" || key === "errorMessage") {
+        term.className = "ai-job-detail__error";
+        value.className = "ai-job-detail__error";
+      }
       fields.append(term, value);
     }
   };
@@ -146,7 +153,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const value = await response.json();
       if (!response.ok || value.error) throw new Error(value.error?.message || "Job 详情请求失败");
       renderAiJobDetail(value.data || {});
-      output.textContent = "Job 详情已加载。";
+      output.textContent = value.data?.status === "failed" ? "失败 Job 审计详情已加载。" : "Job 详情已加载。";
     } catch (error) {
       output.textContent = error.message;
     }
@@ -168,6 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const card = document.createElement("button");
       card.type = "button";
       card.className = "status-card";
+      if (job.status === "failed") card.classList.add("status-card--failed");
       card.setAttribute("aria-label", `查看 ${jobValue(job.jobType)} Job 详情`);
       card.addEventListener("click", () => loadAiJobDetail(job.id));
       const label = document.createElement("p");
@@ -182,6 +190,11 @@ document.addEventListener("DOMContentLoaded", () => {
       addJobField(detail, "延迟", job.latencyMs == null ? null : `${job.latencyMs} ms`);
       addJobField(detail, "创建时间", job.createdAt);
       addJobField(detail, "错误代码", job.errorCode);
+      if (job.status === "failed") {
+        addJobField(detail, "尝试次数", job.attemptCount, true);
+        addJobField(detail, "错误信息", job.errorMessage, true);
+        addJobField(detail, "完成时间", job.completedAt, true);
+      }
       card.append(label, title, detail);
       list.append(card);
     }

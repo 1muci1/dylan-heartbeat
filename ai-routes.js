@@ -44,6 +44,22 @@ function registerAiRoutes(app,{store,runner,config,adapter=runner?.service?.adap
     let output;try{output=JSON.parse(raw);}catch{const error=new Error("模型测试响应不是有效 JSON");error.statusCode=502;error.code="AI_TEST_OUTPUT_INVALID";throw error;}
     return envelope({feature,provider:adapter.provider||runner?.service?.provider||"unknown",configured:true,responseValid:Boolean(output&&typeof output==="object"&&!Array.isArray(output))});
   }));
+  app.get("/admin/ai/metrics",{preHandler:adminAuth},route(()=>{
+    const aggregate=(where,grouped=false)=>store.db.prepare(`SELECT ${grouped?"job_type,":""} COUNT(*) total_jobs,
+      SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) completed_jobs,
+      SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) failed_jobs,
+      COALESCE(SUM(prompt_tokens),0) prompt_tokens,
+      COALESCE(SUM(completion_tokens),0) completion_tokens,
+      COALESCE(SUM(total_tokens),0) total_tokens,
+      COALESCE(ROUND(AVG(latency_ms)),0) average_latency_ms
+      FROM ai_jobs ${where}`).all();
+    const map=row=>({totalJobs:Number(row.total_jobs),completedJobs:Number(row.completed_jobs||0),failedJobs:Number(row.failed_jobs||0),
+      promptTokens:Number(row.prompt_tokens),completionTokens:Number(row.completion_tokens),totalTokens:Number(row.total_tokens),
+      averageLatencyMs:Number(row.average_latency_ms)});
+    const total=map(aggregate("")[0]);
+    const byJobType=aggregate("GROUP BY job_type ORDER BY job_type",true).map(row=>({jobType:row.job_type,...map(row)}));
+    return envelope({total,byJobType});
+  }));
   app.get("/api/v1/ai-automation/status",{preHandler:auth},route(()=>{
     const queued=Number(store.db.prepare("SELECT COUNT(*) n FROM ai_jobs WHERE status='queued'").get().n);
     const running=Number(store.db.prepare("SELECT COUNT(*) n FROM ai_jobs WHERE status='running'").get().n);

@@ -64,8 +64,40 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (error) { output.textContent = error.message; }
   };
 
+  const basicAuthorization = (username, password) => {
+    const bytes = new TextEncoder().encode(`${username}:${password}`);
+    return `Basic ${btoa(String.fromCharCode(...bytes))}`;
+  };
+
+  const loadAiMetrics = async () => {
+    const output = document.querySelector("[data-ai-metrics-status]");
+    const username = window.prompt("管理员账号");
+    if (username === null) return;
+    const password = window.prompt("管理员密码");
+    if (password === null) return;
+    output.textContent = "正在加载指标…";
+    try {
+      const config = window.AppConfig?.getProviderConfig?.() || {};
+      const base = String(config.baseUrl || "").replace(/\/+$/, "");
+      const response = await fetch(base + "/admin/ai/metrics", {
+        cache: "no-store",
+        headers: { Authorization: basicAuthorization(username, password) }
+      });
+      const value = await response.json();
+      if (!response.ok || value.error) throw new Error(value.error?.message || "指标请求失败");
+      const metrics = value.data?.total || {};
+      for (const key of ["totalJobs","completedJobs","failedJobs","promptTokens","completionTokens","totalTokens","averageLatencyMs"]) {
+        setText(`[data-ai-metric="${key}"]`, Number(metrics[key] || 0).toLocaleString());
+      }
+      output.textContent = "指标已更新。管理员凭据未保存。";
+    } catch (error) {
+      output.textContent = error.message;
+    }
+  };
+
   renderDashboard();
   loadAiStatus();
+  document.querySelector("[data-ai-metrics-load]")?.addEventListener("click", loadAiMetrics);
   window.addEventListener("storage", (event) => {
     if (event.key === store.key) renderDashboard();
   });

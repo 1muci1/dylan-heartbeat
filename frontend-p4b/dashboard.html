@@ -96,6 +96,37 @@
       <p class="review-status" data-ai-status></p>
     </section>
 
+    <section class="activity-section ai-metrics" aria-labelledby="ai-metrics-title">
+      <div class="dashboard-section-heading">
+        <div><p>AI USAGE METRICS</p><h2 id="ai-metrics-title">AI 使用指标</h2></div>
+        <button type="button" data-ai-metrics-load>加载指标</button>
+      </div>
+      <div class="status-cards">
+        <article class="status-card">
+          <p class="status-card__label">任务总数</p>
+          <div class="memory-count"><strong data-ai-metric="totalJobs">—</strong><span>次</span></div>
+          <div class="status-card__detail status-card__detail--split">
+            <div><span>已完成</span><strong data-ai-metric="completedJobs">—</strong></div>
+            <div><span>失败</span><strong data-ai-metric="failedJobs">—</strong></div>
+          </div>
+        </article>
+        <article class="status-card">
+          <p class="status-card__label">Token 总量</p>
+          <div class="memory-count"><strong data-ai-metric="totalTokens">—</strong><span>tokens</span></div>
+          <div class="status-card__detail status-card__detail--split">
+            <div><span>Prompt</span><strong data-ai-metric="promptTokens">—</strong></div>
+            <div><span>Completion</span><strong data-ai-metric="completionTokens">—</strong></div>
+          </div>
+        </article>
+        <article class="status-card">
+          <p class="status-card__label">平均延迟</p>
+          <div class="memory-count"><strong data-ai-metric="averageLatencyMs">—</strong><span>ms</span></div>
+          <div class="status-card__detail"><span>数据来源</span><strong>AI 任务记录</strong></div>
+        </article>
+      </div>
+      <p class="review-status" data-ai-metrics-status>需要管理员验证后加载。</p>
+    </section>
+
     <section class="activity-section" aria-labelledby="activity-title">
       <div class="dashboard-section-heading">
         <div>

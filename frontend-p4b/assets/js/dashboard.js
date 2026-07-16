@@ -112,6 +112,46 @@ document.addEventListener("DOMContentLoaded", () => {
     container.append(field);
   };
 
+  const jobDetailFields = [
+    ["id","ID"],["jobType","任务类型"],["sessionId","Session ID"],["status","状态"],
+    ["inputMessageCount","输入消息数"],["attemptCount","尝试次数"],["provider","Provider"],["model","模型"],
+    ["promptTokens","Prompt Tokens"],["completionTokens","Completion Tokens"],["totalTokens","Total Tokens"],
+    ["latencyMs","延迟（ms）"],["startedAt","开始时间"],["completedAt","完成时间"],
+    ["errorCode","错误代码"],["errorMessage","错误信息"],["createdAt","创建时间"]
+  ];
+
+  const renderAiJobDetail = job => {
+    const fields = document.querySelector("[data-ai-job-detail-fields]");
+    fields.replaceChildren();
+    for (const [key, label] of jobDetailFields) {
+      const term = document.createElement("dt");
+      const value = document.createElement("dd");
+      term.textContent = label;
+      value.textContent = jobValue(job[key]);
+      fields.append(term, value);
+    }
+  };
+
+  const loadAiJobDetail = async id => {
+    const dialog = document.querySelector("[data-ai-job-detail]");
+    const output = document.querySelector("[data-ai-job-detail-status]");
+    const headers = requestAdminCredentials();
+    if (!headers) return;
+    output.textContent = "正在加载 Job 详情…";
+    dialog.showModal();
+    try {
+      const config = window.AppConfig?.getProviderConfig?.() || {};
+      const base = String(config.baseUrl || "").replace(/\/+$/, "");
+      const response = await fetch(base + `/admin/ai/jobs/${encodeURIComponent(id)}`, { cache: "no-store", headers });
+      const value = await response.json();
+      if (!response.ok || value.error) throw new Error(value.error?.message || "Job 详情请求失败");
+      renderAiJobDetail(value.data || {});
+      output.textContent = "Job 详情已加载。";
+    } catch (error) {
+      output.textContent = error.message;
+    }
+  };
+
   const renderAiJobs = jobs => {
     const list = document.querySelector("[data-ai-jobs-list]");
     list.replaceChildren();
@@ -125,8 +165,11 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     for (const job of jobs) {
-      const card = document.createElement("article");
+      const card = document.createElement("button");
+      card.type = "button";
       card.className = "status-card";
+      card.setAttribute("aria-label", `查看 ${jobValue(job.jobType)} Job 详情`);
+      card.addEventListener("click", () => loadAiJobDetail(job.id));
       const label = document.createElement("p");
       label.className = "status-card__label";
       label.textContent = jobValue(job.jobType);
@@ -166,6 +209,9 @@ document.addEventListener("DOMContentLoaded", () => {
   loadAiStatus();
   document.querySelector("[data-ai-metrics-load]")?.addEventListener("click", loadAiMetrics);
   document.querySelector("[data-ai-jobs-load]")?.addEventListener("click", loadAiJobs);
+  document.querySelector("[data-ai-job-detail-close]")?.addEventListener("click", () => {
+    document.querySelector("[data-ai-job-detail]")?.close();
+  });
   window.addEventListener("storage", (event) => {
     if (event.key === store.key) renderDashboard();
   });

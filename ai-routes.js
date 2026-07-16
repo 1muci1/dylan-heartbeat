@@ -5,6 +5,12 @@ const crypto = require("node:crypto");
 function safeEqual(actual,expected){const a=Buffer.from(String(actual)),b=Buffer.from(String(expected));return a.length===b.length&&crypto.timingSafeEqual(a,b);}
 function envelope(data,meta={}){return{data,meta,error:null};}
 function sendError(req,reply,error){const status=error.statusCode||500;if(status>=500)req.log.error({errorName:error.name,errorCode:error.code,jobId:error.job?.id},"AI operation failed");const safeConfigurationError=new Set(["AI_MODEL_NOT_CONFIGURED","AI_MODEL_NAME_MISSING","AI_QUEUE_STOPPED"]).has(error.code);return reply.code(status).send({data:null,meta:{},error:{code:error.code||"INTERNAL_ERROR",message:status>=500&&!safeConfigurationError?"AI 记忆服务暂时不可用":error.message}});}
+function adminJob(row){return{id:row.id,jobType:row.job_type,sessionId:row.session_id,status:row.status,
+  inputMessageCount:Number(row.input_message_count),attemptCount:Number(row.attempt_count),provider:row.provider,model:row.model,
+  promptTokens:row.prompt_tokens==null?null:Number(row.prompt_tokens),completionTokens:row.completion_tokens==null?null:Number(row.completion_tokens),
+  totalTokens:row.total_tokens==null?null:Number(row.total_tokens),latencyMs:row.latency_ms==null?null:Number(row.latency_ms),
+  startedAt:row.started_at,completedAt:row.completed_at,errorCode:row.error_code,errorMessage:row.error_message,createdAt:row.created_at};}
+function routeError(message,statusCode=400,code="AI_ADMIN_QUERY_INVALID"){const error=new Error(message);error.statusCode=statusCode;error.code=code;return error;}
 
 function registerAiRoutes(app,{store,runner,config,adapter=runner?.service?.adapter,apiKey=process.env.GATEWAY_API_KEY,
   adminUser=process.env.ADMIN_USER,adminPassword=process.env.ADMIN_PASSWORD}){
@@ -59,6 +65,23 @@ function registerAiRoutes(app,{store,runner,config,adapter=runner?.service?.adap
     const total=map(aggregate("")[0]);
     const byJobType=aggregate("GROUP BY job_type ORDER BY job_type",true).map(row=>({jobType:row.job_type,...map(row)}));
     return envelope({total,byJobType});
+  }));
+  app.get("/admin/ai/jobs",{preHandler:adminAuth},route(req=>{
+    const query=req.query||{},page=Number(query.page||1),limit=Number(query.limit||20);
+    if(!Number.isInteger(page)||page<1||!Number.isInteger(limit)||limit<1||limit>100)throw routeError("分页参数无效");
+    const where=[],params=[];
+    if(query.jobType){if(!new Set(["session_summary","memory_extraction"]).has(query.jobType))throw routeError("jobType 无效");where.push("job_type=?");params.push(query.jobType);}
+    if(query.status){if(!new Set(["queued","running","completed","failed","cancelled"]).has(query.status))throw routeError("status 无效");where.push("status=?");params.push(query.status);}
+    if(query.sessionId){where.push("session_id=?");params.push(String(query.sessionId));}
+    const sql=where.length?`WHERE ${where.join(" AND ")}`:"";
+    const total=Number(store.db.prepare(`SELECT COUNT(*) n FROM ai_jobs ${sql}`).get(...params).n);
+    const rows=store.db.prepare(`SELECT * FROM ai_jobs ${sql} ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?`).all(...params,limit,(page-1)*limit);
+    return envelope(rows.map(adminJob),{page,limit,total,totalPages:Math.ceil(total/limit)});
+  }));
+  app.get("/admin/ai/jobs/:id",{preHandler:adminAuth},route(req=>{
+    const row=store.db.prepare("SELECT * FROM ai_jobs WHERE id=?").get(String(req.params.id));
+    if(!row)throw routeError("AI Job 不存在",404,"AI_JOB_NOT_FOUND");
+    return envelope(adminJob(row));
   }));
   app.get("/api/v1/ai-automation/status",{preHandler:auth},route(()=>{
     const queued=Number(store.db.prepare("SELECT COUNT(*) n FROM ai_jobs WHERE status='queued'").get().n);

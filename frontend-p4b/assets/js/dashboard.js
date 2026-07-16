@@ -69,19 +69,25 @@ document.addEventListener("DOMContentLoaded", () => {
     return `Basic ${btoa(String.fromCharCode(...bytes))}`;
   };
 
+  const requestAdminCredentials = () => {
+    const username = window.prompt("管理员账号");
+    if (username === null) return null;
+    const password = window.prompt("管理员密码");
+    if (password === null) return null;
+    return { Authorization: basicAuthorization(username, password) };
+  };
+
   const loadAiMetrics = async () => {
     const output = document.querySelector("[data-ai-metrics-status]");
-    const username = window.prompt("管理员账号");
-    if (username === null) return;
-    const password = window.prompt("管理员密码");
-    if (password === null) return;
+    const headers = requestAdminCredentials();
+    if (!headers) return;
     output.textContent = "正在加载指标…";
     try {
       const config = window.AppConfig?.getProviderConfig?.() || {};
       const base = String(config.baseUrl || "").replace(/\/+$/, "");
       const response = await fetch(base + "/admin/ai/metrics", {
         cache: "no-store",
-        headers: { Authorization: basicAuthorization(username, password) }
+        headers
       });
       const value = await response.json();
       if (!response.ok || value.error) throw new Error(value.error?.message || "指标请求失败");
@@ -95,9 +101,71 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  const jobValue = value => value == null || value === "" ? "—" : String(value);
+  const addJobField = (container, label, value) => {
+    const field = document.createElement("div");
+    const name = document.createElement("span");
+    const content = document.createElement("strong");
+    name.textContent = label;
+    content.textContent = jobValue(value);
+    field.append(name, content);
+    container.append(field);
+  };
+
+  const renderAiJobs = jobs => {
+    const list = document.querySelector("[data-ai-jobs-list]");
+    list.replaceChildren();
+    if (!jobs.length) {
+      const empty = document.createElement("article");
+      empty.className = "status-card";
+      const text = document.createElement("h3");
+      text.textContent = "暂无 AI Job";
+      empty.append(text);
+      list.append(empty);
+      return;
+    }
+    for (const job of jobs) {
+      const card = document.createElement("article");
+      card.className = "status-card";
+      const label = document.createElement("p");
+      label.className = "status-card__label";
+      label.textContent = jobValue(job.jobType);
+      const title = document.createElement("h3");
+      title.textContent = jobValue(job.status);
+      const detail = document.createElement("div");
+      detail.className = "status-card__detail";
+      addJobField(detail, "模型", job.model);
+      addJobField(detail, "Total Tokens", job.totalTokens);
+      addJobField(detail, "延迟", job.latencyMs == null ? null : `${job.latencyMs} ms`);
+      addJobField(detail, "创建时间", job.createdAt);
+      addJobField(detail, "错误代码", job.errorCode);
+      card.append(label, title, detail);
+      list.append(card);
+    }
+  };
+
+  const loadAiJobs = async () => {
+    const output = document.querySelector("[data-ai-jobs-status]");
+    const headers = requestAdminCredentials();
+    if (!headers) return;
+    output.textContent = "正在加载任务…";
+    try {
+      const config = window.AppConfig?.getProviderConfig?.() || {};
+      const base = String(config.baseUrl || "").replace(/\/+$/, "");
+      const response = await fetch(base + "/admin/ai/jobs?limit=6", { cache: "no-store", headers });
+      const value = await response.json();
+      if (!response.ok || value.error) throw new Error(value.error?.message || "任务请求失败");
+      renderAiJobs(Array.isArray(value.data) ? value.data : []);
+      output.textContent = `已加载 ${Array.isArray(value.data) ? value.data.length : 0} 条最近任务。`;
+    } catch (error) {
+      output.textContent = error.message;
+    }
+  };
+
   renderDashboard();
   loadAiStatus();
   document.querySelector("[data-ai-metrics-load]")?.addEventListener("click", loadAiMetrics);
+  document.querySelector("[data-ai-jobs-load]")?.addEventListener("click", loadAiJobs);
   window.addEventListener("storage", (event) => {
     if (event.key === store.key) renderDashboard();
   });

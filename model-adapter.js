@@ -42,6 +42,7 @@ class OpenAIJsonAdapter {
     signal?.addEventListener("abort", abort, { once: true });
     const timer = setTimeout(() => { timedOut = true; controller.abort(new Error("model timeout")); }, this.timeoutMs);
     let response;
+    const startedAt = Date.now();
     try {
       response = await this.fetch(this.url, {
         method: "POST",
@@ -71,12 +72,18 @@ class OpenAIJsonAdapter {
     let payload;
     try { payload = await response.json(); }
     catch { throw new ModelAdapterError("AI 上游返回了非 JSON 响应", "AI_RESPONSE_NOT_JSON", 502); }
+    const latencyMs = Date.now() - startedAt;
     if (!Array.isArray(payload?.choices) || !payload.choices.length) {
       throw new ModelAdapterError("AI 上游响应缺少 choices", "AI_RESPONSE_CHOICES_MISSING", 502);
     }
     const content = payload?.choices?.[0]?.message?.content;
     if (typeof content !== "string") throw new ModelAdapterError("AI 上游 content 不是字符串", "AI_RESPONSE_CONTENT_INVALID", 502);
-    return content;
+    return {
+      content,
+      usage: payload.usage ?? null,
+      model: payload.model ?? model,
+      latencyMs
+    };
   }
 }
 

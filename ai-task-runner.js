@@ -4,6 +4,7 @@ const { AiMemoryError } = require("./ai-memory-store");
 
 function bool(value) { return ["true","1","yes","on"].includes(String(value||"").trim().toLowerCase()); }
 function integer(value,fallback,min=1,max=Number.MAX_SAFE_INTEGER){const n=Number(value);return Number.isInteger(n)&&n>=min&&n<=max?n:fallback;}
+function metric(value){const n=Number(value);return Number.isSafeInteger(n)&&n>=0?n:null;}
 
 function readAiConfig(env=process.env){return{
   automationEnabled:bool(env.AI_AUTOMATION_ENABLED),summaryEnabled:bool(env.SESSION_AUTO_SUMMARY_ENABLED),
@@ -35,7 +36,12 @@ class AiTaskRunner {
         this.store.updateJob(job.id,"running",{attemptCount:attempt});
         const timer=setTimeout(()=>controller.abort(new Error("timeout")),this.config.timeoutMs);
         try{
-          const runOptions={...options,sourceJobId:job.id,signal:controller.signal,isCancelled:()=>this.store.getJob(job.id).status==="cancelled"};
+          const runOptions={...options,sourceJobId:job.id,signal:controller.signal,isCancelled:()=>this.store.getJob(job.id).status==="cancelled",onModelResponse:response=>{
+            options.onModelResponse?.(response);
+            const usage=response?.usage||{};
+            this.store.db.prepare(`UPDATE ai_jobs SET model=?,prompt_tokens=?,completion_tokens=?,total_tokens=?,latency_ms=? WHERE id=?`)
+              .run(String(response?.model||model),metric(usage.prompt_tokens),metric(usage.completion_tokens),metric(usage.total_tokens),metric(response?.latencyMs),job.id);
+          }};
           const result=jobType==="session_summary"?await this.service.generateSummary(sessionId,runOptions):await this.service.extractCandidates(sessionId,runOptions);
           clearTimeout(timer);if(this.store.getJob(job.id).status==="cancelled")return{job:this.store.getJob(job.id),result:null};
           return{job:this.store.updateJob(job.id,"completed",{attemptCount:attempt}),result};
@@ -60,4 +66,4 @@ class AiTaskRunner {
   }
 }
 
-module.exports={AiTaskRunner,bool,integer,readAiConfig};
+module.exports={AiTaskRunner,bool,integer,metric,readAiConfig};

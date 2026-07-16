@@ -204,6 +204,19 @@ const MIGRATIONS = [
       CREATE INDEX idx_session_summaries_source_job ON session_summaries(source_job_id);
       CREATE INDEX idx_memory_candidates_source_job ON memory_candidates(source_job_id);
     `
+  },
+  {
+    version: 6,
+    sql: `
+      ALTER TABLE ai_jobs ADD COLUMN prompt_tokens INTEGER
+        CHECK (prompt_tokens IS NULL OR prompt_tokens >= 0);
+      ALTER TABLE ai_jobs ADD COLUMN completion_tokens INTEGER
+        CHECK (completion_tokens IS NULL OR completion_tokens >= 0);
+      ALTER TABLE ai_jobs ADD COLUMN total_tokens INTEGER
+        CHECK (total_tokens IS NULL OR total_tokens >= 0);
+      ALTER TABLE ai_jobs ADD COLUMN latency_ms INTEGER
+        CHECK (latency_ms IS NULL OR latency_ms >= 0);
+    `
   }
 ];
 

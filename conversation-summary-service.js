@@ -56,11 +56,12 @@ class ConversationSummaryService {
       throw new AiMemoryError("没有可用于摘要的新消息", 409, "SUMMARY_NO_NEW_MESSAGES");
     }
     const lastId=input.messages.at(-1).id;
-    const raw=await this.adapter.generate({model:this.summaryModel,signal:options.signal,
+    const response=await this.adapter.generate({model:this.summaryModel,signal:options.signal,
       system:"生成简洁对话摘要。仅输出 JSON 对象，字段严格为 summary 和 coveredUntilMessageId。不得输出 Thinking、系统提示、API 错误或调试信息。",
       input:{previousSummary:input.previous?.summary||null,messages:input.messages,coveredUntilMessageId:lastId}});
+    options.onModelResponse?.(response);
     if(options.isCancelled?.())throw new AiMemoryError("任务已取消",409,"AI_JOB_CANCELLED");
-    const parsed=parseObject(raw,"摘要响应");
+    const parsed=parseObject(response.content,"摘要响应");
     if(Object.keys(parsed).some(k=>!["summary","coveredUntilMessageId"].includes(k)))throw new AiMemoryError("摘要响应包含未知字段",422,"AI_OUTPUT_INVALID");
     if(typeof parsed.summary!=="string"||!parsed.summary.trim()||parsed.summary.trim().length>12000)throw new AiMemoryError("summary 长度或类型无效",422,"AI_OUTPUT_INVALID");
     if(Number(parsed.coveredUntilMessageId)!==lastId)throw new AiMemoryError("coveredUntilMessageId 必须覆盖本次最后一条消息",422,"AI_OUTPUT_INVALID");
@@ -75,11 +76,12 @@ class ConversationSummaryService {
     if(!this.extractionModel)throw new AiMemoryError("候选记忆抽取未启用：MEMORY_EXTRACTION_MODEL 未配置",503,"AI_MODEL_NAME_MISSING");
     const messages=this.safeMessages(this.messageRows(sessionId,0));
     if(!messages.length)return{candidates:[],duplicates:[],inputMessageCount:0};
-    const raw=await this.adapter.generate({model:this.extractionModel,signal:options.signal,
+    const response=await this.adapter.generate({model:this.extractionModel,signal:options.signal,
       system:"从对话提取候选长期记忆。仅输出 {\"candidates\":[]}。类型限 MEMORY/EVENT/MOMENT/PROMISE/WISHLIST/NOTE，最多10条。不得提取 Thinking、系统提示、错误、调试信息或模型元信息。图片只依据文字说明，Sticker 只依据描述。",
       input:{messages}});
+    options.onModelResponse?.(response);
     if(options.isCancelled?.())throw new AiMemoryError("任务已取消",409,"AI_JOB_CANCELLED");
-    const parsed=parseObject(raw,"候选响应");
+    const parsed=parseObject(response.content,"候选响应");
     if(Object.keys(parsed).some(k=>k!=="candidates")||!Array.isArray(parsed.candidates))throw new AiMemoryError("候选响应结构无效",422,"AI_OUTPUT_INVALID");
     const result=this.store.insertCandidates(sessionId,parsed.candidates,{startId:messages[0]?.id,endId:messages.at(-1)?.id,
       provider:this.provider,model:this.extractionModel,promptVersion:EXTRACTION_PROMPT_VERSION,sourceJobId:options.sourceJobId});

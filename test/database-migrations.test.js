@@ -14,7 +14,7 @@ test("migrations create required tables and are idempotent", async t => {
   const connection = openDatabase(path.join(dir, "database.sqlite"));
   t.after(() => connection.db.close());
   const versions = connection.db.prepare("SELECT version FROM schema_migrations ORDER BY version").all().map(row => Number(row.version));
-  assert.deepEqual(versions, [1, 2, 3, 4, 5]);
+  assert.deepEqual(versions, [1, 2, 3, 4, 5, 6]);
   assert.deepEqual(applyMigrations(connection.db), []);
   const tables = new Set(connection.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row => row.name));
   for (const table of ["memory_items", "memory_comments", "memory_import_jobs", "schema_migrations", "chat_sessions", "chat_messages", "chat_attachments", "stickers", "session_summaries", "memory_candidates", "ai_jobs"]) {
@@ -66,12 +66,50 @@ test("migration 5 adds source job audit columns without changing existing produc
   db.prepare(`INSERT INTO memory_candidates
     (id,session_id,type,content,status,created_at) VALUES (?,?,?,?,'pending',?)`)
     .run("candidate1", "s1", "NOTE", "keep candidate", "2026-01-01");
-  assert.deepEqual(applyMigrations(db), [5]);
+  assert.deepEqual(applyMigrations(db, { migrations: migrations.slice(0, 5) }), [5]);
   assert.equal(db.prepare("SELECT summary,source_job_id FROM session_summaries WHERE id='sum1'").get().summary, "keep summary");
   assert.equal(db.prepare("SELECT content,source_job_id FROM memory_candidates WHERE id='candidate1'").get().content, "keep candidate");
   const summaryColumns = new Set(db.prepare("PRAGMA table_info(session_summaries)").all().map(row => row.name));
   const candidateColumns = new Set(db.prepare("PRAGMA table_info(memory_candidates)").all().map(row => row.name));
   assert.ok(summaryColumns.has("source_job_id"));
   assert.ok(candidateColumns.has("source_job_id"));
+  assert.deepEqual(applyMigrations(db, { migrations: migrations.slice(0, 5) }), []);
+});
+
+test("migration 6 adds nullable AI job usage metrics without changing existing jobs", async t => {
+  const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "heartbeat-migration-6-data-"));
+  t.after(() => fs.promises.rm(dir, { recursive: true, force: true }));
+  const db = new DatabaseSync(path.join(dir, "database.sqlite"));
+  t.after(() => db.close());
+  const migrations = require("../database").MIGRATIONS;
+  applyMigrations(db, { migrations: migrations.slice(0, 5) });
+  db.prepare(`INSERT INTO ai_jobs
+    (id,job_type,status,input_message_count,attempt_count,provider,model,created_at)
+    VALUES (?,?,?,?,?,?,?,?)`)
+    .run("job1", "session_summary", "completed", 3, 1, "mock", "mock-summary", "2026-01-01");
+  assert.deepEqual(applyMigrations(db), [6]);
+  const job = db.prepare(`SELECT id,prompt_tokens,completion_tokens,total_tokens,latency_ms
+    FROM ai_jobs WHERE id='job1'`).get();
+  assert.deepEqual({ ...job }, {
+    id: "job1",
+    prompt_tokens: null,
+    completion_tokens: null,
+    total_tokens: null,
+    latency_ms: null
+  });
+  const columns = new Set(db.prepare("PRAGMA table_info(ai_jobs)").all().map(row => row.name));
+  for (const column of ["prompt_tokens", "completion_tokens", "total_tokens", "latency_ms"]) {
+    assert.ok(columns.has(column));
+  }
+  db.prepare(`UPDATE ai_jobs SET prompt_tokens=?,completion_tokens=?,total_tokens=?,latency_ms=? WHERE id=?`)
+    .run(10, 4, 14, 25, "job1");
+  assert.deepEqual({ ...db.prepare(`SELECT prompt_tokens,completion_tokens,total_tokens,latency_ms
+    FROM ai_jobs WHERE id='job1'`).get() }, {
+    prompt_tokens: 10,
+    completion_tokens: 4,
+    total_tokens: 14,
+    latency_ms: 25
+  });
+  assert.throws(() => db.prepare("UPDATE ai_jobs SET total_tokens=-1 WHERE id='job1'").run());
   assert.deepEqual(applyMigrations(db), []);
 });

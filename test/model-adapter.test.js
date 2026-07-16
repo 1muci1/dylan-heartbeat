@@ -17,17 +17,30 @@ function adapter(fetch, options = {}) {
 
 test("adapter sends an OpenAI-compatible JSON request through fake fetch", async () => {
   let request;
+  const usage = { prompt_tokens: 12, completion_tokens: 4, total_tokens: 16 };
   const value = await adapter(async (url, options) => {
     request = { url, options };
-    return response(200, { choices: [{ message: { content: '{"ok":true}' } }] });
+    return response(200, { model: "summary-model-2026", usage, choices: [{ message: { content: '{"ok":true}' } }] });
   }).generate({ model: "summary-model", system: "system", input: { messages: ["hello"] } });
-  assert.equal(value, '{"ok":true}');
+  assert.equal(value.content, '{"ok":true}');
+  assert.deepEqual(value.usage, usage);
+  assert.equal(value.model, "summary-model-2026");
+  assert.equal(Number.isInteger(value.latencyMs), true);
+  assert.equal(value.latencyMs >= 0, true);
   assert.equal(request.url, "https://example.invalid/v1/chat/completions");
   const body = JSON.parse(request.options.body);
   assert.equal(body.model, "summary-model");
   assert.equal(body.stream, false);
   assert.deepEqual(body.response_format, { type: "json_object" });
   assert.equal(request.options.headers.Authorization, "Bearer fake-key");
+});
+
+test("adapter falls back to request model and null usage", async () => {
+  const value = await adapter(async () => response(200, {
+    choices: [{ message: { content: '{"ok":true}' } }]
+  })).generate({ model: "fallback-model" });
+  assert.equal(value.model, "fallback-model");
+  assert.equal(value.usage, null);
 });
 
 test("adapter configuration status exposes booleans but never the key or endpoint", () => {

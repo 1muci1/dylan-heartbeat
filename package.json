@@ -26,6 +26,7 @@
     "@fastify/cors": "^11.3.0",
     "@fastify/formbody": "^8.0.2",
     "@fastify/multipart": "^9.4.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^17.4.2",
     "fastify": "^5.3.3",
     "fs-extra": "^11.3.5",

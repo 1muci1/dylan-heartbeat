@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "seedId": "initial-user-memory-v1",
+  "mode": "merge",
+  "source": "manual-seed",
+  "reviewed": false,
+  "memories": [
+    {
+      "type": "MEMORY",
+      "title": "记忆管理偏好",
+      "content": "用户重视长期记忆的准确性，希望重要记忆经过确认后再保存，而不是未经确认自动生成。",
+      "importance": 5,
+      "source": "manual-seed"
+    },
+    {
+      "type": "MEMORY",
+      "title": "AI连续性理解",
+      "content": "用户认为长期记忆对于保持AI跨会话连续性非常重要。",
+      "importance": 5,
+      "source": "manual-seed"
+    },
+    {
+      "type": "MEMORY",
+      "title": "长期技术项目",
+      "content": "用户正在持续开发 Dylan heartbeat 系统，关注 AI 服务、长期记忆、任务管理和工具扩展能力。",
+      "importance": 4,
+      "source": "manual-seed"
+    },
+    {
+      "type": "MEMORY",
+      "title": "AI交互方式偏好",
+      "content": "用户倾向于自然交流，希望AI能够保持连续理解，而不是依赖固定角色设定。",
+      "importance": 4,
+      "source": "manual-seed"
+    }
+  ]
+}

@@ -77,6 +77,67 @@ document.addEventListener("DOMContentLoaded", () => {
     return { Authorization: basicAuthorization(username, password) };
   };
 
+  const renderMemoryOverview = (stats, memories) => {
+    setText("[data-memory-overview-total]", Number(stats.total || 0).toLocaleString());
+    for (const type of ["MEMORY","EVENT","MOMENT","PROMISE","WISHLIST","NOTE"]) {
+      setText(`[data-memory-overview-type="${type}"]`, Number(stats.byType?.[type] || 0).toLocaleString());
+    }
+    const list = document.querySelector("[data-memory-overview-list]");
+    list.replaceChildren();
+    if (!memories.length) {
+      const empty = document.createElement("article");
+      empty.className = "status-card";
+      const title = document.createElement("h3");
+      title.textContent = "暂无长期 Memory";
+      empty.append(title);
+      list.append(empty);
+      return;
+    }
+    for (const memory of memories) {
+      const card = document.createElement("article");
+      card.className = "status-card memory-overview__item";
+      const type = document.createElement("span");
+      type.className = "status-card__label";
+      type.textContent = String(memory.type || "—");
+      const title = document.createElement("h3");
+      title.textContent = memory.title || "无标题 Memory";
+      const content = document.createElement("p");
+      content.textContent = String(memory.content || "");
+      const detail = document.createElement("div");
+      detail.className = "status-card__detail status-card__detail--split";
+      addJobField(detail, "重要度", memory.importance);
+      addJobField(detail, "创建时间", memory.createdAt);
+      card.append(type, title, content, detail);
+      list.append(card);
+    }
+  };
+
+  const loadMemoryOverview = async () => {
+    const output = document.querySelector("[data-memory-overview-status]");
+    output.textContent = "正在加载长期 Memory…";
+    try {
+      const config = window.AppConfig?.getProviderConfig?.() || {};
+      const base = String(config.baseUrl || "").replace(/\/+$/, "");
+      const token = String(config.auth?.token || "");
+      if (!base || config.auth?.type !== "bearer" || !token) throw new Error("Memory API 尚未配置 Gateway 地址和 Bearer Token。");
+      const headers = { Authorization: `Bearer ${token}` };
+      const request = async path => {
+        const response = await fetch(base + path, { cache: "no-store", headers });
+        const value = await response.json();
+        if (!response.ok || value.error) throw new Error(value.error?.message || "Memory 请求失败");
+        return value;
+      };
+      const [stats, recent] = await Promise.all([
+        request("/api/v1/memories/stats"),
+        request("/api/v1/memories?page=1&limit=4&sort=newest")
+      ]);
+      renderMemoryOverview(stats.data || {}, Array.isArray(recent.data) ? recent.data : []);
+      output.textContent = `已加载 ${Array.isArray(recent.data) ? recent.data.length : 0} 条最近 Memory。不会自动刷新。`;
+    } catch (error) {
+      output.textContent = error.message;
+    }
+  };
+
   const loadAiMetrics = async () => {
     const output = document.querySelector("[data-ai-metrics-status]");
     const headers = requestAdminCredentials();
@@ -264,6 +325,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadAiStatus();
   document.querySelector("[data-ai-metrics-load]")?.addEventListener("click", loadAiMetrics);
   document.querySelector("[data-ai-jobs-load]")?.addEventListener("click", loadAiJobs);
+  document.querySelector("[data-memory-overview-load]")?.addEventListener("click", loadMemoryOverview);
   document.querySelector("[data-ai-job-detail-close]")?.addEventListener("click", () => {
     document.querySelector("[data-ai-job-detail]")?.close();
   });

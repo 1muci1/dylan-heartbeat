@@ -17,6 +17,11 @@
     .ai-job-detail__error { color: #9d3e4c; font-weight: 700; }
     .ai-job-card__detail { width: 100%; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; }
     .ai-job-card__cancel { margin-top: 12px; padding: 7px 10px; border: 1px solid rgba(171,73,85,.25); border-radius: 99px; color: #9d3e4c; background: rgba(255,255,255,.7); font-size: 9px; }
+    .memory-overview__types { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin: 12px 0; }
+    .memory-overview__types div { padding: 8px; border-radius: 10px; background: rgba(255,255,255,.55); }
+    .memory-overview__types span,.memory-overview__types strong { display: block; }
+    .memory-overview__types span { font-size: 9px; color: var(--muted); }
+    .memory-overview__item p { margin-top: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
   </style>
   <title>心伴 · 沉的状态</title>
 </head>
@@ -94,6 +99,29 @@
           </div>
         </a>
       </div>
+    </section>
+
+    <section class="activity-section memory-overview" aria-labelledby="memory-overview-title">
+      <div class="dashboard-section-heading">
+        <div><p>LONG-TERM MEMORY</p><h2 id="memory-overview-title">长期 Memory 概览</h2></div>
+        <button type="button" data-memory-overview-load>加载 Memory</button>
+      </div>
+      <article class="status-card">
+        <p class="status-card__label">Memory 总数量</p>
+        <div class="memory-count"><strong data-memory-overview-total>—</strong><span>条</span></div>
+        <div class="memory-overview__types" data-memory-overview-types>
+          <div><span>MEMORY</span><strong data-memory-overview-type="MEMORY">—</strong></div>
+          <div><span>EVENT</span><strong data-memory-overview-type="EVENT">—</strong></div>
+          <div><span>MOMENT</span><strong data-memory-overview-type="MOMENT">—</strong></div>
+          <div><span>PROMISE</span><strong data-memory-overview-type="PROMISE">—</strong></div>
+          <div><span>WISHLIST</span><strong data-memory-overview-type="WISHLIST">—</strong></div>
+          <div><span>NOTE</span><strong data-memory-overview-type="NOTE">—</strong></div>
+        </div>
+      </article>
+      <div class="status-cards" data-memory-overview-list>
+        <article class="status-card"><p class="status-card__label">最近创建的 Memory</p><h3>等待手动加载</h3></article>
+      </div>
+      <p class="review-status" data-memory-overview-status>只读展示，不会自动刷新。</p>
     </section>
 
     <section class="activity-section ai-overview" aria-labelledby="ai-title">

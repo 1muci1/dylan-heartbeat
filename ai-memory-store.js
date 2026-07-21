@@ -5,7 +5,7 @@ const { MEMORY_TYPES, hashContent, isoDate } = require("./structured-memory-stor
 
 const CANDIDATE_STATUSES = new Set(["pending", "approved", "rejected", "duplicate", "deleted"]);
 const JOB_STATUSES = new Set(["queued", "running", "completed", "failed", "cancelled"]);
-const JOB_TYPES = new Set(["session_summary", "memory_extraction"]);
+const JOB_TYPES = new Set(["session_summary", "memory_extraction", "proactive_response"]);
 const MAX_TITLE = 200;
 const MAX_CONTENT = 20000;
 const MAX_REASON = 2000;
@@ -78,10 +78,32 @@ function publicJob(row) {
 }
 
 class AiMemoryStore {
-  constructor({ database, memoryStore }) {
+  constructor({ database, memoryStore, eventStore = null, logger = null }) {
     if (!database || !memoryStore) throw new TypeError("database 和 memoryStore 必填");
     this.db = database;
     this.memoryStore = memoryStore;
+    this.eventStore = eventStore;
+    this.logger = logger;
+  }
+
+  recordJobEvent(input) {
+    if (!this.eventStore) return null;
+    try {
+      return this.eventStore.create(input, { source: "ai-memory-store" });
+    } catch (error) {
+      this.logger?.error?.({ errorCode: error.code, eventType: input.eventType, subjectId: input.subjectId }, "AI Job Event 写入失败");
+      return null;
+    }
+  }
+
+  recordCandidateEvent(input) {
+    if (!this.eventStore) return null;
+    try {
+      return this.eventStore.create(input, { source: "memory-candidate" });
+    } catch (error) {
+      this.logger?.error?.({ errorCode: error.code, eventType: input.eventType, subjectId: input.subjectId }, "Memory Candidate Event 写入失败");
+      return null;
+    }
   }
 
   requireSession(id) {
@@ -162,6 +184,8 @@ class AiMemoryStore {
           item.type, item.title, item.content, item.occurredAt, item.importance, item.confidence, item.reason,
           item.contentHash, metadata.provider || null, metadata.model || null, metadata.promptVersion || null, metadata.sourceJobId || null, now);
         created.push({ id, contentHash: item.contentHash });
+        this.recordCandidateEvent({eventType:"memory_candidate.created",subjectType:"memory_candidate",subjectId:id,
+          payload:{type:item.type,importance:item.importance},dedupeKey:`memory-candidate:${id}:created`,occurredAt:now});
       }
       this.db.exec("COMMIT");
     } catch (error) { this.db.exec("ROLLBACK"); throw error; }
@@ -205,11 +229,28 @@ class AiMemoryStore {
         this.db.exec("COMMIT");
         return this.getCandidate(id);
       }
+      const correlationId=crypto.randomUUID();
       const memory = this.memoryStore.create({ type:item.type,title:item.title,content:item.content,occurredAt:item.occurredAt,
-        importance:item.importance,source:"ai-candidate",sourceSessionId:current.sessionId });
+        importance:item.importance,source:"ai-candidate",sourceSessionId:current.sessionId },{suppressEvent:true});
       this.db.prepare(`UPDATE memory_candidates SET type=?,title=?,content=?,occurred_at=?,importance=?,reason=?,content_hash=?,
         status='approved',approved_memory_id=?,reviewed_at=?,reviewed_by=? WHERE id=?`).run(item.type,item.title,item.content,item.occurredAt,
           item.importance,item.reason,item.contentHash,memory.id,now,reviewer,id);
+      if(this.eventStore){
+        this.db.exec("SAVEPOINT candidate_approval_events");
+        try{
+          this.eventStore.create({eventType:"memory.created",subjectType:"memory",subjectId:memory.id,
+            payload:{type:memory.type,importance:memory.importance,source:memory.source},dedupeKey:`memory:${memory.id}:created`,
+            correlationId,occurredAt:memory.createdAt},{source:"memory-candidate"});
+          this.eventStore.create({eventType:"memory_candidate.approved",subjectType:"memory_candidate",subjectId:id,
+            payload:{type:item.type,importance:item.importance,memoryId:memory.id},dedupeKey:`memory-candidate:${id}:approved`,
+            correlationId,occurredAt:now},{source:"memory-candidate"});
+          this.db.exec("RELEASE SAVEPOINT candidate_approval_events");
+        }catch(error){
+          this.db.exec("ROLLBACK TO SAVEPOINT candidate_approval_events");
+          this.db.exec("RELEASE SAVEPOINT candidate_approval_events");
+          this.logger?.error?.({errorCode:error.code,candidateId:id},"Candidate approve Event 写入失败");
+        }
+      }
       this.db.exec("COMMIT");
       return this.getCandidate(id);
     } catch (error) { this.db.exec("ROLLBACK"); throw error; }
@@ -221,7 +262,10 @@ class AiMemoryStore {
     if(action==="reopen"&&!new Set(["rejected","duplicate"]).has(current.status))throw new AiMemoryError("只有 rejected/duplicate 候选可以重新打开",409,"CANDIDATE_NOT_REOPENABLE");
     const status=action==="reject"?"rejected":"pending";
     this.db.prepare("UPDATE memory_candidates SET status=?,reviewed_at=?,reviewed_by=?,deleted_at=NULL WHERE id=?").run(status,now,reviewer,id);
-    return this.getCandidate(id);
+    const candidate=this.getCandidate(id);
+    if(action==="reject")this.recordCandidateEvent({eventType:"memory_candidate.rejected",subjectType:"memory_candidate",subjectId:id,
+      payload:{reasonCode:"USER_REJECTED"},dedupeKey:`memory-candidate:${id}:rejected`,occurredAt:now});
+    return candidate;
   }
 
   deleteCandidate(id, reviewer="user") {
@@ -237,12 +281,31 @@ class AiMemoryStore {
     const id=crypto.randomUUID(),now=new Date().toISOString();
     this.db.prepare("INSERT INTO ai_jobs (id,job_type,session_id,status,input_message_count,provider,model,created_at) VALUES (?,?,?,'queued',?,?,?,?)")
       .run(id,jobType,sessionId,Number(inputCount||0),provider||null,model||null,now);
-    return this.getJob(id);
+    const job=this.getJob(id);
+    this.recordJobEvent({eventType:"ai_job.queued",subjectType:"ai_job",subjectId:job.id,
+      payload:{jobType:job.jobType,status:"queued"},dedupeKey:`ai-job:${job.id}:queued`,occurredAt:job.createdAt});
+    return job;
+  }
+
+  createProactiveJob(input) {
+    if (!input || typeof input !== "object" || Array.isArray(input)) throw new AiMemoryError("主动任务输入无效", 422, "AI_JOB_INPUT_INVALID");
+    const allowed = new Set(["eventId", "reasonCode", "candidateType"]);
+    if (Object.keys(input).some(key => !allowed.has(key))) throw new AiMemoryError("主动任务输入包含禁止字段", 422, "AI_JOB_INPUT_INVALID");
+    const eventId = cleanText(input.eventId, "eventId", 200);
+    const reasonCode = cleanText(input.reasonCode, "reasonCode", 100);
+    const candidateType = cleanText(input.candidateType, "candidateType", 100);
+    const id = crypto.randomUUID(), now = new Date().toISOString();
+    this.db.prepare("INSERT INTO ai_jobs (id,job_type,session_id,status,input_message_count,provider,model,created_at) VALUES (?,'proactive_response',NULL,'queued',0,NULL,NULL,?)")
+      .run(id, now);
+    const job = this.getJob(id);
+    this.recordJobEvent({ eventType: "ai_job.proactive_queued", subjectType: "ai_job", subjectId: job.id,
+      payload: { jobType: "proactive_response", reasonCode }, dedupeKey: `ai-job:${job.id}:proactive-queued`, occurredAt: now });
+    return Object.assign(job, { payload: { eventId, reasonCode, candidateType } });
   }
 
   getJob(id) { const row=this.db.prepare("SELECT * FROM ai_jobs WHERE id=?").get(String(id));if(!row)throw new AiMemoryError("AI Job 不存在",404,"AI_JOB_NOT_FOUND");return publicJob(row); }
   updateJob(id,status,values={}) { if(!JOB_STATUSES.has(status))throw new AiMemoryError("job status 无效");const now=new Date().toISOString();const result=this.db.prepare(`UPDATE ai_jobs SET status=?,attempt_count=COALESCE(?,attempt_count),started_at=COALESCE(?,started_at),completed_at=?,error_code=?,error_message=? WHERE id=?`).run(status,values.attemptCount??null,status==="running"?now:null,new Set(["completed","failed","cancelled"]).has(status)?now:null,values.errorCode||null,values.errorMessage?String(values.errorMessage).slice(0,500):null,id);if(!result.changes)throw new AiMemoryError("AI Job 不存在",404,"AI_JOB_NOT_FOUND");return this.getJob(id); }
-  cancelJob(id) { const job=this.getJob(id);if(!new Set(["queued","running"]).has(job.status))throw new AiMemoryError("该任务不可取消",409,"AI_JOB_NOT_CANCELLABLE");return this.updateJob(id,"cancelled"); }
+  cancelJob(id) { const job=this.getJob(id);if(!new Set(["queued","running"]).has(job.status))throw new AiMemoryError("该任务不可取消",409,"AI_JOB_NOT_CANCELLABLE");const cancelled=this.updateJob(id,"cancelled");this.recordJobEvent({eventType:"ai_job.cancelled",subjectType:"ai_job",subjectId:cancelled.id,payload:{jobType:cancelled.jobType,previousStatus:job.status},dedupeKey:`ai-job:${cancelled.id}:cancelled`,occurredAt:cancelled.completedAt});return cancelled; }
   listJobs(query={}) { const page=Number(query.page||1),limit=Number(query.limit||20);if(!Number.isInteger(page)||page<1||!Number.isInteger(limit)||limit<1||limit>100)throw new AiMemoryError("分页参数无效");const where=[],params=[];if(query.jobType){if(!JOB_TYPES.has(query.jobType))throw new AiMemoryError("jobType 无效");where.push("job_type=?");params.push(query.jobType)}if(query.status){if(!JOB_STATUSES.has(query.status))throw new AiMemoryError("status 无效");where.push("status=?");params.push(query.status)}if(query.sessionId){where.push("session_id=?");params.push(String(query.sessionId))}const sql=where.length?`WHERE ${where.join(" AND ")}`:"";const total=Number(this.db.prepare(`SELECT COUNT(*) n FROM ai_jobs ${sql}`).get(...params).n);const rows=this.db.prepare(`SELECT * FROM ai_jobs ${sql} ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?`).all(...params,limit,(page-1)*limit);return{items:rows.map(publicJob),meta:{page,limit,total,totalPages:Math.ceil(total/limit)}}; }
 }
 

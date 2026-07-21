@@ -85,9 +85,9 @@ function registeredTools(apiClient) {
   return tools;
 }
 
-test("Memory MCP registers exactly four read-only tools", () => {
+test("Memory MCP registers exactly six read-only tools", () => {
   const tools = registeredTools({});
-  assert.deepEqual([...tools.keys()], ["memory_search", "memory_get", "memory_list", "memory_stats"]);
+  assert.deepEqual([...tools.keys()], ["memory_search", "memory_get", "memory_list", "memory_stats", "companion_state_get", "relationship_view_get", "proactive_overview_get", "tool_audit_get"]);
   for (const { definition } of tools.values()) {
     assert.deepEqual(definition.annotations, {
       readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false
@@ -96,14 +96,14 @@ test("Memory MCP registers exactly four read-only tools", () => {
 });
 
 test("tool schemas enforce required arguments, enums, and limit 20", async t => {
-  const apiClient = { list: async query => ({ data: [], meta: { query } }), get: async id => ({ data: { id }, meta: {} }), stats: async () => ({ data: {}, meta: {} }) };
+  const apiClient = { list: async query => ({ data: [], meta: { query } }), get: async id => ({ data: { id }, meta: {} }), stats: async () => ({ data: {}, meta: {} }), state: async () => ({ items: [] }), relationship: async () => ({}) };
   const runtime = createMemoryMcpRuntime({ config: config(), apiClient, signalSource: new EventEmitter() });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "memory-mcp-test", version: "1.0.0" });
   await Promise.all([runtime.server.connect(serverTransport), client.connect(clientTransport)]);
   t.after(async () => { await client.close(); await runtime.close(); });
   const listed = await client.listTools();
-  assert.deepEqual(listed.tools.map(tool => tool.name), ["memory_search", "memory_get", "memory_list", "memory_stats"]);
+  assert.deepEqual(listed.tools.map(tool => tool.name), ["memory_search", "memory_get", "memory_list", "memory_stats", "companion_state_get", "relationship_view_get", "proactive_overview_get", "tool_audit_get"]);
   for (const args of [{}, { query: "rain", limit: 21 }, { query: "rain", type: "UNKNOWN" }]) {
     const result = await client.callTool({ name: "memory_search", arguments: args });
     assert.equal(result.isError, true);
@@ -117,25 +117,31 @@ test("tool schemas enforce required arguments, enums, and limit 20", async t => 
   assert.equal(tooLarge.isError, true);
 });
 
-test("four tools call the Memory API client with bounded read-only arguments", async () => {
+test("six tools call the API client with bounded read-only arguments", async () => {
   const calls = [];
   const apiClient = {
     async list(query) { calls.push(["list", query]); return { data: [{ id: "one" }], meta: { total: 1 } }; },
     async get(id) { calls.push(["get", id]); return { data: { id, status: "active", deletedAt: null }, meta: {} }; },
-    async stats() { calls.push(["stats"]); return { data: { total: 1 }, meta: {} }; }
+    async stats() { calls.push(["stats"]); return { data: { total: 1 }, meta: {} }; },
+    async state(scope) { calls.push(["state", scope]); return { items: [{ stateKey: "last_user_interaction_at", value: { timestamp: "now" }, updatedAt: "now" }] }; },
+    async relationship() { calls.push(["relationship"]); return {}; }
   };
   const tools = registeredTools(apiClient);
   const search = await tools.get("memory_search").handler({ query: "rain", type: "MOMENT", status: "active", limit: 20 });
   const get = await tools.get("memory_get").handler({ id: "one" });
   const list = await tools.get("memory_list").handler({ page: 2, limit: 20, type: "NOTE", sort: "updated" });
   const stats = await tools.get("memory_stats").handler({});
+  const state = await tools.get("companion_state_get").handler({ scope: "default" });
+  const relationship = await tools.get("relationship_view_get").handler({});
   assert.deepEqual(calls, [
     ["list", { keyword: "rain", type: "MOMENT", status: "active", limit: 20, page: 1 }],
     ["get", "one"],
     ["list", { page: 2, limit: 20, type: "NOTE", sort: "updated", status: "active" }],
-    ["stats"]
+    ["stats"],
+    ["state", "default"],
+    ["relationship"]
   ]);
-  for (const result of [search, get, list, stats]) {
+  for (const result of [search, get, list, stats, state, relationship]) {
     assert.equal(result.isError, undefined);
     assert.deepEqual(JSON.parse(result.content[0].text), result.structuredContent);
   }
@@ -158,7 +164,9 @@ test("tools use HTTP GET only and leave mocked Memory data unchanged", async () 
   await tools.get("memory_get").handler({ id: "memory-1" });
   await tools.get("memory_list").handler({ page: 1, limit: 20, sort: "newest" });
   await tools.get("memory_stats").handler({});
-  assert.deepEqual(methods, ["GET", "GET", "GET", "GET"]);
+  await tools.get("companion_state_get").handler({ scope: "default" });
+  await tools.get("relationship_view_get").handler({});
+  assert.deepEqual(methods, ["GET", "GET", "GET", "GET", "GET", "GET"]);
   assert.equal(JSON.stringify(memories), before);
 });
 

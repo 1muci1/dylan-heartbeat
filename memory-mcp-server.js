@@ -10,6 +10,7 @@ const { MemoryApiClient } = require("./memory-api-client");
 const MEMORY_TYPES = ["MEMORY", "EVENT", "MOMENT", "PROMISE", "WISHLIST", "NOTE"];
 const MEMORY_STATUSES = ["active", "archived", "deleted"];
 const MEMORY_SORTS = ["newest", "oldest", "updated", "importance"];
+const TOOL_AUDIT_EVENT_TYPES = ["tool.requested", "tool.approved", "tool.completed", "tool.failed"];
 
 class MemoryMcpConfigurationError extends Error {
   constructor(message) {
@@ -131,6 +132,95 @@ function registerMemoryTools(server, apiClient) {
   }, async () => {
     const payload = await apiClient.stats();
     return { stats: payload?.data || {}, meta: payload?.meta || {} };
+  });
+
+  register("companion_state_get", {
+    title: "Get Companion State",
+    description: "Return the current public companion/default State projection.",
+    inputSchema: {
+      scope: z.enum(["default"]).default("default")
+    }
+  }, async ({ scope }) => {
+    const payload = await apiClient.state(scope);
+    const items = Array.isArray(payload?.items) ? payload.items : [];
+    return {
+      states: items.map(item => ({ key: item.stateKey, value: item.value, updatedAt: item.updatedAt }))
+    };
+  });
+
+  register("relationship_view_get", {
+    title: "Get Relationship View",
+    description: "Return the current read-only relationship context for companion/default.",
+    inputSchema: {}
+  }, async () => {
+    const payload = await apiClient.relationship();
+    const interactionStyle = payload?.interactionStyle || {};
+    const proactiveContact = payload?.proactiveContact || {};
+    const familiarity = payload?.familiarity || {};
+    return {
+      interactionStyle: {
+        value: typeof interactionStyle.value === "string" ? interactionStyle.value : "unspecified",
+        source: interactionStyle.source === "memory" ? "memory" : "default"
+      },
+      proactiveContact: {
+        enabled: proactiveContact.enabled === true,
+        source: proactiveContact.source === "state" ? "state" : "default"
+      },
+      familiarity: {
+        level: [1, 2, 3].includes(familiarity.level) ? familiarity.level : 1,
+        basis: "interaction_count"
+      },
+      recentTopics: Array.isArray(payload?.recentTopics)
+        ? payload.recentTopics.filter(item => typeof item === "string" && item.length <= 100).slice(0, 10) : [],
+      importantMemoryIds: Array.isArray(payload?.importantMemoryIds)
+        ? payload.importantMemoryIds.filter(item => typeof item === "string").slice(0, 100) : []
+    };
+  });
+
+  register("proactive_overview_get", {
+    title: "Get Proactive Overview",
+    description: "Return the read-only Companion Center proactive overview.",
+    inputSchema: {}
+  }, async () => {
+    const payload = await apiClient.proactiveOverview();
+    return {
+      enabled: payload?.enabled === true,
+      quietHours: { start: payload?.quietHours?.start || "23:00", end: payload?.quietHours?.end || "08:00" },
+      recentDeliveries: (Array.isArray(payload?.recentDeliveries) ? payload.recentDeliveries : []).slice(0, 5).map(item => ({
+        id: item.id, channel: item.channel, status: item.status, reasonCode: item.reasonCode,
+        createdAt: item.createdAt, sentAt: item.sentAt
+      })),
+      pendingCount: Number(payload?.pendingCount || 0),
+      failedCount: Number(payload?.failedCount || 0),
+      lastContactAt: payload?.lastContactAt || null,
+      lastReasonCode: payload?.lastReasonCode || null,
+      feedbackSummary: Object.fromEntries(Object.entries(payload?.feedbackSummary || {})
+        .filter(([key, value]) => ["liked", "dismissed", "not_relevant", "disable_future"].includes(key) && Number.isSafeInteger(value) && value > 0))
+    };
+  });
+
+  register("tool_audit_get", {
+    title: "Get Tool Audit",
+    description: "Query the safe read-only Tool lifecycle audit trail.",
+    inputSchema: {
+      limit: z.number().int().min(1).max(100).default(20),
+      toolName: z.string().regex(/^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*){1,7}$/).max(120).optional(),
+      eventType: z.enum(TOOL_AUDIT_EVENT_TYPES).optional(),
+      from: z.iso.datetime().optional(),
+      to: z.iso.datetime().optional()
+    }
+  }, async input => {
+    const payload = await apiClient.toolAudit(input);
+    return {
+      items: (Array.isArray(payload?.items) ? payload.items : []).slice(0, input.limit).map(item => ({
+        eventType: item.eventType,
+        toolName: item.toolName,
+        approvalStatus: item.approvalStatus ?? null,
+        success: typeof item.success === "boolean" ? item.success : null,
+        errorCode: item.errorCode ?? null,
+        createdAt: item.createdAt
+      }))
+    };
   });
 }
 

@@ -2,6 +2,10 @@
 
 const LIST_PATH = "/api/v1/memories";
 const STATS_PATH = "/api/v1/memories/stats";
+const STATE_PATH = "/api/v1/state";
+const RELATIONSHIP_PATH = "/api/v1/relationship";
+const PROACTIVE_OVERVIEW_PATH = "/api/v1/proactive/overview";
+const TOOL_AUDIT_PATH = "/api/v1/tools/audit";
 const MEMORY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 class MemoryApiClientError extends Error {
@@ -44,8 +48,33 @@ class MemoryApiClient {
     return this.request(STATS_PATH);
   }
 
+  state(scope = "default") {
+    if (scope !== "default") throw new MemoryApiClientError("State scope 不允许", "STATE_SCOPE_FORBIDDEN", 403);
+    return this.request(`${STATE_PATH}?scopeType=companion&scopeId=default`);
+  }
+
+  relationship() {
+    return this.request(RELATIONSHIP_PATH);
+  }
+
+  proactiveOverview() {
+    return this.request(PROACTIVE_OVERVIEW_PATH);
+  }
+
+  toolAudit(query = {}) {
+    const search = new URLSearchParams();
+    for (const key of ["limit", "toolName", "eventType", "from", "to"]) {
+      if (query[key] !== undefined && query[key] !== null && query[key] !== "") search.set(key, String(query[key]));
+    }
+    const suffix = search.size ? `?${search}` : "";
+    return this.request(`${TOOL_AUDIT_PATH}${suffix}`);
+  }
+
   async request(pathname) {
     const allowed = pathname === LIST_PATH || pathname === STATS_PATH || pathname.startsWith(`${LIST_PATH}?`) ||
+      pathname === `${STATE_PATH}?scopeType=companion&scopeId=default` ||
+      pathname === RELATIONSHIP_PATH || pathname === PROACTIVE_OVERVIEW_PATH ||
+      pathname === TOOL_AUDIT_PATH || pathname.startsWith(`${TOOL_AUDIT_PATH}?`) ||
       new RegExp(`^${LIST_PATH}/[A-Za-z0-9][A-Za-z0-9._%:-]{0,383}$`).test(pathname);
     if (!allowed) throw new MemoryApiClientError("Memory API 路径不允许", "MEMORY_API_PATH_FORBIDDEN", 403);
     const url = new URL(pathname, this.baseUrl);

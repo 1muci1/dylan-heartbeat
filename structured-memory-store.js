@@ -114,6 +114,18 @@ class StructuredMemoryStore {
     if (!options?.database) throw new TypeError("database 必填");
     this.db = options.database;
     this.filename = options.filename || null;
+    this.eventStore = options.eventStore || null;
+    this.logger = options.logger || null;
+  }
+
+  recordMemoryEvent(input, context = {}) {
+    if (!this.eventStore) return null;
+    try {
+      return this.eventStore.create(input, { source: context.source || "structured-memory-store" });
+    } catch (error) {
+      this.logger?.error?.({ errorCode: error.code, eventType: input.eventType, subjectId: input.subjectId }, "Memory Event 写入失败");
+      return null;
+    }
   }
 
   validateSourceSession(id) {
@@ -204,10 +216,13 @@ class StructuredMemoryStore {
       }
       throw error;
     }
-    return this.get(item.id, { includeDeleted: true });
+    const memory=this.get(item.id, { includeDeleted: true });
+    if(!options.suppressEvent)this.recordMemoryEvent({eventType:"memory.created",subjectType:"memory",subjectId:memory.id,
+      payload:{type:memory.type,importance:memory.importance,source:memory.source},dedupeKey:`memory:${memory.id}:created`,occurredAt:memory.createdAt},options.eventContext);
+    return memory;
   }
 
-  update(id, input) {
+  update(id, input, context = {}) {
     const current = this.get(id, { includeDeleted: true });
     if (!input || typeof input !== "object" || Array.isArray(input)) throw new StructuredMemoryError("请求体必须是对象");
     const next = {
@@ -229,22 +244,32 @@ class StructuredMemoryStore {
       if (/UNIQUE/.test(error.message)) throw new StructuredMemoryError("相同内容的记忆已存在", 409, "MEMORY_DUPLICATE");
       throw error;
     }
-    return this.get(id, { includeDeleted: true });
+    const memory=this.get(id, { includeDeleted: true });
+    const fields={type:"type",title:"title",content:"content",source:"source",sourceSessionId:"sourceSessionId",importance:"importance",status:"status",occurredAt:"occurredAt"};
+    const changedFields=Object.entries(fields).filter(([inputField,currentField])=>input[inputField]!==undefined&&current[currentField]!==memory[currentField]).map(([inputField])=>inputField);
+    this.recordMemoryEvent({eventType:"memory.updated",subjectType:"memory",subjectId:memory.id,payload:{changedFields},
+      dedupeKey:`memory:${memory.id}:updated:${memory.updatedAt}`,occurredAt:memory.updatedAt},context);
+    return memory;
   }
 
-  softDelete(id) {
-    this.get(id, { includeDeleted: true });
+  softDelete(id, context = {}) {
+    const current=this.get(id, { includeDeleted: true });
     const timestamp = new Date().toISOString();
     this.db.prepare("UPDATE memory_items SET status='deleted', deleted_at=?, updated_at=? WHERE id=?")
       .run(timestamp, timestamp, id);
+    this.recordMemoryEvent({eventType:"memory.deleted",subjectType:"memory",subjectId:String(id),payload:{previousStatus:current.status},
+      dedupeKey:`memory:${id}:deleted`,occurredAt:timestamp},context);
   }
 
-  restore(id) {
+  restore(id, context = {}) {
     const current = this.get(id, { includeDeleted: true });
     if (!current.deletedAt) throw new StructuredMemoryError("记忆未被删除", 409, "MEMORY_NOT_DELETED");
     const timestamp = new Date().toISOString();
     this.db.prepare("UPDATE memory_items SET status='active', deleted_at=NULL, updated_at=? WHERE id=?").run(timestamp, id);
-    return this.get(id);
+    const memory=this.get(id);
+    this.recordMemoryEvent({eventType:"memory.restored",subjectType:"memory",subjectId:memory.id,payload:{previousStatus:"deleted"},
+      dedupeKey:`memory:${memory.id}:restored`,occurredAt:timestamp},context);
+    return memory;
   }
 
   stats() {
@@ -318,7 +343,7 @@ class StructuredMemoryStore {
           } else skippedCount++;
           continue;
         }
-        this.create(item);
+        this.create(item, { eventContext: { source: "memory-admin" } });
         importedCount++;
       }
       await writeJson(this.exportLegacyItems());

@@ -13,10 +13,32 @@ const { registerMemoryRoutes } = require("./memory-routes");
 const { MediaStore } = require("./media-store");
 const { registerMediaRoutes } = require("./media-routes");
 const { AiMemoryStore } = require("./ai-memory-store");
+const { DeliveryStore } = require("./delivery-store");
 const { ConversationSummaryService } = require("./conversation-summary-service");
 const { AiTaskRunner, readAiConfig } = require("./ai-task-runner");
 const { OpenAIJsonAdapter } = require("./model-adapter");
 const { registerAiRoutes } = require("./ai-routes");
+const { EventStore } = require("./event-store");
+const { registerEventRoutes } = require("./event-routes");
+const { StateStore } = require("./state-store");
+const { StateProjector } = require("./state-projector");
+const { registerStateRoutes } = require("./state-routes");
+const { RelationshipViewService } = require("./relationship-view");
+const { registerRelationshipRoutes } = require("./relationship-routes");
+const { WakeDecisionGate } = require("./wake-decision-gate");
+const { WakeDecisionMetrics } = require("./wake-decision-metrics");
+const { WakeDecisionRollout } = require("./wake-decision-rollout");
+const { WakeDecisionRolloutMetrics } = require("./wake-decision-rollout-metrics");
+const { registerWakeDecisionRoutes } = require("./wake-decision-routes");
+const { WakeDecisionSnapshotClient } = require("./wake-decision-snapshot-client");
+const { ProactiveContactSettings } = require("./proactive-contact-settings");
+const { registerProactiveDeliveryRoutes } = require("./proactive-delivery-routes");
+const { ProactiveView } = require("./proactive-view");
+const { ProactiveFeedbackStore } = require("./proactive-feedback-store");
+const { registerToolAuditRoutes } = require("./tool-audit-routes");
+const { DeviceIdentityStore } = require("./device-identity-store");
+const { DevicePairingService } = require("./device-pairing-service");
+const { registerDevicePairingRoutes } = require("./device-pairing-routes");
 
 const DEFAULT_BODY_LIMIT_MB = 50;
 
@@ -52,28 +74,55 @@ app.register(cors, {
   origin(origin, callback) {
     callback(null, !origin || ALLOWED_FRONTEND_ORIGINS.has(origin));
   },
-  methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Session-Id"]
 });
 
 const databaseConnection = openDatabase(process.env.SESSION_DB_FILE || "./chat-sessions.sqlite");
+const stateStore = new StateStore({ database: databaseConnection.db });
+const stateProjector = new StateProjector({ stateStore });
+const eventStore = new EventStore({ database: databaseConnection.db, stateProjector, logger: app.log });
 const sessionStore = new SessionStore({ database: databaseConnection.db, filename: databaseConnection.filename });
-const structuredMemoryStore = new StructuredMemoryStore({ database: databaseConnection.db, filename: databaseConnection.filename });
+const structuredMemoryStore = new StructuredMemoryStore({ database: databaseConnection.db, filename: databaseConnection.filename, eventStore, logger: app.log });
 const mediaStore = new MediaStore({
   database: databaseConnection.db,
   imageDir: process.env.CHAT_IMAGE_UPLOAD_DIR || "./uploads/chat-images",
   stickerDir: process.env.STICKER_UPLOAD_DIR || "./uploads/stickers"
 });
 const aiConfig = readAiConfig();
-const aiMemoryStore = new AiMemoryStore({ database: databaseConnection.db, memoryStore: structuredMemoryStore });
+const aiMemoryStore = new AiMemoryStore({ database: databaseConnection.db, memoryStore: structuredMemoryStore, eventStore, logger: app.log });
+const deliveryStore = new DeliveryStore({ database: databaseConnection.db });
+const proactiveContactSettings = new ProactiveContactSettings({ stateStore, eventStore });
+const proactiveFeedbackStore = new ProactiveFeedbackStore({ database: databaseConnection.db, deliveryStore, eventStore });
 const aiAdapter = new OpenAIJsonAdapter();
 const conversationSummaryService = new ConversationSummaryService({ database: databaseConnection.db, store: aiMemoryStore,
   adapter: aiAdapter, summaryModel: aiConfig.summaryModel, extractionModel: aiConfig.extractionModel });
-const aiTaskRunner = new AiTaskRunner({ store: aiMemoryStore, service: conversationSummaryService, config: aiConfig, logger: app.log });
+const aiTaskRunner = new AiTaskRunner({ store: aiMemoryStore, service: conversationSummaryService, eventStore, deliveryStore, config: aiConfig, logger: app.log });
+const relationshipViewService = new RelationshipViewService({ memoryStore: structuredMemoryStore, eventStore, stateStore });
+const proactiveView = new ProactiveView({ deliveryStore, stateStore, relationshipView: relationshipViewService, eventStore, feedbackStore: proactiveFeedbackStore });
+const deviceIdentityStore = new DeviceIdentityStore();
+const devicePairingService = new DevicePairingService({ store: deviceIdentityStore });
+const wakeDecisionGate = new WakeDecisionGate({
+  mode: process.env.WAKE_DECISION_MODE || "legacy",
+  metrics: new WakeDecisionMetrics(),
+  rollout: new WakeDecisionRollout({ percent: process.env.WAKE_DECISION_ENFORCED_PERCENT }),
+  rolloutMetrics: new WakeDecisionRolloutMetrics()
+});
+const wakeDecisionSnapshotClient = new WakeDecisionSnapshotClient({
+  url: process.env.WAKE_DECISION_SNAPSHOT_URL,
+  token: process.env.WAKE_DECISION_INTERNAL_TOKEN
+});
 registerSessionRoutes(app, { store: sessionStore });
 registerMemoryRoutes(app, { store: structuredMemoryStore });
 registerMediaRoutes(app, { store: mediaStore, sessionStore });
 registerAiRoutes(app, { store: aiMemoryStore, runner: aiTaskRunner, config: aiConfig, adapter: aiAdapter });
+registerEventRoutes(app, { store: eventStore });
+registerStateRoutes(app, { store: stateStore });
+registerRelationshipRoutes(app, { service: relationshipViewService });
+registerWakeDecisionRoutes(app, { gate: wakeDecisionGate, snapshotClient: wakeDecisionSnapshotClient });
+registerProactiveDeliveryRoutes(app, { deliveryStore, settings: proactiveContactSettings, proactiveView, feedbackStore: proactiveFeedbackStore });
+registerToolAuditRoutes(app, { eventStore });
+registerDevicePairingRoutes(app, { pairingService: devicePairingService });
 registerMemoryAdmin(app, {
   structuredStore: structuredMemoryStore,
   database: databaseConnection.db,

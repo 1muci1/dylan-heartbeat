@@ -55,7 +55,7 @@ function registerMemoryRoutes(app, options) {
   }));
 
   app.post("/api/v1/memories", { preHandler: bearerAuth }, route((req, reply) => (
-    reply.code(201).send(envelope(store.create(req.body)))
+    reply.code(201).send(envelope(store.create(req.body, { eventContext: { source: "memory-api" } })))
   )));
 
   app.get("/api/v1/memories/stats", { preHandler: bearerAuth }, route(() => envelope(store.stats())));
@@ -64,14 +64,14 @@ function registerMemoryRoutes(app, options) {
     store.get(req.params.id, { includeDeleted: req.query?.includeDeleted === "true" })
   )));
 
-  app.patch("/api/v1/memories/:id", { preHandler: bearerAuth }, route(req => envelope(store.update(req.params.id, req.body))));
+  app.patch("/api/v1/memories/:id", { preHandler: bearerAuth }, route(req => envelope(store.update(req.params.id, req.body, { source: "memory-api" }))));
 
   app.delete("/api/v1/memories/:id", { preHandler: bearerAuth }, route(req => {
-    store.softDelete(req.params.id);
+    store.softDelete(req.params.id, { source: "memory-api" });
     return envelope({ id: req.params.id, status: "deleted" });
   }));
 
-  app.post("/api/v1/memories/:id/restore", { preHandler: bearerAuth }, route(req => envelope(store.restore(req.params.id))));
+  app.post("/api/v1/memories/:id/restore", { preHandler: bearerAuth }, route(req => envelope(store.restore(req.params.id, { source: "memory-api" }))));
 
   app.get("/api/v1/memories/:id/comments", { preHandler: bearerAuth }, route(req => envelope(store.listComments(req.params.id))));
 

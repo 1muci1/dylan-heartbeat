@@ -217,6 +217,224 @@ const MIGRATIONS = [
       ALTER TABLE ai_jobs ADD COLUMN latency_ms INTEGER
         CHECK (latency_ms IS NULL OR latency_ms >= 0);
     `
+  },
+  {
+    version: 7,
+    sql: `
+      CREATE TABLE events (
+        id TEXT PRIMARY KEY,
+        event_type TEXT NOT NULL,
+        category TEXT NOT NULL,
+        source TEXT NOT NULL,
+        subject_type TEXT,
+        subject_id TEXT,
+        payload_json TEXT NOT NULL DEFAULT '{}'
+          CHECK (json_valid(payload_json))
+          CHECK (json_type(payload_json) = 'object'),
+        importance INTEGER NOT NULL DEFAULT 3 CHECK (importance BETWEEN 1 AND 5),
+        priority INTEGER NOT NULL DEFAULT 3 CHECK (priority BETWEEN 1 AND 5),
+        dedupe_key TEXT,
+        correlation_id TEXT,
+        causation_id TEXT,
+        occurred_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        expires_at TEXT,
+        CHECK ((subject_type IS NULL AND subject_id IS NULL) OR (subject_type IS NOT NULL AND subject_id IS NOT NULL)),
+        FOREIGN KEY (causation_id) REFERENCES events(id) ON DELETE SET NULL
+      );
+      CREATE UNIQUE INDEX idx_events_dedupe_key ON events(dedupe_key) WHERE dedupe_key IS NOT NULL;
+      CREATE INDEX idx_events_occurred ON events(occurred_at DESC, id DESC);
+      CREATE INDEX idx_events_type_occurred ON events(event_type, occurred_at DESC, id DESC);
+      CREATE INDEX idx_events_category_occurred ON events(category, occurred_at DESC, id DESC);
+      CREATE INDEX idx_events_subject ON events(subject_type, subject_id, occurred_at DESC);
+      CREATE INDEX idx_events_correlation ON events(correlation_id, occurred_at ASC);
+      CREATE INDEX idx_events_expires ON events(expires_at) WHERE expires_at IS NOT NULL;
+    `
+  },
+  {
+    version: 8,
+    sql: `
+      CREATE TABLE companion_state (
+        id TEXT PRIMARY KEY,
+        scope_type TEXT NOT NULL,
+        scope_id TEXT NOT NULL,
+        state_key TEXT NOT NULL,
+        value_json TEXT NOT NULL CHECK (json_valid(value_json)),
+        value_type TEXT NOT NULL,
+        confidence REAL CHECK (confidence IS NULL OR confidence BETWEEN 0 AND 1),
+        source_kind TEXT NOT NULL,
+        source_event_id TEXT,
+        source_memory_id TEXT,
+        valid_from TEXT NOT NULL,
+        expires_at TEXT,
+        updated_at TEXT NOT NULL,
+        version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+        UNIQUE(scope_type, scope_id, state_key),
+        FOREIGN KEY (source_event_id) REFERENCES events(id) ON DELETE SET NULL,
+        FOREIGN KEY (source_memory_id) REFERENCES memory_items(id) ON DELETE SET NULL
+      );
+      CREATE INDEX idx_companion_state_scope ON companion_state(scope_type, scope_id);
+      CREATE INDEX idx_companion_state_key ON companion_state(state_key);
+      CREATE INDEX idx_companion_state_source_event ON companion_state(source_event_id);
+    `
+  },
+  {
+    version: 9,
+    foreignKeysOff: true,
+    sql: `
+      CREATE TABLE ai_jobs_v9 (
+        id TEXT PRIMARY KEY,
+        job_type TEXT NOT NULL CHECK (job_type IN ('session_summary','memory_extraction','proactive_response')),
+        session_id TEXT,
+        status TEXT NOT NULL CHECK (status IN ('queued','running','completed','failed','cancelled')),
+        input_message_count INTEGER NOT NULL DEFAULT 0,
+        attempt_count INTEGER NOT NULL DEFAULT 0,
+        provider TEXT,
+        model TEXT,
+        started_at TEXT,
+        completed_at TEXT,
+        error_code TEXT,
+        error_message TEXT,
+        created_at TEXT NOT NULL,
+        prompt_tokens INTEGER CHECK (prompt_tokens IS NULL OR prompt_tokens >= 0),
+        completion_tokens INTEGER CHECK (completion_tokens IS NULL OR completion_tokens >= 0),
+        total_tokens INTEGER CHECK (total_tokens IS NULL OR total_tokens >= 0),
+        latency_ms INTEGER CHECK (latency_ms IS NULL OR latency_ms >= 0),
+        FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE SET NULL
+      );
+      INSERT INTO ai_jobs_v9 (
+        id,job_type,session_id,status,input_message_count,attempt_count,provider,model,
+        started_at,completed_at,error_code,error_message,created_at,
+        prompt_tokens,completion_tokens,total_tokens,latency_ms
+      ) SELECT
+        id,job_type,session_id,status,input_message_count,attempt_count,provider,model,
+        started_at,completed_at,error_code,error_message,created_at,
+        prompt_tokens,completion_tokens,total_tokens,latency_ms
+      FROM ai_jobs;
+      DROP TABLE ai_jobs;
+      ALTER TABLE ai_jobs_v9 RENAME TO ai_jobs;
+      CREATE INDEX idx_ai_jobs_status_created
+        ON ai_jobs(status, created_at DESC);
+      CREATE INDEX idx_ai_jobs_type_session
+        ON ai_jobs(job_type, session_id, created_at DESC);
+      CREATE UNIQUE INDEX idx_ai_jobs_one_running
+        ON ai_jobs(job_type, session_id) WHERE status = 'running' AND session_id IS NOT NULL;
+    `
+  },
+  {
+    version: 10,
+    sql: `
+      CREATE TABLE deliveries (
+        id TEXT PRIMARY KEY,
+        job_id TEXT NOT NULL,
+        event_id TEXT,
+        channel TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending'
+          CHECK (status IN ('pending','sent','failed','cancelled')),
+        text TEXT NOT NULL CHECK (length(text) BETWEEN 1 AND 500),
+        reason_code TEXT NOT NULL,
+        dedupe_key TEXT,
+        created_at TEXT NOT NULL,
+        sent_at TEXT,
+        failed_at TEXT,
+        FOREIGN KEY (job_id) REFERENCES ai_jobs(id) ON DELETE CASCADE
+      );
+      CREATE INDEX idx_deliveries_job ON deliveries(job_id);
+      CREATE INDEX idx_deliveries_status_created ON deliveries(status, created_at DESC);
+      CREATE UNIQUE INDEX idx_deliveries_dedupe ON deliveries(dedupe_key) WHERE dedupe_key IS NOT NULL;
+    `
+  },
+  {
+    version: 11,
+    foreignKeysOff: true,
+    sql: `
+      CREATE TABLE deliveries_v11 (
+        id TEXT PRIMARY KEY,
+        job_id TEXT NOT NULL,
+        event_id TEXT,
+        channel TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending'
+          CHECK (status IN ('pending','sending','sent','failed','cancelled')),
+        text TEXT NOT NULL CHECK (length(text) BETWEEN 1 AND 500),
+        reason_code TEXT NOT NULL,
+        dedupe_key TEXT,
+        created_at TEXT NOT NULL,
+        sent_at TEXT,
+        failed_at TEXT,
+        attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+        locked_at TEXT,
+        lock_owner TEXT,
+        FOREIGN KEY (job_id) REFERENCES ai_jobs(id) ON DELETE CASCADE
+      );
+      INSERT INTO deliveries_v11 (
+        id,job_id,event_id,channel,status,text,reason_code,dedupe_key,created_at,sent_at,failed_at,
+        attempt_count,locked_at,lock_owner
+      ) SELECT
+        id,job_id,event_id,channel,status,text,reason_code,dedupe_key,created_at,sent_at,failed_at,
+        0,NULL,NULL
+      FROM deliveries;
+      DROP TABLE deliveries;
+      ALTER TABLE deliveries_v11 RENAME TO deliveries;
+      CREATE INDEX idx_deliveries_job ON deliveries(job_id);
+      CREATE INDEX idx_deliveries_status_created ON deliveries(status, created_at DESC);
+      CREATE UNIQUE INDEX idx_deliveries_dedupe ON deliveries(dedupe_key) WHERE dedupe_key IS NOT NULL;
+    `
+  },
+  {
+    version: 12,
+    foreignKeysOff: true,
+    sql: `
+      CREATE TABLE deliveries_v12 (
+        id TEXT PRIMARY KEY,
+        job_id TEXT NOT NULL,
+        event_id TEXT,
+        channel TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending'
+          CHECK (status IN ('pending','sending','sent','failed','cancelled')),
+        text TEXT NOT NULL CHECK (length(text) BETWEEN 1 AND 500),
+        reason_code TEXT NOT NULL,
+        dedupe_key TEXT,
+        created_at TEXT NOT NULL,
+        sent_at TEXT,
+        failed_at TEXT,
+        attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+        locked_at TEXT,
+        lock_owner TEXT,
+        max_attempt_count INTEGER NOT NULL DEFAULT 3 CHECK (max_attempt_count >= 1),
+        next_retry_at TEXT,
+        last_error_code TEXT,
+        FOREIGN KEY (job_id) REFERENCES ai_jobs(id) ON DELETE CASCADE
+      );
+      INSERT INTO deliveries_v12 (
+        id,job_id,event_id,channel,status,text,reason_code,dedupe_key,created_at,sent_at,failed_at,
+        attempt_count,locked_at,lock_owner,max_attempt_count,next_retry_at,last_error_code
+      ) SELECT
+        id,job_id,event_id,channel,status,text,reason_code,dedupe_key,created_at,sent_at,failed_at,
+        attempt_count,locked_at,lock_owner,3,NULL,NULL
+      FROM deliveries;
+      DROP TABLE deliveries;
+      ALTER TABLE deliveries_v12 RENAME TO deliveries;
+      CREATE INDEX idx_deliveries_job ON deliveries(job_id);
+      CREATE INDEX idx_deliveries_status_created ON deliveries(status, created_at DESC);
+      CREATE INDEX idx_deliveries_retry ON deliveries(status, next_retry_at, created_at);
+      CREATE UNIQUE INDEX idx_deliveries_dedupe ON deliveries(dedupe_key) WHERE dedupe_key IS NOT NULL;
+    `
+  },
+  {
+    version: 13,
+    sql: `
+      CREATE TABLE delivery_feedback (
+        id TEXT PRIMARY KEY,
+        delivery_id TEXT NOT NULL,
+        feedback_type TEXT NOT NULL
+          CHECK (feedback_type IN ('liked','dismissed','not_relevant','disable_future')),
+        created_at TEXT NOT NULL,
+        UNIQUE(delivery_id),
+        FOREIGN KEY (delivery_id) REFERENCES deliveries(id) ON DELETE CASCADE
+      );
+      CREATE INDEX idx_delivery_feedback_delivery ON delivery_feedback(delivery_id);
+      CREATE INDEX idx_delivery_feedback_type ON delivery_feedback(feedback_type);
+    `
   }
 ];
 
@@ -238,9 +456,13 @@ function applyMigrations(db, options = {}) {
   const newlyApplied = [];
   for (const migration of (options.migrations || MIGRATIONS)) {
     if (applied.has(migration.version)) continue;
+    if (migration.foreignKeysOff) db.exec("PRAGMA foreign_keys = OFF");
     db.exec("BEGIN IMMEDIATE");
     try {
       db.exec(migration.sql);
+      if (migration.foreignKeysOff && db.prepare("PRAGMA foreign_key_check").all().length) {
+        throw new Error(`Migration ${migration.version} 产生外键不一致`);
+      }
       db.prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)")
         .run(migration.version, new Date().toISOString());
       db.exec("COMMIT");
@@ -248,6 +470,8 @@ function applyMigrations(db, options = {}) {
     } catch (error) {
       db.exec("ROLLBACK");
       throw error;
+    } finally {
+      if (migration.foreignKeysOff) db.exec("PRAGMA foreign_keys = ON");
     }
   }
   return newlyApplied;

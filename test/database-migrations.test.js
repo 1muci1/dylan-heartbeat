@@ -14,10 +14,10 @@ test("migrations create required tables and are idempotent", async t => {
   const connection = openDatabase(path.join(dir, "database.sqlite"));
   t.after(() => connection.db.close());
   const versions = connection.db.prepare("SELECT version FROM schema_migrations ORDER BY version").all().map(row => Number(row.version));
-  assert.deepEqual(versions, [1, 2, 3, 4, 5, 6]);
+  assert.deepEqual(versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
   assert.deepEqual(applyMigrations(connection.db), []);
   const tables = new Set(connection.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row => row.name));
-  for (const table of ["memory_items", "memory_comments", "memory_import_jobs", "schema_migrations", "chat_sessions", "chat_messages", "chat_attachments", "stickers", "session_summaries", "memory_candidates", "ai_jobs"]) {
+  for (const table of ["memory_items", "memory_comments", "memory_import_jobs", "schema_migrations", "chat_sessions", "chat_messages", "chat_attachments", "stickers", "session_summaries", "memory_candidates", "ai_jobs", "events", "companion_state", "deliveries", "delivery_feedback"]) {
     assert.ok(tables.has(table));
   }
 });
@@ -87,7 +87,7 @@ test("migration 6 adds nullable AI job usage metrics without changing existing j
     (id,job_type,status,input_message_count,attempt_count,provider,model,created_at)
     VALUES (?,?,?,?,?,?,?,?)`)
     .run("job1", "session_summary", "completed", 3, 1, "mock", "mock-summary", "2026-01-01");
-  assert.deepEqual(applyMigrations(db), [6]);
+  assert.deepEqual(applyMigrations(db, { migrations: migrations.slice(0, 6) }), [6]);
   const job = db.prepare(`SELECT id,prompt_tokens,completion_tokens,total_tokens,latency_ms
     FROM ai_jobs WHERE id='job1'`).get();
   assert.deepEqual({ ...job }, {
@@ -111,5 +111,5 @@ test("migration 6 adds nullable AI job usage metrics without changing existing j
     latency_ms: 25
   });
   assert.throws(() => db.prepare("UPDATE ai_jobs SET total_tokens=-1 WHERE id='job1'").run());
-  assert.deepEqual(applyMigrations(db), []);
+  assert.deepEqual(applyMigrations(db, { migrations: migrations.slice(0, 6) }), []);
 });

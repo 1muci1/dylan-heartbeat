@@ -52,7 +52,7 @@ class MemorySeedCommitter {
           importance: item.importance,
           occurredAt: item.occurredAt,
           source: "manual-seed"
-        });
+        }, { eventContext: { source: "memory-seed" } });
         result.created++;
         result.results.push({ id, status: "created", memoryId: memory.id });
       } catch (error) {

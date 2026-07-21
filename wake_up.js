@@ -25,6 +25,178 @@ function readBooleanEnv(key, fallback = false) {
   return ["1", "true", "yes", "on"].includes(raw);
 }
 
+function createWakeDecisionAdapter() {
+  const { BehaviorPolicyEngine } = require("./behavior-policy");
+  const { ProactiveCandidateGenerator } = require("./proactive-candidate-generator");
+  const { ProactiveDecisionService } = require("./proactive-decision-service");
+  const { WakeDecisionAdapter } = require("./wake-decision-adapter");
+  return new WakeDecisionAdapter({
+    decisionService: new ProactiveDecisionService({
+      candidateGenerator: new ProactiveCandidateGenerator(),
+      policyEngine: new BehaviorPolicyEngine()
+    })
+  });
+}
+
+function evaluateWakeDecisionGate(context, options = {}) {
+  const { WakeDecisionGate, normalizeMode } = require("./wake-decision-gate");
+  const { WakeDecisionRollout } = require("./wake-decision-rollout");
+  const mode = options.mode ?? process.env.WAKE_DECISION_MODE ?? "legacy";
+  const normalizedMode = normalizeMode(mode);
+  const adapter = normalizedMode === "legacy" ? null : (options.adapter || createWakeDecisionAdapter());
+  const gate = options.gate || new WakeDecisionGate({
+    mode,
+    adapter,
+    logger: options.logger || console,
+    debug: options.debug ?? readBooleanEnv("WAKE_DECISION_MODE_DEBUG", false),
+    metrics: options.metrics || getWakeDecisionMetrics(),
+    evaluator: options.evaluator || null,
+    evaluationDebug: options.evaluationDebug ?? readBooleanEnv("WAKE_DECISION_EVALUATION_DEBUG", false),
+    rollout: options.rollout || new WakeDecisionRollout({ percent: options.percent ?? process.env.WAKE_DECISION_ENFORCED_PERCENT }),
+    rolloutDebug: options.rolloutDebug ?? readBooleanEnv("WAKE_DECISION_ROLLOUT_DEBUG", false),
+    rolloutMetrics: options.rolloutMetrics || getWakeDecisionRolloutMetrics(),
+    rolloutMetricsDebug: options.rolloutMetricsDebug ?? readBooleanEnv("WAKE_DECISION_ROLLOUT_METRICS_DEBUG", false),
+    dashboardDebug: options.dashboardDebug ?? readBooleanEnv("WAKE_DECISION_DASHBOARD_DEBUG", false)
+  });
+  const result = gate.decide(context);
+  if (options.evaluationDebug ?? readBooleanEnv("WAKE_DECISION_EVALUATION_DEBUG", false)) gate.getEvaluation();
+  if (options.dashboardDebug ?? readBooleanEnv("WAKE_DECISION_DASHBOARD_DEBUG", false)) gate.getDashboardSnapshot();
+  return result;
+}
+
+function buildWakeDecisionInput(lastUserTime, now = new Date()) {
+  const timestamp = lastUserTime instanceof Date && !Number.isNaN(lastUserTime.getTime())
+    ? lastUserTime.toISOString() : null;
+  return {
+    events: [],
+    state: timestamp ? { last_user_interaction_at: { timestamp } } : {},
+    relationship: {},
+    now
+  };
+}
+
+function evaluateWakeDecision(input, options = {}) {
+  const enabled = options.enabled ?? readBooleanEnv("WAKE_DECISION_ENABLED", false);
+  if (!enabled) return null;
+  const logger = options.logger || console;
+  try {
+    const result = (options.adapter || createWakeDecisionAdapter()).evaluate(input);
+    const approvedCount = result?.shouldContact === true ? 1 : 0;
+    const rejectedCount = !approvedCount && result?.reasonCode ? 1 : 0;
+    const candidateCount = approvedCount + rejectedCount;
+    logger.debug?.("Wake decision", {
+      candidateCount,
+      approvedCount,
+      rejectedCount,
+      reasonCode: result?.reasonCode || ""
+    });
+    return result;
+  } catch (error) {
+    logger.debug?.("Wake decision unavailable", {
+      candidateCount: 0,
+      approvedCount: 0,
+      rejectedCount: 0,
+      reasonCode: "DECISION_ERROR"
+    });
+    return null;
+  }
+}
+
+let wakeDecisionMetrics;
+let wakeDecisionRolloutMetrics;
+let wakeDecisionSnapshotServer;
+
+function getWakeDecisionMetrics() {
+  if (!wakeDecisionMetrics) {
+    const { WakeDecisionMetrics } = require("./wake-decision-metrics");
+    wakeDecisionMetrics = new WakeDecisionMetrics();
+  }
+  return wakeDecisionMetrics;
+}
+
+function getWakeDecisionRolloutMetrics() {
+  if (!wakeDecisionRolloutMetrics) {
+    const { WakeDecisionRolloutMetrics } = require("./wake-decision-rollout-metrics");
+    wakeDecisionRolloutMetrics = new WakeDecisionRolloutMetrics();
+  }
+  return wakeDecisionRolloutMetrics;
+}
+
+function createWakeDecisionSnapshotRuntime() {
+  const { WakeDecisionGate } = require("./wake-decision-gate");
+  const { WakeDecisionRollout } = require("./wake-decision-rollout");
+  const { createWakeDecisionSnapshotServer } = require("./wake-decision-snapshot-server");
+  const gate = new WakeDecisionGate({
+    mode: process.env.WAKE_DECISION_MODE || "legacy",
+    metrics: getWakeDecisionMetrics(),
+    rollout: new WakeDecisionRollout({ percent: process.env.WAKE_DECISION_ENFORCED_PERCENT }),
+    rolloutMetrics: getWakeDecisionRolloutMetrics()
+  });
+  return createWakeDecisionSnapshotServer({
+    gate,
+    token: process.env.WAKE_DECISION_INTERNAL_TOKEN,
+    host: "127.0.0.1",
+    port: Number(process.env.WAKE_DECISION_SNAPSHOT_PORT) || 3001
+  });
+}
+
+function recordWakeDecisionMetrics(comparison, options = {}, logger = console) {
+  try {
+    const metrics = options.metrics || getWakeDecisionMetrics();
+    metrics.record(comparison);
+    const debug = options.metricsDebug ?? readBooleanEnv("WAKE_DECISION_METRICS_DEBUG", false);
+    if (debug) {
+      const snapshot = metrics.snapshot();
+      const topReasons = Object.entries(snapshot.reasonCounts || {})
+        .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+        .slice(0, 5)
+        .map(([reasonCode, count]) => ({ reasonCode, count }));
+      logger.debug?.("Wake decision metrics", {
+        total: snapshot.total,
+        agreementRate: snapshot.agreementRate,
+        oldOnly: snapshot.oldOnly,
+        newOnly: snapshot.newOnly,
+        topReasons
+      });
+    }
+  } catch {
+    logger.debug?.("Wake decision metrics unavailable", {
+      total: 0,
+      agreementRate: 0,
+      oldOnly: 0,
+      newOnly: 0,
+      topReasons: []
+    });
+  }
+}
+
+function compareWakeDecisionShadow(oldDecision, newDecision, context, options = {}) {
+  const enabled = options.enabled ?? (
+    readBooleanEnv("WAKE_DECISION_ENABLED", false) &&
+    readBooleanEnv("WAKE_DECISION_SHADOW", false)
+  );
+  if (!enabled) return null;
+  const logger = options.logger || console;
+  try {
+    const shadow = options.shadow || new (require("./wake-decision-shadow").WakeDecisionShadow)();
+    const comparison = shadow.compare({ oldDecision, newDecision, context });
+    logger.debug?.("Wake decision shadow", {
+      agreement: comparison.agreement,
+      differenceType: comparison.differenceType,
+      reasonCode: comparison.newDecision.reasonCode
+    });
+    recordWakeDecisionMetrics(comparison, options, logger);
+    return comparison;
+  } catch {
+    logger.debug?.("Wake decision shadow unavailable", {
+      agreement: false,
+      differenceType: "same",
+      reasonCode: "SHADOW_ERROR"
+    });
+    return null;
+  }
+}
+
 function loadWakeState() {
   try {
     if (!fs.existsSync(WAKE_STATE_PATH)) return {};
@@ -384,12 +556,28 @@ async function runWakeUp() {
   const now = new Date();
   const diffMinutes = Math.floor((now - lastUserTime) / 1000 / 60);
 
+  const decisionContext = buildWakeDecisionInput(lastUserTime, now);
+  const gateDecision = evaluateWakeDecisionGate(decisionContext);
+  const policyDecision = gateDecision.mode === "shadow" ? gateDecision.shadowDecision : null;
+  const shadowOptions = { enabled: gateDecision.mode === "shadow" };
+
+  if (gateDecision.mode === "enforced" && gateDecision.shouldContact === false) {
+    console.debug("Wake decision enforced", {
+      mode: "enforced",
+      shouldContact: false,
+      reasonCode: gateDecision.reasonCode || "POLICY_REJECTED"
+    });
+    return;
+  }
+
   if (!shouldWake(lastUserTime)) {
+    compareWakeDecisionShadow({ shouldContact: false }, policyDecision, decisionContext, shadowOptions);
     console.log("\n暂不需要唤醒\n");
     return;
   }
 
   if (isPushCooldownActive(now)) {
+    compareWakeDecisionShadow({ shouldContact: false }, policyDecision, decisionContext, shadowOptions);
     const lastPushAt = getLastSuccessfulPushAt();
     const elapsedMinutes = lastPushAt
       ? Math.floor((now - lastPushAt) / 1000 / 60)
@@ -454,6 +642,7 @@ ${historyText}`
   console.log(JSON.stringify(wakeMessages, null, 2));
 
   if (!process.env.TARGET_API_URL || !process.env.TARGET_API_KEY || !process.env.MODEL_NAME) {
+    compareWakeDecisionShadow({ shouldContact: false }, policyDecision, decisionContext, shadowOptions);
     console.log("缺少 TARGET_API_URL / TARGET_API_KEY / MODEL_NAME，跳过本次唤醒");
     return;
   }
@@ -492,6 +681,7 @@ ${historyText}`
   console.log(aiText);
 
   let eventContent;
+  let oldShouldContact = false;
 
   if (!aiText) {
     console.log("\nAI 返回空内容，本次不发送 Bark\n");
@@ -510,6 +700,7 @@ ${historyText}`
       : `（${getLocalTimeString()} 自动唤醒：本次未发送 Bark）`;
   } else {
     // 没有 [NO_ACTION] 就视为想发 Bark
+    oldShouldContact = true;
     console.log("\nAI 选择发送 Bark\n");
     let barkText = aiText;
 
@@ -592,6 +783,8 @@ ${historyText}`
     }
   }
 
+  compareWakeDecisionShadow({ shouldContact: oldShouldContact }, policyDecision, decisionContext, shadowOptions);
+
   try {
     const eventResponse = await fetch(GATEWAY_URL, {
       method: "POST",
@@ -626,10 +819,33 @@ async function scheduleNextCheck() {
   setTimeout(scheduleNextCheck, getCheckIntervalMs());
 }
 
-// 潮水记得第一次没过礁石的时间。之后每一次涨落，都是同一片海在确认边界。
-// 启动第一次检查（延迟10秒）
-setTimeout(scheduleNextCheck, 10_000);
+function startRuntime() {
+  wakeDecisionSnapshotServer = createWakeDecisionSnapshotRuntime();
+  wakeDecisionSnapshotServer.start().catch(() => {
+    console.debug("Wake decision snapshot unavailable", { reasonCode: "SNAPSHOT_SERVER_ERROR" });
+  });
+  // 潮水记得第一次没过礁石的时间。之后每一次涨落，都是同一片海在确认边界。
+  // 启动第一次检查（延迟10秒）
+  setTimeout(scheduleNextCheck, 10_000);
 
-console.log("\n==================================");
-console.log("Dylan Heartbeat Runtime 已启动（动态间隔）");
-console.log("==================================\n");
+  console.log("\n==================================");
+  console.log("Dylan Heartbeat Runtime 已启动（动态间隔）");
+  console.log("==================================\n");
+}
+
+if (require.main === module) startRuntime();
+
+module.exports = {
+  buildWakeDecisionInput,
+  compareWakeDecisionShadow,
+  createWakeDecisionAdapter,
+  evaluateWakeDecision,
+  evaluateWakeDecisionGate,
+  getWakeDecisionMetrics,
+  getWakeDecisionRolloutMetrics,
+  createWakeDecisionSnapshotRuntime,
+  recordWakeDecisionMetrics,
+  runWakeUp,
+  scheduleNextCheck,
+  startRuntime
+};

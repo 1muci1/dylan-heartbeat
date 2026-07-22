@@ -41,7 +41,7 @@ test("Provider Registry resolves the Android command runtime by Tool", () => {
   const f = fixture();
   assert.equal(f.providers.get("android_device"), f.provider);
   assert.equal(f.providers.getForTool("android.device.status_get"), f.provider);
-  assert.equal(f.providers.getForTool("android.reminder.draft_create"), null);
+  assert.equal(f.providers.getForTool("android.reminder.draft_create"), f.provider);
 });
 
 test("automatic Android status completes Gateway, Provider, Command, and Normalizer chain", async () => {

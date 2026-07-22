@@ -23,6 +23,23 @@ class BridgeClientTest {
     }
 
     @Test
+    fun reminderDraftUsesOnlyFakeCompanionHandler() {
+        val handler = InMemoryReminderDraftHandler { "draft-1" }
+        val client = ProtocolBridgeClient(FakeDeviceTransport(
+            authorization = DeviceAuthorization { true },
+            reminderDraftHandler = handler,
+        ))
+        val input = mapOf("title" to "Call Alice", "time" to "2026-07-23T09:30:00.000Z")
+        val response = client.request(DeviceActions.REMINDER_DRAFT_CREATE, input)
+
+        assertTrue(response.success)
+        assertEquals("draft-1", response.result["draftId"])
+        assertEquals("created", response.result["status"])
+        assertEquals(mapOf("title" to "Call Alice", "time" to "2026-07-23T09:30:00.000Z"), input)
+        assertEquals(ReminderDraft("draft-1", "Call Alice", "2026-07-23T09:30:00.000Z"), handler.get("draft-1"))
+    }
+
+    @Test
     fun authorizationCannotBeBypassed() {
         val client = ProtocolBridgeClient(FakeDeviceTransport(DeviceAuthorization { false }))
         val response = client.request(DeviceActions.STATUS_GET)

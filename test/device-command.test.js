@@ -104,12 +104,45 @@ test("revoked Device is rejected even if it previously had an online session", a
   assert.equal(f.commandStore.records.size, 0);
 });
 
-test("only device.status_get is accepted", async () => {
+test("only explicitly registered status and Reminder Draft actions are accepted", async () => {
   const f = fixture();
   const deviceId = f.online();
-  for (const action of ["reminder.draft_create", "device.app_control", "notification.read"]) {
+  for (const action of ["device.app_control", "notification.read"]) {
     await assert.rejects(f.commands.execute({ deviceId, action }),
       error => error.code === "DEVICE_ACTION_UNSUPPORTED");
+  }
+  assert.equal(f.commandStore.records.size, 0);
+});
+
+test("Reminder Draft payload crosses protocol but is never retained by Command Store", async () => {
+  const transport = new FakeDeviceTransport({ draftId: "opaque-draft-1" });
+  const f = fixture({ transport });
+  const input = Object.freeze({
+    deviceId: f.online(),
+    action: "reminder.draft_create",
+    payload: Object.freeze({ title: "Call Alice", time: "2026-07-23T09:30:00.000Z" })
+  });
+  const result = await f.commands.execute(input);
+  assert.deepEqual(result.response.result, { draftId: "opaque-draft-1", status: "created" });
+  assert.deepEqual(transport.requests[0].payload, input.payload);
+  assert.deepEqual(input.payload, { title: "Call Alice", time: "2026-07-23T09:30:00.000Z" });
+  assert.doesNotMatch(JSON.stringify(f.commandStore.records.get("command-1")), /Call Alice|2026-07-23|payload|response/);
+});
+
+test("Command Service rejects action-specific payload shape before command creation", async () => {
+  const f = fixture();
+  const deviceId = f.online();
+  const invalid = [
+    { deviceId, action: "device.status_get", payload: { unexpected: true } },
+    { deviceId, action: "reminder.draft_create" },
+    { deviceId, action: "reminder.draft_create", payload: { title: " Call", time: "2026-07-23T09:30:00.000Z" } },
+    { deviceId, action: "reminder.draft_create", payload: { title: "Call", time: "not-a-time" } },
+    { deviceId, action: "reminder.draft_create", payload: {
+      title: "Call", time: "2026-07-23T09:30:00.000Z", notification: true
+    } }
+  ];
+  for (const input of invalid) {
+    await assert.rejects(f.commands.execute(input), error => error.code === "DEVICE_COMMAND_INVALID");
   }
   assert.equal(f.commandStore.records.size, 0);
 });
@@ -171,4 +204,5 @@ test("Command prototype stays outside forbidden capabilities and persistence bou
     "java", "com", "dylanheartbeat", "companion", "DeviceCommandClient.kt"), "utf8");
   assert.doesNotMatch(androidSource, /notification|app.?control|accessibility|\badb\b|HttpURLConnection|android\./i);
   assert.match(androidSource, /DeviceActions\.STATUS_GET/);
+  assert.match(androidSource, /DeviceActions\.REMINDER_DRAFT_CREATE/);
 });

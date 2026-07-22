@@ -4,7 +4,7 @@ const { randomUUID } = require("node:crypto");
 const { DeviceCommandStore } = require("./device-command-store");
 const { DeviceBridgeProtocol } = require("./device-bridge-protocol");
 
-const DEVICE_COMMAND_ACTIONS = Object.freeze(["device.status_get"]);
+const DEVICE_COMMAND_ACTIONS = Object.freeze(["device.status_get", "reminder.draft_create"]);
 const DEFAULT_COMMAND_TIMEOUT_MS = 5_000;
 
 class DeviceCommandError extends Error {
@@ -15,10 +15,27 @@ class DeviceCommandError extends Error {
   }
 }
 
-function exactInput(input) {
+function plainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function validInput(input) {
+  const keys = plainObject(input) ? Object.keys(input) : [];
   return Boolean(input) && typeof input === "object" && !Array.isArray(input) &&
-    Object.keys(input).length === 2 && typeof input.deviceId === "string" && Boolean(input.deviceId) &&
-    typeof input.action === "string" && Boolean(input.action);
+    keys.every(key => ["deviceId", "action", "payload"].includes(key)) &&
+    keys.includes("deviceId") && keys.includes("action") &&
+    typeof input.deviceId === "string" && Boolean(input.deviceId) &&
+    typeof input.action === "string" && Boolean(input.action) &&
+    (input.payload === undefined || plainObject(input.payload));
+}
+
+function validPayload(action, payload) {
+  if (action === "device.status_get") return payload === undefined || plainObject(payload) && Object.keys(payload).length === 0;
+  if (action !== "reminder.draft_create" || !plainObject(payload) || Object.keys(payload).length !== 2 ||
+      !Object.hasOwn(payload, "title") || !Object.hasOwn(payload, "time")) return false;
+  return typeof payload.title === "string" && payload.title.trim() === payload.title &&
+    payload.title.length >= 1 && payload.title.length <= 120 && typeof payload.time === "string" &&
+    payload.time.length <= 40 && payload.time.endsWith("Z") && !Number.isNaN(Date.parse(payload.time));
 }
 
 class DeviceCommandService {
@@ -45,10 +62,11 @@ class DeviceCommandService {
   }
 
   async execute(input = {}) {
-    if (!exactInput(input)) throw new DeviceCommandError("Command 输入无效");
+    if (!validInput(input)) throw new DeviceCommandError("Command 输入无效");
     if (!DEVICE_COMMAND_ACTIONS.includes(input.action)) {
       throw new DeviceCommandError("Device action 不支持", "DEVICE_ACTION_UNSUPPORTED");
     }
+    if (!validPayload(input.action, input.payload)) throw new DeviceCommandError("Command payload 无效");
     this.#assertPaired(input.deviceId);
     this.sessionService.assertOnline(input.deviceId);
 
@@ -59,7 +77,11 @@ class DeviceCommandService {
 
     let timer;
     try {
-      const request = this.protocol.createRequest({ deviceId: input.deviceId, action: input.action, payload: {} });
+      const request = this.protocol.createRequest({
+        deviceId: input.deviceId,
+        action: input.action,
+        payload: input.payload === undefined ? {} : input.payload
+      });
       this.commandStore.markSent(commandId);
       const response = await Promise.race([
         Promise.resolve().then(() => this.transport.send(request)),

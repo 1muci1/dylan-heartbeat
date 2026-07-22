@@ -93,7 +93,8 @@ test("Fake Transport performs offline roundtrips for both Android actions", asyn
     result: { batteryLevelBucket: "high", online: true, appForeground: false }, errorCode: null
   });
   const reminder = p.createRequest({
-    deviceId: "android-1", action: "reminder.draft_create", payload: { title: "Call", time: "09:00" }
+    deviceId: "android-1", action: "reminder.draft_create",
+    payload: { title: "Call", time: "2026-07-23T09:00:00.000Z" }
   });
   assert.deepEqual(await transport.send(reminder), {
     requestId: "request-2", success: true, result: { draftId: "draft-1", status: "created" }, errorCode: null

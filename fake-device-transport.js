@@ -17,6 +17,13 @@ class FakeDeviceTransport {
 
   async send(request) {
     const safeRequest = validateRequest(request);
+    const validStatus = safeRequest.action === "device.status_get" && !Object.keys(safeRequest.payload).length;
+    const validDraft = safeRequest.action === "reminder.draft_create" &&
+      Object.keys(safeRequest.payload).length === 2 && typeof safeRequest.payload.title === "string" &&
+      safeRequest.payload.title.trim() === safeRequest.payload.title && safeRequest.payload.title.length >= 1 &&
+      safeRequest.payload.title.length <= 120 && typeof safeRequest.payload.time === "string" &&
+      safeRequest.payload.time.endsWith("Z") && !Number.isNaN(Date.parse(safeRequest.payload.time));
+    if (!validStatus && !validDraft) throw new DeviceProtocolError("Device request 无效");
     this.requests.push(structuredClone(safeRequest));
     try {
       if (this.failActions.has(safeRequest.action)) throw new Error("isolated fake failure");

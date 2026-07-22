@@ -97,7 +97,8 @@ function inputHash(value) {
 }
 
 class ToolExecutionGateway {
-  constructor({ registry, executor = null, providerRegistry = null, approvalStore = null, policy = evaluateToolCapability } = {}) {
+  constructor({ registry, executor = null, providerRegistry = null, approvalStore = null,
+    auditStore = null, policy = evaluateToolCapability } = {}) {
     if (!registry || typeof registry.get !== "function") throw new TypeError("registry 必填");
     if (!(executor == null || typeof executor === "function" || executor && typeof executor.execute === "function")) {
       throw new TypeError("executor 无效");
@@ -115,6 +116,12 @@ class ToolExecutionGateway {
       throw new TypeError("approvalStore 无效");
     }
     this.approvalStore = approvalStore;
+    if (auditStore && ["recordRequested", "recordApproved", "recordCompleted", "recordFailed"]
+      .some(method => typeof auditStore[method] !== "function")) {
+      throw new TypeError("auditStore 无效");
+    }
+    this.auditStore = auditStore;
+    this.usedApprovalIds = new Set();
     if (!(typeof policy === "function" || policy && typeof policy.evaluate === "function")) {
       throw new TypeError("policy 无效");
     }
@@ -163,6 +170,7 @@ class ToolExecutionGateway {
           toolName: tool.name, inputHash: hash, riskLevel,
           reasonCode: policyDecision.reasonCode, summary: tool.description.slice(0, 240)
         });
+        this.#audit("recordRequested", { toolName: tool.name, approvalStatus: "pending" });
         return { errorCode: "TOOL_APPROVAL_REQUIRED", approval: approvalRequestFromRecord(approval) };
       }
       const approval = this.approvalStore.get(request.approvalId);
@@ -175,8 +183,15 @@ class ToolExecutionGateway {
       if (approval.status !== "approved") {
         throw new ToolExecutionGatewayError("Tool 权限拒绝", "TOOL_PERMISSION_DENIED");
       }
+      if (this.usedApprovalIds.has(approval.id)) {
+        throw new ToolExecutionGatewayError("Tool Approval 已使用", "TOOL_APPROVAL_ALREADY_USED");
+      }
+      this.#audit("recordApproved", { toolName: tool.name, approvalStatus: "approved" });
+      this.usedApprovalIds.add(approval.id);
     } else if (!policyDecision.allowed || policyDecision.decision !== "automatic") {
       throw new ToolExecutionGatewayError("Tool Policy 不可用", "TOOL_POLICY_UNAVAILABLE");
+    } else {
+      this.#audit("recordRequested", { toolName: tool.name });
     }
 
     try {
@@ -191,10 +206,22 @@ class ToolExecutionGateway {
           ? await this.executor({ tool, input: request.input })
           : await this.executor.execute({ tool, input: request.input });
       }
+      this.#audit("recordCompleted", { toolName: tool.name });
       return { success: true, toolName: tool.name, output };
     } catch (error) {
-      if (["TOOL_PROVIDER_NOT_FOUND", "TOOL_PROVIDER_EXECUTION_FAILED"].includes(error?.code)) throw error;
-      throw new ToolExecutionGatewayError("Tool 执行失败", "TOOL_EXECUTION_FAILED");
+      const exposed = ["TOOL_PROVIDER_NOT_FOUND", "TOOL_PROVIDER_EXECUTION_FAILED"].includes(error?.code)
+        ? error : new ToolExecutionGatewayError("Tool 执行失败", "TOOL_EXECUTION_FAILED");
+      this.#audit("recordFailed", { toolName: tool.name, errorCode: exposed.code });
+      throw exposed;
+    }
+  }
+
+  #audit(method, input) {
+    if (!this.auditStore) return;
+    try {
+      this.auditStore[method](input);
+    } catch {
+      throw new ToolExecutionGatewayError("Tool Audit 不可用", "TOOL_AUDIT_UNAVAILABLE");
     }
   }
 }

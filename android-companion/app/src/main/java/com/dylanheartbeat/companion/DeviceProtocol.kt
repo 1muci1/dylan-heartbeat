@@ -2,7 +2,8 @@ package com.dylanheartbeat.companion
 
 object DeviceActions {
     const val STATUS_GET = "device.status_get"
-    val allowed: Set<String> = setOf(STATUS_GET)
+    const val REMINDER_DRAFT_CREATE = "reminder.draft_create"
+    val allowed: Set<String> = setOf(STATUS_GET, REMINDER_DRAFT_CREATE)
 }
 
 data class BridgeRequest(

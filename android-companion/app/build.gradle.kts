@@ -7,6 +7,15 @@ android {
     namespace = "com.dylanheartbeat.companion"
     compileSdk = 35
 
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+
+    kotlinOptions {
+        jvmTarget = "21"
+    }
+
     defaultConfig {
         applicationId = "com.dylanheartbeat.companion"
         minSdk = 26

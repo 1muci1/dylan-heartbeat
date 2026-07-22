@@ -19,7 +19,7 @@ function fakeTool(overrides = {}) {
 }
 
 test("registry registers, lists, and queries validated fake Tool metadata", () => {
-  const registry = new ToolRegistry();
+  const registry = new ToolRegistry({ definitions: [] });
   const input = fakeTool();
   const before = structuredClone(input);
   const registered = registry.register(input);
@@ -78,10 +78,21 @@ test("returned metadata cannot mutate Registry state", () => {
   assert.equal(registry.list().length, 1);
 });
 
-test("default definitions are static and empty until tools are explicitly approved", () => {
+test("default definitions include the approved proactive explanation query", () => {
   assert.ok(Object.isFrozen(TOOL_DEFINITIONS));
-  assert.deepEqual(TOOL_DEFINITIONS, []);
-  assert.deepEqual(new ToolRegistry().list(), []);
+  assert.deepEqual(TOOL_DEFINITIONS.map(tool => tool.name), ["proactive_explanation_get"]);
+  assert.deepEqual(new ToolRegistry().get("proactive_explanation_get"), {
+    name: "proactive_explanation_get",
+    description: "Return a structured read-only explanation for one proactive delivery.",
+    inputSchema: {
+      type: "object",
+      properties: { deliveryId: { type: "string", minLength: 1, maxLength: 200 } },
+      required: ["deliveryId"],
+      additionalProperties: false
+    },
+    permissionLevel: "automatic",
+    executionType: "local"
+  });
 });
 
 test("Registry layer has no execution, mobile, MCP, model, network, or database dependency", () => {

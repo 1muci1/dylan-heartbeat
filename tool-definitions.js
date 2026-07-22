@@ -6,7 +6,22 @@ const TOOL_DEFINITION_FIELDS = Object.freeze([
   "name", "description", "inputSchema", "permissionLevel", "executionType"
 ]);
 
-const TOOL_DEFINITIONS = Object.freeze([]);
+const TOOL_DEFINITIONS = Object.freeze([
+  Object.freeze({
+    name: "proactive_explanation_get",
+    description: "Return a structured read-only explanation for one proactive delivery.",
+    inputSchema: Object.freeze({
+      type: "object",
+      properties: Object.freeze({
+        deliveryId: Object.freeze({ type: "string", minLength: 1, maxLength: 200 })
+      }),
+      required: Object.freeze(["deliveryId"]),
+      additionalProperties: false
+    }),
+    permissionLevel: "automatic",
+    executionType: "local"
+  })
+]);
 
 module.exports = {
   EXECUTION_TYPES,

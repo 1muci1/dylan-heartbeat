@@ -35,6 +35,8 @@ const { ProactiveContactSettings } = require("./proactive-contact-settings");
 const { registerProactiveDeliveryRoutes } = require("./proactive-delivery-routes");
 const { ProactiveView } = require("./proactive-view");
 const { ProactiveFeedbackStore } = require("./proactive-feedback-store");
+const { ProactiveExplanationView } = require("./proactive-explanation-view");
+const { registerProactiveExplanationRoutes } = require("./proactive-explanation-routes");
 const { registerToolAuditRoutes } = require("./tool-audit-routes");
 const { DeviceIdentityStore } = require("./device-identity-store");
 const { DevicePairingService } = require("./device-pairing-service");
@@ -100,6 +102,12 @@ const conversationSummaryService = new ConversationSummaryService({ database: da
 const aiTaskRunner = new AiTaskRunner({ store: aiMemoryStore, service: conversationSummaryService, eventStore, deliveryStore, config: aiConfig, logger: app.log });
 const relationshipViewService = new RelationshipViewService({ memoryStore: structuredMemoryStore, eventStore, stateStore });
 const proactiveView = new ProactiveView({ deliveryStore, stateStore, relationshipView: relationshipViewService, eventStore, feedbackStore: proactiveFeedbackStore });
+const proactiveExplanationView = new ProactiveExplanationView({
+  deliveryStore,
+  aiJobStore: aiMemoryStore,
+  eventStore,
+  feedbackStore: proactiveFeedbackStore
+});
 const deviceIdentityStore = new DeviceIdentityStore();
 const devicePairingService = new DevicePairingService({ store: deviceIdentityStore });
 const wakeDecisionGate = new WakeDecisionGate({
@@ -121,6 +129,7 @@ registerStateRoutes(app, { store: stateStore });
 registerRelationshipRoutes(app, { service: relationshipViewService });
 registerWakeDecisionRoutes(app, { gate: wakeDecisionGate, snapshotClient: wakeDecisionSnapshotClient });
 registerProactiveDeliveryRoutes(app, { deliveryStore, settings: proactiveContactSettings, proactiveView, feedbackStore: proactiveFeedbackStore });
+registerProactiveExplanationRoutes(app, { explanationView: proactiveExplanationView });
 registerToolAuditRoutes(app, { eventStore });
 registerDevicePairingRoutes(app, { pairingService: devicePairingService });
 registerMemoryAdmin(app, {

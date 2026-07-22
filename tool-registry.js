@@ -7,7 +7,7 @@ const {
   TOOL_DEFINITION_FIELDS
 } = require("./tool-definitions");
 
-const NAME_PATTERN = /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*){1,7}$/;
+const NAME_PATTERN = /^(?:[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*){1,7}|[a-z][a-z0-9]*(?:_[a-z][a-z0-9]*){1,7})$/;
 const MAX_NAME_LENGTH = 120;
 const MAX_DESCRIPTION_LENGTH = 500;
 

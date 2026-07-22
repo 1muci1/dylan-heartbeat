@@ -82,21 +82,42 @@ Roadmap 只记录已经落地的能力和明确指定的下一阶段。每个阶
 
 安全边界：不保存评论或消息正文；不推断情绪；不修改人格、Behavior Policy、Memory 或关系等级；MCP 保持只读。
 
+### P6-9.13 Proactive Explanation Layer 第一阶段
+
+目标：以 Delivery ID 为锚点，提供安全、结构化、只读的主动行为解释查询。
+
+已完成：
+
+- Proactive Explanation 只读数据读取层。
+- Delivery、AI Job、Trigger Event 和 Feedback 的精确关联与字段白名单。
+- Delivery 状态到稳定 summary code 的映射。
+- 认证只读 GET API：`/api/v1/proactive/explanations/:deliveryId`。
+- `proactive_explanation_get` 静态 Tool Registry 定义。
+- 缺失关联返回不可用，不反推历史事实。
+
+安全边界：不调用模型；不写 Event、State 或 Memory；不修改 Delivery；不调用 Device Command；不新增 migration 或数据库字段；尚未注册到 MCP Server。
+
+### P6-9.38 Reminder Draft Integration 第一阶段
+
+目标：通过现有 Agent Tool Runtime 和 Android Device Command Channel，在已配对设备的 Companion 应用内创建待用户检查的 Reminder Draft。
+
+已完成：
+
+- `android.reminder.draft_create` Tool、严格输入 schema 和逐次 Approval。
+- Tool Audit、Provider、Device Authorization、Device Command 和协议校验链路。
+- Android Companion 进程内 Reminder Draft handler。
+- Android/Kotlin JVM 单元测试和 Debug APK 构建验证。
+
+安全边界：仅创建 Companion 应用内草稿；不创建系统 Reminder、Alarm、Calendar 或通知；不新增 Android 权限；不接入真实系统 API；不自动修改 Memory、State 或关系等级。
+
 ## 下一阶段
 
-### P6-9.13 Proactive Explanation Layer
+当前没有明确标记为 `READY` 的下一阶段。以下仅为基于现有架构的候选方向，不代表授权、排期或实现目标：
 
-状态：READY
+- Proactive Explanation MCP Server 与现有受认证 HTTP client 接入。
+- Companion Center Proactive Explanation 只读 UI。
+- 逐 Delivery Wake Decision 历史关联；前提是先明确可信关联来源和持久化边界。
+- Reminder Draft 的 Companion 前台检查体验；不包含真实系统 Reminder API。
+- Reminder Draft Approval/执行幂等边界的进一步持久化设计；不得隐式修改现有 Approval 生命周期。
 
-目标：增加主动行为解释查询能力，让 Companion Center 能基于现有 Delivery、Event、State、Relationship 和决策事实说明一次主动行为为何发生、被阻止、失败或处于当前状态。
-
-预期边界：
-
-- 只读查询，不增加发送、Retry、Cancel 或设置写能力。
-- 使用现有结构化事实，不调用模型生成解释。
-- 不修改 Delivery、Memory、State、Wake Decision、Rollout 或 Behavior Policy。
-- 不暴露消息正文、prompt、provider response、token、URL、错误栈、锁或内部字段。
-- 不创建新的业务事实，除非后续任务明确要求 Event 类型和写入路径。
-- HTTP 与 MCP 能力必须由后续任务明确指定，不自动扩展 MCP 权限模型。
-
-本阶段暂不实现任何代码；具体输入、输出 schema 和查询范围等待 P6-9.13 任务定义。
+所有候选阶段当前状态均为 `NOT_READY`。在阶段编号、目标、输入输出、安全边界和明确授权确定之前，不创建实现任务、不修改代码、不新增 migration，也不扩展 HTTP、MCP、Device 或 Android 权限。

@@ -2,7 +2,8 @@
 
 ## 已完成
 
-P6-9.13 Proactive Explanation Layer 第一阶段
+- P6-9.13 Proactive Explanation Layer 第一阶段。
+- P6-9.38 Reminder Draft Integration 第一阶段。
 
 ## 当前系统状态
 
@@ -22,4 +23,14 @@ P6-9.13 Proactive Explanation Layer 第一阶段
 
 ## 下一阶段
 
-P6-9.13 后续阶段可评估 MCP Server 接入、Companion Center UI 和逐 Delivery Wake Decision 可靠关联；上述能力均尚未实现，等待明确任务定义。
+当前没有明确标记为 `READY` 的下一阶段。
+
+候选方向包括：
+
+- Proactive Explanation MCP Server 接入。
+- Companion Center Explanation 只读 UI。
+- 逐 Delivery Wake Decision 可靠关联。
+- Reminder Draft Companion 前台检查体验。
+- Reminder Draft Approval/执行幂等边界的进一步设计。
+
+以上候选均未进入实现阶段。等待明确的阶段编号、目标、范围和安全边界后再继续。

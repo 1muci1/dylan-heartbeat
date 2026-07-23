@@ -7,7 +7,7 @@ const EVENT_DEFINITIONS = Object.freeze({
   }),
   "memory.created": Object.freeze({
     category: "memory",
-    allowedSources: Object.freeze(["structured-memory-store", "memory-api", "memory-seed", "memory-candidate", "memory-admin"])
+    allowedSources: Object.freeze(["structured-memory-store", "memory-api", "memory-seed", "memory-candidate", "memory-admin", "memory-import-runtime"])
   }),
   "memory.updated": Object.freeze({
     category: "memory",

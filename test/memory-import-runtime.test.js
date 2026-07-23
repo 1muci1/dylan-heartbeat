@@ -116,11 +116,16 @@ test("preview expires at its TTL and cannot be recovered", t => {
 test("commit accepts only ready hash-bound items and repeated commit is idempotent", t => {
   const { database, store } = fixture(t);
   let createCalls = 0;
+  const createOptions = [];
   const originalCreate = store.create.bind(store);
   store.create = (input, options) => {
     createCalls++;
+    createOptions.push(options);
     return originalCreate(input, options);
   };
+  store.update = () => { throw new Error("commit must not call update"); };
+  store.softDelete = () => { throw new Error("commit must not call softDelete"); };
+  store.restore = () => { throw new Error("commit must not call restore"); };
   const previewService = new MemoryImportPreviewService({ store });
   const preview = previewService.create(document());
   const selected = [{ id: preview.items[0].id, itemHash: preview.items[0].itemHash }];
@@ -134,6 +139,7 @@ test("commit accepts only ready hash-bound items and repeated commit is idempote
   assert.equal(first.created, 1);
   assert.equal(first.results[0].status, "created");
   assert.equal(createCalls, 1);
+  assert.deepEqual(createOptions, [{ eventContext: { source: "memory-import-runtime" } }]);
   const row = database.prepare("SELECT source FROM memory_items WHERE id=?").get(first.results[0].memoryId);
   assert.equal(row.source, "memory-import:v1:fact:personal-backup");
 

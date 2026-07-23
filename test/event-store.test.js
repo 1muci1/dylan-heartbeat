@@ -89,6 +89,23 @@ test("dedupe, get, existsByDedupeKey and not found behavior", async t => {
   assert.throws(() => store.get("missing"), error => error.code === "EVENT_NOT_FOUND");
 });
 
+test("memory-import-runtime may create memory.created while unknown sources remain forbidden", async t => {
+  const { store } = await fixture(t);
+  const event = store.create({
+    eventType: "memory.created",
+    subjectType: "memory",
+    subjectId: "imported-memory-1",
+    payload: { type: "MEMORY", importance: 4, source: "memory-import:v1:fact:reviewed" },
+    dedupeKey: "memory:imported-memory-1:created"
+  }, { source: "memory-import-runtime" });
+  assert.equal(event.eventType, "memory.created");
+  assert.equal(event.source, "memory-import-runtime");
+  assert.throws(
+    () => store.create({ eventType: "memory.created" }, { source: "unapproved-memory-importer" }),
+    error => error.code === "EVENT_SOURCE_FORBIDDEN"
+  );
+});
+
 test("list paginates, filters time, and normalizes timestamps", async t => {
   const { store } = await fixture(t);
   for (const [index, occurredAt] of ["2026-07-16T12:00:00+02:00", "2026-07-17T10:00:00Z", "2026-07-18T10:00:00Z"].entries()) {

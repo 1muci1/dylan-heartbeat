@@ -6,6 +6,15 @@ const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
 const z = require("zod/v4");
 const { MemoryApiClient } = require("./memory-api-client");
+const {
+  DELIVERY_STATUSES,
+  FEEDBACK_TYPES,
+  MAX_DELIVERY_ID_LENGTH,
+  PROACTIVE_EXPLANATION_TOOL_NAME,
+  SUMMARY_CODES,
+  mapPublicExplanation
+} = require("./proactive-explanation-contract");
+const { ToolRegistry } = require("./tool-registry");
 
 const MEMORY_TYPES = ["MEMORY", "EVENT", "MOMENT", "PROMISE", "WISHLIST", "NOTE"];
 const MEMORY_STATUSES = ["active", "archived", "deleted"];
@@ -69,16 +78,37 @@ function mapToolError(error) {
   };
 }
 
+function mapExplanationToolError(error) {
+  let code = "EXPLANATION_UNAVAILABLE";
+  let message = "Proactive Explanation 服务暂时不可用";
+  if (error?.code === "PROACTIVE_EXPLANATION_INVALID" || error?.code === "INVALID_ARGUMENT") {
+    code = "INVALID_ARGUMENT";
+    message = "deliveryId 参数无效";
+  } else if (error?.statusCode === 404 || error?.code === "DELIVERY_NOT_FOUND") {
+    code = "DELIVERY_NOT_FOUND";
+    message = "Delivery 不存在";
+  } else if ([401, 403].includes(error?.statusCode) || error?.code === "UNAUTHORIZED") {
+    code = "UNAUTHORIZED";
+    message = "Proactive Explanation API 认证失败";
+  }
+  const structuredContent = { error: { code, message } };
+  return {
+    isError: true,
+    content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+    structuredContent
+  };
+}
+
 function registerMemoryTools(server, apiClient) {
   const readOnlyAnnotations = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
-  const register = (name, config, handler) => server.registerTool(name, {
+  const register = (name, config, handler, errorMapper = mapToolError) => server.registerTool(name, {
     ...config,
     annotations: readOnlyAnnotations
   }, async input => {
     try {
       return toolSuccess(await handler(input));
     } catch (error) {
-      return mapToolError(error);
+      return errorMapper(error);
     }
   });
 
@@ -199,6 +229,47 @@ function registerMemoryTools(server, apiClient) {
     };
   });
 
+  const explanationTool = new ToolRegistry().get(PROACTIVE_EXPLANATION_TOOL_NAME);
+  const expectedInput = explanationTool?.inputSchema;
+  if (!expectedInput || expectedInput.required?.length !== 1 || expectedInput.required[0] !== "deliveryId" ||
+      expectedInput.properties?.deliveryId?.maxLength !== MAX_DELIVERY_ID_LENGTH ||
+      expectedInput.additionalProperties !== false) {
+    throw new MemoryMcpConfigurationError("proactive_explanation_get contract 无效");
+  }
+  register(PROACTIVE_EXPLANATION_TOOL_NAME, {
+    title: "Get Proactive Explanation",
+    description: explanationTool.description,
+    inputSchema: z.strictObject({
+      deliveryId: z.string().trim().min(1).max(MAX_DELIVERY_ID_LENGTH)
+    }),
+    outputSchema: z.strictObject({
+      deliveryId: z.string(),
+      summaryCode: z.enum(Object.values(SUMMARY_CODES)),
+      delivery: z.strictObject({
+        status: z.enum(DELIVERY_STATUSES),
+        channel: z.string(),
+        reasonCode: z.string(),
+        attemptCount: z.number().int().nonnegative(),
+        createdAt: z.string(),
+        sentAt: z.string().nullable(),
+        failedAt: z.string().nullable(),
+        lastErrorCode: z.string().nullable()
+      }),
+      aiJob: z.strictObject({
+        available: z.boolean(), id: z.string().nullable(), status: z.string().nullable()
+      }),
+      triggerEvent: z.strictObject({
+        available: z.boolean(), eventType: z.string().nullable(), occurredAt: z.string().nullable()
+      }),
+      wakeDecision: z.strictObject({
+        available: z.literal(false), decision: z.null(), reasonCode: z.null()
+      }),
+      feedback: z.strictObject({
+        feedbackType: z.enum(FEEDBACK_TYPES), createdAt: z.string()
+      }).nullable()
+    })
+  }, async ({ deliveryId }) => mapPublicExplanation(await apiClient.proactiveExplanation(deliveryId)), mapExplanationToolError);
+
   register("tool_audit_get", {
     title: "Get Tool Audit",
     description: "Query the safe read-only Tool lifecycle audit trail.",
@@ -286,6 +357,7 @@ module.exports = {
   createMemoryMcpRuntime,
   main,
   mapToolError,
+  mapExplanationToolError,
   readMemoryMcpConfig,
   registerMemoryTools
 };

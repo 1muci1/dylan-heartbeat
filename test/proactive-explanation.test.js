@@ -7,6 +7,12 @@ const { test } = require("node:test");
 const Fastify = require("fastify");
 const { ProactiveExplanationView } = require("../proactive-explanation-view");
 const { registerProactiveExplanationRoutes } = require("../proactive-explanation-routes");
+const {
+  PROACTIVE_EXPLANATION_INPUT_SCHEMA,
+  PROACTIVE_EXPLANATION_TOOL_NAME,
+  mapPublicExplanation
+} = require("../proactive-explanation-contract");
+const { TOOL_DEFINITIONS } = require("../tool-definitions");
 
 function delivery(overrides = {}) {
   return {
@@ -85,6 +91,27 @@ test("explanation maps every Delivery state and marks missing optional facts una
     assert.deepEqual(result.triggerEvent, { available: false, eventType: null, occurredAt: null });
     assert.equal(result.feedback, null);
   }
+});
+
+test("shared contract is the Registry input source and sanitizes HTTP output", () => {
+  const definition = TOOL_DEFINITIONS.find(item => item.name === PROACTIVE_EXPLANATION_TOOL_NAME);
+  assert.equal(definition.inputSchema, PROACTIVE_EXPLANATION_INPUT_SCHEMA);
+  const view = new ProactiveExplanationView({ deliveryStore: { get() { return delivery(); } } });
+  const publicResult = view.get("delivery-1");
+  const sanitized = mapPublicExplanation({
+    ...publicResult,
+    secret: "drop-me",
+    delivery: { ...publicResult.delivery, text: "drop-me", lockOwner: "drop-me" }
+  });
+  assert.deepEqual(sanitized, publicResult);
+  assert.doesNotMatch(JSON.stringify(sanitized), /drop-me|lockOwner|text/i);
+  assert.throws(() => mapPublicExplanation({ ...publicResult, summaryCode: "UNKNOWN" }));
+  assert.throws(() => mapPublicExplanation({
+    ...publicResult, feedback: { feedbackType: "inferred_mood", createdAt: "2026-07-22T11:00:00.000Z" }
+  }));
+  assert.throws(() => mapPublicExplanation({
+    ...publicResult, aiJob: { available: false, id: "untrusted-job", status: null }
+  }));
 });
 
 test("explanation validates IDs and only hides explicit missing optional associations", () => {

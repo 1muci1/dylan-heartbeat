@@ -66,7 +66,7 @@ test("local MCP client discovers tools and calls memory_search over stdio", asyn
 
   const discovered = await client.listTools();
   assert.deepEqual(discovered.tools.map(tool => tool.name), [
-    "memory_search", "memory_get", "memory_list", "memory_stats", "companion_state_get", "relationship_view_get", "proactive_overview_get", "tool_audit_get"
+    "memory_search", "memory_get", "memory_list", "memory_stats", "companion_state_get", "relationship_view_get", "proactive_overview_get", "proactive_explanation_get", "tool_audit_get"
   ]);
   const search = discovered.tools.find(tool => tool.name === "memory_search");
   assert.match(search.description, /Search active long-term Memory by keyword/);

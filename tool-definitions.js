@@ -1,5 +1,10 @@
 "use strict";
 
+const {
+  PROACTIVE_EXPLANATION_INPUT_SCHEMA,
+  PROACTIVE_EXPLANATION_TOOL_NAME
+} = require("./proactive-explanation-contract");
+
 const PERMISSION_LEVELS = Object.freeze(["automatic", "user_confirm", "blocked"]);
 const EXECUTION_TYPES = Object.freeze(["local", "device_bridge", "vps_relay"]);
 const TOOL_DEFINITION_FIELDS = Object.freeze([
@@ -8,16 +13,9 @@ const TOOL_DEFINITION_FIELDS = Object.freeze([
 
 const TOOL_DEFINITIONS = Object.freeze([
   Object.freeze({
-    name: "proactive_explanation_get",
+    name: PROACTIVE_EXPLANATION_TOOL_NAME,
     description: "Return a structured read-only explanation for one proactive delivery.",
-    inputSchema: Object.freeze({
-      type: "object",
-      properties: Object.freeze({
-        deliveryId: Object.freeze({ type: "string", minLength: 1, maxLength: 200 })
-      }),
-      required: Object.freeze(["deliveryId"]),
-      additionalProperties: false
-    }),
+    inputSchema: PROACTIVE_EXPLANATION_INPUT_SCHEMA,
     permissionLevel: "automatic",
     executionType: "local"
   })

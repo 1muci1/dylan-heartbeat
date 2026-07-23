@@ -69,14 +69,18 @@ test("Memory API client only issues allowlisted GET requests", async () => {
   await client.list({ page: 1, keyword: "rain" });
   await client.get("memory-1");
   await client.stats();
+  await client.proactiveExplanation("delivery-1");
   assert.deepEqual(requests.map(request => new URL(request.url).pathname), [
-    "/api/v1/memories", "/api/v1/memories/memory-1", "/api/v1/memories/stats"
+    "/api/v1/memories", "/api/v1/memories/memory-1", "/api/v1/memories/stats",
+    "/api/v1/proactive/explanations/delivery-1"
   ]);
   assert.equal(requests.every(request => request.options.method === "GET"), true);
   assert.equal(requests.every(request => request.options.body === undefined), true);
   assert.equal(requests.every(request => request.options.headers.Authorization === "Bearer test-memory-token"), true);
   await assert.rejects(client.request("/api/v1/memories/memory-1/comments"), /路径不允许/);
   await assert.rejects(client.request("/admin/memory/export"), /路径不允许/);
+  await assert.rejects(client.request("/api/v1/proactive/explanations/delivery-1/details"), /路径不允许/);
+  assert.throws(() => client.proactiveExplanation("x".repeat(201)), /deliveryId/);
 });
 
 function registeredTools(apiClient) {
@@ -85,9 +89,26 @@ function registeredTools(apiClient) {
   return tools;
 }
 
-test("Memory MCP registers exactly six read-only tools", () => {
+function explanation(overrides = {}) {
+  return {
+    deliveryId: "delivery-1",
+    summaryCode: "DELIVERY_SENT",
+    delivery: {
+      status: "sent", channel: "push", reasonCode: "FOLLOW_UP", attemptCount: 1,
+      createdAt: "2026-07-22T10:00:00.000Z", sentAt: "2026-07-22T10:00:02.000Z",
+      failedAt: null, lastErrorCode: null
+    },
+    aiJob: { available: true, id: "job-1", status: "completed" },
+    triggerEvent: { available: false, eventType: null, occurredAt: null },
+    wakeDecision: { available: false, decision: null, reasonCode: null },
+    feedback: null,
+    ...overrides
+  };
+}
+
+test("Memory MCP registers its approved read-only tools", () => {
   const tools = registeredTools({});
-  assert.deepEqual([...tools.keys()], ["memory_search", "memory_get", "memory_list", "memory_stats", "companion_state_get", "relationship_view_get", "proactive_overview_get", "tool_audit_get"]);
+  assert.deepEqual([...tools.keys()], ["memory_search", "memory_get", "memory_list", "memory_stats", "companion_state_get", "relationship_view_get", "proactive_overview_get", "proactive_explanation_get", "tool_audit_get"]);
   for (const { definition } of tools.values()) {
     assert.deepEqual(definition.annotations, {
       readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false
@@ -95,15 +116,15 @@ test("Memory MCP registers exactly six read-only tools", () => {
   }
 });
 
-test("tool schemas enforce required arguments, enums, and limit 20", async t => {
-  const apiClient = { list: async query => ({ data: [], meta: { query } }), get: async id => ({ data: { id }, meta: {} }), stats: async () => ({ data: {}, meta: {} }), state: async () => ({ items: [] }), relationship: async () => ({}) };
+test("tool schemas enforce required arguments, enums, and limits", async t => {
+  const apiClient = { list: async query => ({ data: [], meta: { query } }), get: async id => ({ data: { id }, meta: {} }), stats: async () => ({ data: {}, meta: {} }), state: async () => ({ items: [] }), relationship: async () => ({}), proactiveExplanation: async () => explanation() };
   const runtime = createMemoryMcpRuntime({ config: config(), apiClient, signalSource: new EventEmitter() });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "memory-mcp-test", version: "1.0.0" });
   await Promise.all([runtime.server.connect(serverTransport), client.connect(clientTransport)]);
   t.after(async () => { await client.close(); await runtime.close(); });
   const listed = await client.listTools();
-  assert.deepEqual(listed.tools.map(tool => tool.name), ["memory_search", "memory_get", "memory_list", "memory_stats", "companion_state_get", "relationship_view_get", "proactive_overview_get", "tool_audit_get"]);
+  assert.deepEqual(listed.tools.map(tool => tool.name), ["memory_search", "memory_get", "memory_list", "memory_stats", "companion_state_get", "relationship_view_get", "proactive_overview_get", "proactive_explanation_get", "tool_audit_get"]);
   for (const args of [{}, { query: "rain", limit: 21 }, { query: "rain", type: "UNKNOWN" }]) {
     const result = await client.callTool({ name: "memory_search", arguments: args });
     assert.equal(result.isError, true);
@@ -115,6 +136,52 @@ test("tool schemas enforce required arguments, enums, and limit 20", async t => 
   assert.deepEqual(valid.structuredContent.items, []);
   const tooLarge = await client.callTool({ name: "memory_list", arguments: { limit: 21 } });
   assert.equal(tooLarge.isError, true);
+  for (const args of [{}, { deliveryId: " " }, { deliveryId: "x".repeat(201) },
+    { deliveryId: "delivery-1", includeText: true }]) {
+    const result = await client.callTool({ name: "proactive_explanation_get", arguments: args });
+    assert.equal(result.isError, true);
+  }
+  const explanationResult = await client.callTool({
+    name: "proactive_explanation_get", arguments: { deliveryId: " delivery-1 " }
+  });
+  assert.equal(explanationResult.isError, undefined);
+  assert.deepEqual(explanationResult.structuredContent, explanation());
+  assert.deepEqual(JSON.parse(explanationResult.content[0].text), explanationResult.structuredContent);
+});
+
+test("proactive explanation tool calls only its HTTP client method and strips unknown response fields", async () => {
+  const calls = [];
+  const payload = explanation({
+    text: "secret-text",
+    delivery: { ...explanation().delivery, lockOwner: "secret-worker" },
+    aiJob: { ...explanation().aiJob, provider: "secret-provider" }
+  });
+  const tools = registeredTools({
+    async proactiveExplanation(id) { calls.push(id); return payload; }
+  });
+  const result = await tools.get("proactive_explanation_get").handler({ deliveryId: "delivery-1" });
+  assert.deepEqual(calls, ["delivery-1"]);
+  assert.deepEqual(result.structuredContent, explanation());
+  assert.deepEqual(JSON.parse(result.content[0].text), result.structuredContent);
+  assert.doesNotMatch(JSON.stringify(result), /secret-text|secret-worker|secret-provider|lockOwner|provider/i);
+});
+
+test("proactive explanation tool maps missing, unavailable, and auth failures without leaking details", async () => {
+  const secret = "never-expose-explanation-secret";
+  const cases = [
+    [Object.assign(new Error(secret), { statusCode: 404, code: "DELIVERY_NOT_FOUND" }), "DELIVERY_NOT_FOUND"],
+    [Object.assign(new Error(secret), { statusCode: 500, code: "PROACTIVE_EXPLANATION_UNAVAILABLE" }), "EXPLANATION_UNAVAILABLE"],
+    [Object.assign(new Error(secret), { statusCode: 401, code: "UNAUTHORIZED" }), "UNAUTHORIZED"]
+  ];
+  for (const [failure, code] of cases) {
+    const tools = registeredTools({ proactiveExplanation: async () => { throw failure; } });
+    const result = await tools.get("proactive_explanation_get").handler({ deliveryId: "delivery-1" });
+    assert.equal(result.isError, true);
+    assert.equal(result.structuredContent.error.code, code);
+    assert.deepEqual(JSON.parse(result.content[0].text), result.structuredContent);
+    assert.doesNotMatch(JSON.stringify(result), new RegExp(secret));
+    assert.doesNotMatch(JSON.stringify(result), /stack/i);
+  }
 });
 
 test("six tools call the API client with bounded read-only arguments", async () => {

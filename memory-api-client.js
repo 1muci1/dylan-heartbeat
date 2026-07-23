@@ -1,11 +1,14 @@
 "use strict";
 
+const { normalizeDeliveryId } = require("./proactive-explanation-contract");
+
 const LIST_PATH = "/api/v1/memories";
 const STATS_PATH = "/api/v1/memories/stats";
 const STATE_PATH = "/api/v1/state";
 const RELATIONSHIP_PATH = "/api/v1/relationship";
 const PROACTIVE_OVERVIEW_PATH = "/api/v1/proactive/overview";
 const TOOL_AUDIT_PATH = "/api/v1/tools/audit";
+const PROACTIVE_EXPLANATION_PATH = "/api/v1/proactive/explanations";
 const MEMORY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 class MemoryApiClientError extends Error {
@@ -61,6 +64,11 @@ class MemoryApiClient {
     return this.request(PROACTIVE_OVERVIEW_PATH);
   }
 
+  proactiveExplanation(deliveryId) {
+    const normalized = normalizeDeliveryId(deliveryId);
+    return this.request(`${PROACTIVE_EXPLANATION_PATH}/${encodeURIComponent(normalized)}`);
+  }
+
   toolAudit(query = {}) {
     const search = new URLSearchParams();
     for (const key of ["limit", "toolName", "eventType", "from", "to"]) {
@@ -75,6 +83,7 @@ class MemoryApiClient {
       pathname === `${STATE_PATH}?scopeType=companion&scopeId=default` ||
       pathname === RELATIONSHIP_PATH || pathname === PROACTIVE_OVERVIEW_PATH ||
       pathname === TOOL_AUDIT_PATH || pathname.startsWith(`${TOOL_AUDIT_PATH}?`) ||
+      new RegExp(`^${PROACTIVE_EXPLANATION_PATH}/(?:[A-Za-z0-9._~!'()*-]|%[0-9A-Fa-f]{2}){1,600}$`).test(pathname) ||
       new RegExp(`^${LIST_PATH}/[A-Za-z0-9][A-Za-z0-9._%:-]{0,383}$`).test(pathname);
     if (!allowed) throw new MemoryApiClientError("Memory API 路径不允许", "MEMORY_API_PATH_FORBIDDEN", 403);
     const url = new URL(pathname, this.baseUrl);

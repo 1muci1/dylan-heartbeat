@@ -1,12 +1,6 @@
 "use strict";
 
-const SUMMARY_CODES = Object.freeze({
-  pending: "DELIVERY_PENDING",
-  sending: "DELIVERY_SENDING",
-  sent: "DELIVERY_SENT",
-  failed: "DELIVERY_FAILED",
-  cancelled: "DELIVERY_CANCELLED"
-});
+const { SUMMARY_CODES, createPublicExplanation, normalizeDeliveryId } = require("./proactive-explanation-contract");
 
 class ProactiveExplanationError extends Error {
   constructor(message, statusCode = 400, code = "PROACTIVE_EXPLANATION_INVALID") {
@@ -15,13 +9,6 @@ class ProactiveExplanationError extends Error {
     this.statusCode = statusCode;
     this.code = code;
   }
-}
-
-function deliveryId(value) {
-  if (typeof value !== "string" || !value.trim() || value.trim().length > 200) {
-    throw new ProactiveExplanationError("deliveryId 格式无效");
-  }
-  return value.trim();
 }
 
 function unavailable(fields) {
@@ -50,30 +37,15 @@ class ProactiveExplanationView {
   }
 
   get(deliveryIdValue) {
-    const id = deliveryId(deliveryIdValue);
+    const id = normalizeDeliveryId(deliveryIdValue);
     const delivery = this.deliveryStore.get(id);
     const aiJob = this.#aiJob(delivery.jobId);
     const triggerEvent = this.#event(delivery.eventId);
     const feedback = this.#feedback(id);
-    const summaryCode = SUMMARY_CODES[delivery.status];
-    if (!summaryCode) throw new ProactiveExplanationError("Delivery 状态不可解释", 500, "PROACTIVE_EXPLANATION_UNAVAILABLE");
-
-    return Object.freeze({
-      deliveryId: delivery.id,
-      summaryCode,
-      delivery: Object.freeze({
-        status: delivery.status,
-        channel: delivery.channel,
-        reasonCode: delivery.reasonCode,
-        attemptCount: delivery.attemptCount,
-        createdAt: delivery.createdAt,
-        sentAt: delivery.sentAt,
-        failedAt: delivery.failedAt,
-        lastErrorCode: delivery.lastErrorCode
-      }),
+    return createPublicExplanation({
+      delivery,
       aiJob,
       triggerEvent,
-      wakeDecision: unavailable({ decision: null, reasonCode: null }),
       feedback
     });
   }
@@ -105,4 +77,4 @@ class ProactiveExplanationView {
   }
 }
 
-module.exports = { ProactiveExplanationError, ProactiveExplanationView, SUMMARY_CODES, deliveryId };
+module.exports = { ProactiveExplanationError, ProactiveExplanationView, SUMMARY_CODES, normalizeDeliveryId };

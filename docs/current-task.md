@@ -3,6 +3,7 @@
 ## 已完成
 
 - P6-9.13 Proactive Explanation Layer 第一阶段。
+- P6-9.13 Explanation MCP Server 第一阶段。
 - P6-9.38 Reminder Draft Integration 第一阶段。
 
 ## 当前系统状态
@@ -12,7 +13,9 @@
 - Device Runtime 完成基础闭环。
 - Proactive Explanation 已新增按 Delivery ID 聚合的只读数据读取层。
 - 已新增认证 GET API：`/api/v1/proactive/explanations/:deliveryId`。
-- `proactive_explanation_get` 定义已接入静态 Tool Registry，尚未注册到 MCP Server。
+- Explanation 的 Tool name、input schema、字段白名单和公共输出 mapper 已收敛到 shared contract。
+- `proactive_explanation_get` 已注册到现有 MCP Server；HTTP 与 MCP 使用同一公共 mapper，保持 schema 一致。
+- Explanation MCP Tool 保持只读：仅使用固定 GET 路径，无 Approval、写能力、任意 URL 或任意 HTTP method。
 - Explanation 只返回 Delivery、AI Job、Trigger Event 和 Feedback 的安全字段；Wake Decision 缺少可靠历史关联时返回不可用。
 - Explanation 不调用模型，不写 Event、State 或 Memory，不修改 Delivery，也不调用 Device Command Channel。
 - Reminder Draft 已接入现有 Approval、Audit 和 Device Command Channel。
@@ -27,10 +30,12 @@
 
 候选方向包括：
 
-- Proactive Explanation MCP Server 接入。
 - Companion Center Explanation 只读 UI。
 - 逐 Delivery Wake Decision 可靠关联。
+- 模型生成的 Explanation。
 - Reminder Draft Companion 前台检查体验。
 - Reminder Draft Approval/执行幂等边界的进一步设计。
+
+Explanation MCP Server 第一阶段不包含 UI、Wake Decision 关联或模型解释，也不扩展任何 Reminder 相关能力。
 
 以上候选均未进入实现阶段。等待明确的阶段编号、目标、范围和安全边界后再继续。

@@ -160,6 +160,51 @@ test("Sticker messages persist as sticker and become a short model descriptor", 
   const user = (await history(id))[0]; assert.equal(user.type, "sticker"); assert.equal(user.sticker.id, sticker.id);
 });
 
+test("chat consumes memory context without logging or persisting memory content", async () => {
+  const memoryContent = "PRIVATE_MEMORY_CONTEXT_TEST_7c2e";
+  const created = await app.inject({
+    method: "POST",
+    url: "/api/v1/memories",
+    headers: auth,
+    payload: { type: "MEMORY", title: "Context test", content: memoryContent, importance: 5 }
+  });
+  assert.equal(created.statusCode, 201);
+
+  const id = await createSession("Memory context");
+  let forwarded = null;
+  const logs = [];
+  const originalLog = console.log;
+  console.log = (...values) => { logs.push(values.map(String).join(" ")); };
+  try {
+    global.fetch = async (_url, options) => {
+      forwarded = JSON.parse(options.body);
+      return new Response(JSON.stringify({
+        choices: [{ message: { role: "assistant", content: "memory-aware reply" } }]
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      headers: { "x-session-id": id },
+      payload: { model: "test", stream: false, messages: [{ role: "user", content: "context user" }] }
+    });
+    assert.equal(response.statusCode, 200);
+  } finally {
+    console.log = originalLog;
+  }
+
+  const context = forwarded.messages.find(message =>
+    message.role === "system" && message.content.includes("<memory_reference_data")
+  );
+  assert.ok(context);
+  assert.match(context.content, new RegExp(memoryContent));
+  assert.equal(logs.join("\n").includes(memoryContent), false);
+  assert.deepEqual((await history(id)).map(message => message.content), [
+    "context user",
+    "memory-aware reply"
+  ]);
+});
+
 test("upstream errors record error status instead of completed", async () => {
   const id = await createSession("Error");
   jsonUpstream("upstream rejected", 502);

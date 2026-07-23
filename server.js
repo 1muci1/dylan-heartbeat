@@ -9,6 +9,8 @@ const { beginSessionTurn, createSseAccumulator } = require("./chat-session-persi
 const { openDatabase } = require("./database");
 const { SessionStore } = require("./session-store");
 const { StructuredMemoryStore } = require("./structured-memory-store");
+const { AgentMemoryRetriever } = require("./agent-memory-retriever");
+const { AgentMemoryContextBuilder } = require("./agent-memory-context-builder");
 const { registerMemoryRoutes } = require("./memory-routes");
 const { MediaStore } = require("./media-store");
 const { registerMediaRoutes } = require("./media-routes");
@@ -86,6 +88,12 @@ const stateProjector = new StateProjector({ stateStore });
 const eventStore = new EventStore({ database: databaseConnection.db, stateProjector, logger: app.log });
 const sessionStore = new SessionStore({ database: databaseConnection.db, filename: databaseConnection.filename });
 const structuredMemoryStore = new StructuredMemoryStore({ database: databaseConnection.db, filename: databaseConnection.filename, eventStore, logger: app.log });
+const agentMemoryRetriever = new AgentMemoryRetriever({
+  store: structuredMemoryStore,
+  defaultLimit: 8,
+  defaultCharacterBudget: 3000
+});
+const agentMemoryContextBuilder = new AgentMemoryContextBuilder({ maxItems: 8, maxCharacters: 3000 });
 const mediaStore = new MediaStore({
   database: databaseConnection.db,
   imageDir: process.env.CHAT_IMAGE_UPLOAD_DIR || "./uploads/chat-images",
@@ -809,6 +817,14 @@ app.post("/v1/chat/completions", async (req, reply) => {
     const sortedRemove = Array.from(removeSet).sort((a, b) => b - a);
     for (const idx of sortedRemove) {
       llmMessages.splice(idx, 1);
+    }
+
+    const memoryContext = agentMemoryContextBuilder.build(
+      agentMemoryRetriever.retrieve({ limit: 8, characterBudget: 3000 })
+    );
+    if (memoryContext) {
+      const firstConversationMessage = llmMessages.findIndex(message => message.role !== "system");
+      llmMessages.splice(firstConversationMessage < 0 ? llmMessages.length : firstConversationMessage, 0, memoryContext);
     }
 
     if (!TARGET_API_URL || !process.env.TARGET_API_KEY) {

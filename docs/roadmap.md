@@ -114,6 +114,21 @@ Roadmap 只记录已经落地的能力和明确指定的下一阶段。每个阶
 
 安全边界：仅创建 Companion 应用内草稿；不创建系统 Reminder、Alarm、Calendar 或通知；不新增 Android 权限；不接入真实系统 API；不自动修改 Memory、State 或关系等级。
 
+### Memory Runtime 第一阶段内部核心模块
+
+目标：在不扩展 API、UI、MCP 写权限或数据库结构的前提下，建立受控 Memory Import 和 Agent 只读检索的内部核心边界。
+
+已完成：
+
+- `ai-companion-memory-import/v1` Import Contract，以及 `fact`、`preference`、`event`、`relationship` 四类映射。
+- 严格 schema、额外字段拒绝、导入数量/内容限制，以及安全 source marker。
+- 进程内 Memory Import Preview、TTL、item hash 绑定和 `ready/duplicate/conflict/sensitive/invalid` 决策。
+- 只接受用户确认的 `ready` item、commit 前重新校验和幂等结果的 Memory Import Commit。
+- 仅通过 `StructuredMemoryStore.create` 创建正式 Memory，不覆盖或修改既有 Memory。
+- Agent Memory Retriever 的 active-only 读取、分类过滤、字段白名单、数量限制和字符预算。
+
+安全边界：不自动保存聊天；不自动批准；不写入敏感内容；不覆盖历史事实；不调用模型或外部服务；不新增 migration、数据库字段、HTTP API、UI 或 MCP 写能力。
+
 ## 下一阶段
 
 当前没有明确标记为 `READY` 的下一阶段。以下仅为基于现有架构的候选方向，不代表授权、排期或实现目标：
@@ -122,5 +137,9 @@ Roadmap 只记录已经落地的能力和明确指定的下一阶段。每个阶
 - 逐 Delivery Wake Decision 历史关联；前提是先明确可信关联来源和持久化边界。
 - Reminder Draft Companion 前台检查体验实现；设计已完成，但本地存储、TTL、Android schema 和 command receipt 事务边界尚未批准，不包含真实系统 Reminder API。
 - Reminder Draft Approval/执行幂等实现；设计已完成，但 Gateway migration、新表、Android receipt 存储和结果确认协议尚未批准，不得隐式修改现有 Approval 生命周期。
+- Memory UI；需先明确导入入口、Preview/确认交互、敏感内容展示和错误恢复边界。
+- Memory API；内部 Contract/Preview/Commit 尚未形成 HTTP 能力，任何写接口需单独设计、认证和授权。
+- 自动聊天记忆；不得将聊天或模型输出自动写入长期 Memory，候选生成和用户确认边界尚未形成新的授权阶段。
+- Memory MCP 写能力；现有 MCP 保持只读，不因内部 Memory Runtime 完成而增加 Import、Preview 或 Commit Tool。
 
-所有候选阶段当前状态均为 `NOT_READY`。在阶段编号、目标、输入输出、安全边界和明确授权确定之前，不创建实现任务、不修改代码、不新增 migration，也不扩展 HTTP、MCP、Device 或 Android 权限。
+所有候选阶段当前状态均为 `NOT_READY`。Memory Runtime 第一阶段内部核心模块完成不改变这些候选状态；在阶段编号、目标、输入输出、安全边界和明确授权确定之前，不创建实现任务、不修改代码、不新增 migration，也不扩展 HTTP、MCP、Device 或 Android 权限。

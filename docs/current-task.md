@@ -7,6 +7,7 @@
 - P6-9.38 Reminder Draft Integration 第一阶段。
 - P6-9.38 Reminder Draft Approval/执行幂等边界设计。
 - P6-9.38 Reminder Draft Companion 前台检查体验设计。
+- Memory Runtime 第一阶段内部核心模块。
 
 ## 当前系统状态
 
@@ -27,6 +28,11 @@
 - Manifest 权限仍只有 INTERNET。
 - Node 全量测试已覆盖 Reminder Draft 基础闭环。
 - Android Companion 已在 JDK 17 和 Android SDK 35 环境完成 JVM 单元测试与 Debug APK 构建验证。
+- Memory Runtime 已实现 `ai-companion-memory-import/v1` Import Contract，支持 `fact`、`preference`、`event`、`relationship` 四类长期记忆。
+- Memory Import Preview 已实现严格校验、TTL、item hash 绑定，以及 `ready/duplicate/conflict/sensitive/invalid` 决策；Preview 不写 Memory，也不调用模型。
+- Memory Import Commit 已实现只提交用户确认的 `ready` item、commit 前 hash/duplicate/conflict 重检和幂等结果；写入仅通过 `StructuredMemoryStore.create`。
+- Agent Memory Retriever 已实现只读 active Memory、分类过滤、字段白名单、数量限制和字符预算。
+- Memory Runtime 第一阶段保持为内部核心模块，没有 HTTP API、UI、MCP 写 Tool、migration、数据库字段或外部服务接入。
 
 ## 下一阶段
 
@@ -39,7 +45,11 @@
 - 模型生成的 Explanation。
 - Reminder Draft Companion 前台检查体验实现；设计已完成，仍缺本地存储、TTL、Android schema 和 receipt 事务边界授权。
 - Reminder Draft Approval/执行幂等实现；设计已完成，仍缺 migration、新表、Android receipt 和结果确认协议授权。
+- Memory UI；尚未明确页面入口、确认交互和敏感内容展示边界。
+- Memory API；内部 Import/Preview/Commit 尚未暴露为 HTTP 能力，任何写接口仍需独立设计和授权。
+- 自动聊天记忆；聊天不能自动写入长期 Memory，仍须保留候选和用户确认边界。
+- Memory MCP 写能力；现有 MCP 继续只读，不注册 Import、Preview 或 Commit 写 Tool。
 
 Explanation MCP Server 第一阶段不包含 UI、Wake Decision 关联或模型解释，也不扩展任何 Reminder 相关能力。
 
-以上候选均未进入实现阶段，也未标记为 `READY`。等待明确的阶段编号、目标、范围和安全边界后再继续。
+以上候选均未进入实现阶段，也未标记为 `READY`。Memory Runtime 内部核心模块完成不代表 UI、API、自动聊天记忆或 MCP 写能力获得授权；等待明确的阶段编号、目标、范围和安全边界后再继续。

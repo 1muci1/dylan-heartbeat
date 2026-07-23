@@ -1,0 +1,105 @@
+.explanation-page {
+  background:
+    radial-gradient(circle at 50% -8%, rgba(216, 202, 233, .55), transparent 30%),
+    var(--bg);
+}
+
+.explanation-shell { padding-bottom: calc(var(--nav-height) + 36px); }
+
+.explanation-header {
+  display: grid;
+  grid-template-columns: 42px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.explanation-header p {
+  margin-bottom: 5px;
+  color: #958c9d;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: .16em;
+}
+
+.explanation-header h1 {
+  margin: 0;
+  font-family: "Songti SC", "STSong", serif;
+  font-size: 23px;
+  font-weight: 600;
+}
+
+.explanation-back {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--primary-dark);
+  background: rgba(255,255,255,.8);
+  font-size: 27px;
+}
+
+.explanation-readonly {
+  padding: 6px 10px;
+  border-radius: 99px;
+  color: #657e92;
+  background: #eaf0f4;
+  font-size: 10px;
+}
+
+.explanation-intro {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.explanation-query,
+.explanation-notice,
+.explanation-summary,
+.explanation-card {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid rgba(109,86,126,.08);
+  border-radius: 22px;
+  background: rgba(255,255,255,.84);
+  box-shadow: 0 14px 32px rgba(62,44,75,.055);
+}
+
+.explanation-query label { display: block; margin-bottom: 8px; color: #6f6574; font-size: 11px; font-weight: 700; }
+.explanation-query > div { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 9px; }
+.explanation-query input { min-width: 0; padding: 11px 12px; border: 1px solid var(--line); border-radius: 12px; color: var(--text); background: white; font: inherit; }
+.explanation-query button { padding: 0 15px; border: 0; border-radius: 12px; color: white; background: var(--primary); font-weight: 700; }
+.explanation-query button:disabled { opacity: .55; }
+.explanation-query p { margin-top: 9px; color: #9b92a1; font-size: 9px; line-height: 1.5; }
+
+.explanation-notice h2 { margin: 0 0 7px; font-size: 15px; }
+.explanation-notice p { color: var(--muted); font-size: 11px; line-height: 1.6; }
+.explanation-notice a { display: inline-block; margin-top: 10px; color: var(--primary); font-size: 11px; font-weight: 700; }
+.explanation-notice[data-kind="error"] { border-color: rgba(171,73,85,.24); background: rgba(255,244,245,.92); }
+
+.explanation-summary p { color: #958c9d; font-size: 9px; font-weight: 700; letter-spacing: .16em; }
+.explanation-summary h2 { margin: 7px 0; font-family: "Songti SC", "STSong", serif; font-size: 21px; }
+.explanation-summary span { display: block; overflow-wrap: anywhere; color: var(--muted); font-size: 10px; }
+
+.explanation-sections { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 11px; }
+.explanation-card { min-width: 0; }
+.explanation-card h3 { margin: 0 0 13px; font-size: 14px; }
+.explanation-card dl { margin: 0; }
+.explanation-card div + div { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.explanation-card dt { color: #aaa1ae; font-size: 9px; }
+.explanation-card dd { margin: 4px 0 0; overflow-wrap: anywhere; color: #615767; font-size: 11px; font-weight: 650; }
+.explanation-unavailable { color: var(--muted); font-size: 11px; line-height: 1.6; }
+
+@media (max-width: 420px) {
+  .explanation-query > div,
+  .explanation-sections { grid-template-columns: 1fr; }
+  .explanation-query button { min-height: 42px; }
+}
+
+@media (max-width: 359px) {
+  .explanation-shell { padding-right: 14px; padding-left: 14px; }
+  .explanation-header { grid-template-columns: 38px 1fr; }
+  .explanation-readonly { display: none; }
+}

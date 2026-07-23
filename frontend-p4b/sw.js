@@ -1,4 +1,4 @@
-const CACHE_NAME = "xinban-shell-v20-p4b";
+const CACHE_NAME = "xinban-shell-v21-p4b";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -8,6 +8,7 @@ const APP_SHELL = [
   "./memory.html",
   "./stickers.html",
   "./ai-memory-review.html",
+  "./proactive-explanation.html",
   "./manifest.json",
   "./assets/css/common.css",
   "./assets/css/home.css",
@@ -17,6 +18,7 @@ const APP_SHELL = [
   "./assets/css/memory.css",
   "./assets/css/stickers.css",
   "./assets/css/ai-memory-review.css",
+  "./assets/css/proactive-explanation.css",
   "./assets/js/data.js",
   "./assets/js/message.js",
   "./assets/js/provider.js",
@@ -31,6 +33,7 @@ const APP_SHELL = [
   "./assets/js/settings.js",
   "./assets/js/memory.js",
   "./assets/js/ai-memory-review.js",
+  "./assets/js/proactive-explanation.js",
   "./assets/icons/icon.svg",
   "./assets/icons/maskable-icon.svg"
 ];

@@ -162,6 +162,8 @@ test("Sticker messages persist as sticker and become a short model descriptor", 
 
 test("chat consumes memory context without logging or persisting memory content", async () => {
   const memoryContent = "PRIVATE_MEMORY_CONTEXT_TEST_7c2e";
+  const identityContent = "ASSISTANT_IDENTITY_CONTEXT_TEST_4a91";
+  const nicknameContent = "USER_NICKNAME_CONTEXT_TEST_8b13";
   const created = await app.inject({
     method: "POST",
     url: "/api/v1/memories",
@@ -169,6 +171,24 @@ test("chat consumes memory context without logging or persisting memory content"
     payload: { type: "MEMORY", title: "Context test", content: memoryContent, importance: 5 }
   });
   assert.equal(created.statusCode, 201);
+  for (const [title, content] of [
+    ["Companion名称", identityContent],
+    ["用户称呼", nicknameContent]
+  ]) {
+    const identity = await app.inject({
+      method: "POST",
+      url: "/api/v1/memories",
+      headers: auth,
+      payload: {
+        type: "MEMORY",
+        title,
+        content,
+        source: "memory-import:v1:relationship:server-regression",
+        importance: 5
+      }
+    });
+    assert.equal(identity.statusCode, 201);
+  }
 
   const id = await createSession("Memory context");
   let forwarded = null;
@@ -196,9 +216,22 @@ test("chat consumes memory context without logging or persisting memory content"
   const context = forwarded.messages.find(message =>
     message.role === "system" && message.content.includes("<memory_reference_data")
   );
+  const identityContext = forwarded.messages.find(message =>
+    message.role === "system" && message.content.includes("<identity_reference_data")
+  );
   assert.ok(context);
+  assert.ok(identityContext);
   assert.match(context.content, new RegExp(memoryContent));
-  assert.equal(logs.join("\n").includes(memoryContent), false);
+  assert.match(identityContext.content, new RegExp(identityContent));
+  assert.match(identityContext.content, new RegExp(nicknameContent));
+  const identityIndex = forwarded.messages.indexOf(identityContext);
+  const memoryIndex = forwarded.messages.indexOf(context);
+  const conversationIndex = forwarded.messages.findIndex(message => message.role === "user");
+  assert.ok(identityIndex < memoryIndex && memoryIndex < conversationIndex);
+  const logged = logs.join("\n");
+  assert.equal(logged.includes(memoryContent), false);
+  assert.equal(logged.includes(identityContent), false);
+  assert.equal(logged.includes(nicknameContent), false);
   assert.deepEqual((await history(id)).map(message => message.content), [
     "context user",
     "memory-aware reply"

@@ -11,6 +11,7 @@ const { SessionStore } = require("./session-store");
 const { StructuredMemoryStore } = require("./structured-memory-store");
 const { AgentMemoryRetriever } = require("./agent-memory-retriever");
 const { AgentMemoryContextBuilder } = require("./agent-memory-context-builder");
+const { AgentIdentityContextBuilder } = require("./agent-identity-context-builder");
 const { registerMemoryRoutes } = require("./memory-routes");
 const { MediaStore } = require("./media-store");
 const { registerMediaRoutes } = require("./media-routes");
@@ -94,6 +95,7 @@ const agentMemoryRetriever = new AgentMemoryRetriever({
   defaultCharacterBudget: 3000
 });
 const agentMemoryContextBuilder = new AgentMemoryContextBuilder({ maxItems: 8, maxCharacters: 3000 });
+const agentIdentityContextBuilder = new AgentIdentityContextBuilder({ database: databaseConnection.db });
 const mediaStore = new MediaStore({
   database: databaseConnection.db,
   imageDir: process.env.CHAT_IMAGE_UPLOAD_DIR || "./uploads/chat-images",
@@ -819,12 +821,18 @@ app.post("/v1/chat/completions", async (req, reply) => {
       llmMessages.splice(idx, 1);
     }
 
+    const identityContext = agentIdentityContextBuilder.build();
     const memoryContext = agentMemoryContextBuilder.build(
       agentMemoryRetriever.retrieve({ limit: 8, characterBudget: 3000 })
     );
-    if (memoryContext) {
+    const runtimeContexts = [identityContext, memoryContext].filter(Boolean);
+    if (runtimeContexts.length) {
       const firstConversationMessage = llmMessages.findIndex(message => message.role !== "system");
-      llmMessages.splice(firstConversationMessage < 0 ? llmMessages.length : firstConversationMessage, 0, memoryContext);
+      llmMessages.splice(
+        firstConversationMessage < 0 ? llmMessages.length : firstConversationMessage,
+        0,
+        ...runtimeContexts
+      );
     }
 
     if (!TARGET_API_URL || !process.env.TARGET_API_KEY) {

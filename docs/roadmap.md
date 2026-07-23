@@ -93,9 +93,11 @@ Roadmap 只记录已经落地的能力和明确指定的下一阶段。每个阶
 - Delivery 状态到稳定 summary code 的映射。
 - 认证只读 GET API：`/api/v1/proactive/explanations/:deliveryId`。
 - `proactive_explanation_get` 静态 Tool Registry 定义。
+- Explanation shared contract，以及共用公共 mapper 的 HTTP/MCP schema 一致性边界。
+- 现有本地 MCP Server 中只读的 `proactive_explanation_get` Tool。
 - 缺失关联返回不可用，不反推历史事实。
 
-安全边界：不调用模型；不写 Event、State 或 Memory；不修改 Delivery；不调用 Device Command；不新增 migration 或数据库字段；尚未注册到 MCP Server。
+安全边界：不调用模型；不写 Event、State 或 Memory；不修改 Delivery；不调用 Device Command；不新增 migration 或数据库字段；MCP 只允许固定 GET 路径，不开放 Approval、写能力、任意 URL 或任意 HTTP method。
 
 ### P6-9.38 Reminder Draft Integration 第一阶段
 
@@ -114,7 +116,6 @@ Roadmap 只记录已经落地的能力和明确指定的下一阶段。每个阶
 
 当前没有明确标记为 `READY` 的下一阶段。以下仅为基于现有架构的候选方向，不代表授权、排期或实现目标：
 
-- Proactive Explanation MCP Server 与现有受认证 HTTP client 接入。
 - Companion Center Proactive Explanation 只读 UI。
 - 逐 Delivery Wake Decision 历史关联；前提是先明确可信关联来源和持久化边界。
 - Reminder Draft 的 Companion 前台检查体验；不包含真实系统 Reminder API。

@@ -109,6 +109,8 @@ Roadmap 只记录已经落地的能力和明确指定的下一阶段。每个阶
 - Tool Audit、Provider、Device Authorization、Device Command 和协议校验链路。
 - Android Companion 进程内 Reminder Draft handler。
 - Android/Kotlin JVM 单元测试和 Debug APK 构建验证。
+- Approval/执行幂等边界设计；确认强幂等需要单独批准持久化 Approval、execution receipt、稳定 command ID 和 Android receipt。
+- Companion 前台检查体验设计；明确草稿 lifecycle、本地持久化、重启恢复及 Gateway/Device Command 边界。
 
 安全边界：仅创建 Companion 应用内草稿；不创建系统 Reminder、Alarm、Calendar 或通知；不新增 Android 权限；不接入真实系统 API；不自动修改 Memory、State 或关系等级。
 
@@ -118,7 +120,7 @@ Roadmap 只记录已经落地的能力和明确指定的下一阶段。每个阶
 
 - Companion Center Proactive Explanation 只读 UI。
 - 逐 Delivery Wake Decision 历史关联；前提是先明确可信关联来源和持久化边界。
-- Reminder Draft 的 Companion 前台检查体验；不包含真实系统 Reminder API。
-- Reminder Draft Approval/执行幂等边界的进一步持久化设计；不得隐式修改现有 Approval 生命周期。
+- Reminder Draft Companion 前台检查体验实现；设计已完成，但本地存储、TTL、Android schema 和 command receipt 事务边界尚未批准，不包含真实系统 Reminder API。
+- Reminder Draft Approval/执行幂等实现；设计已完成，但 Gateway migration、新表、Android receipt 存储和结果确认协议尚未批准，不得隐式修改现有 Approval 生命周期。
 
 所有候选阶段当前状态均为 `NOT_READY`。在阶段编号、目标、输入输出、安全边界和明确授权确定之前，不创建实现任务、不修改代码、不新增 migration，也不扩展 HTTP、MCP、Device 或 Android 权限。

@@ -5,6 +5,8 @@
 - P6-9.13 Proactive Explanation Layer 第一阶段。
 - P6-9.13 Explanation MCP Server 第一阶段。
 - P6-9.38 Reminder Draft Integration 第一阶段。
+- P6-9.38 Reminder Draft Approval/执行幂等边界设计。
+- P6-9.38 Reminder Draft Companion 前台检查体验设计。
 
 ## 当前系统状态
 
@@ -20,6 +22,8 @@
 - Explanation 不调用模型，不写 Event、State 或 Memory，不修改 Delivery，也不调用 Device Command Channel。
 - Reminder Draft 已接入现有 Approval、Audit 和 Device Command Channel。
 - Android Companion 当前仅使用进程内草稿 handler，不调用真实 Reminder API。
+- Reminder Draft 幂等设计已确认：当前进程内 Approval/Command 状态不足以支持跨重启、多实例和网络结果不确定场景；任何持久化实现仍未获授权。
+- Companion review 设计已明确 `created/rejected/expired` 本地生命周期；本地 repository、重启恢复和 UI 尚未实现。
 - Manifest 权限仍只有 INTERNET。
 - Node 全量测试已覆盖 Reminder Draft 基础闭环。
 - Android Companion 已在 JDK 17 和 Android SDK 35 环境完成 JVM 单元测试与 Debug APK 构建验证。
@@ -33,9 +37,9 @@
 - Companion Center Explanation 只读 UI。
 - 逐 Delivery Wake Decision 可靠关联。
 - 模型生成的 Explanation。
-- Reminder Draft Companion 前台检查体验。
-- Reminder Draft Approval/执行幂等边界的进一步设计。
+- Reminder Draft Companion 前台检查体验实现；设计已完成，仍缺本地存储、TTL、Android schema 和 receipt 事务边界授权。
+- Reminder Draft Approval/执行幂等实现；设计已完成，仍缺 migration、新表、Android receipt 和结果确认协议授权。
 
 Explanation MCP Server 第一阶段不包含 UI、Wake Decision 关联或模型解释，也不扩展任何 Reminder 相关能力。
 
-以上候选均未进入实现阶段。等待明确的阶段编号、目标、范围和安全边界后再继续。
+以上候选均未进入实现阶段，也未标记为 `READY`。等待明确的阶段编号、目标、范围和安全边界后再继续。

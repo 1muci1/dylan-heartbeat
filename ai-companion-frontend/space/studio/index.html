@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="zh-CN" data-companion-theme="night">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>沉的小世界 · 空间工作室</title>
+  <link rel="stylesheet" href="../../theme/theme.css">
+  <link rel="stylesheet" href="../../avatar/avatar.css">
+  <link rel="stylesheet" href="./studio.css">
+</head>
+<body class="companion-themed-page">
+  <main class="studio-shell">
+    <header class="studio-header">
+      <div>
+        <p class="studio-kicker">SPACE STUDIO</p>
+        <h1>沉的小世界</h1>
+        <p>在这里整理紫月小屋的样子。所有配置只停留在当前页面。</p>
+      </div>
+      <button type="button" class="button button--quiet" data-profile-reset>恢复默认</button>
+    </header>
+
+    <section class="studio-preview companion-themed-surface" aria-label="空间预览" data-space-preview>
+      <div class="studio-preview__background"></div>
+      <div class="studio-preview__room">
+        <span class="moon" aria-hidden="true">☾</span>
+        <div data-avatar-preview aria-label="当前沉头像"></div>
+        <p>紫月小屋</p>
+      </div>
+    </section>
+
+    <section class="profile-card companion-themed-surface" aria-labelledby="profile-title">
+      <h2 id="profile-title">当前 Space Profile</h2>
+      <dl>
+        <div><dt>名称</dt><dd data-profile-name></dd></div>
+        <div><dt>主题</dt><dd data-profile-theme></dd></div>
+        <div><dt>头像</dt><dd data-profile-avatar></dd></div>
+        <div><dt>背景</dt><dd data-profile-background></dd></div>
+        <div><dt>字体</dt><dd data-profile-font></dd></div>
+      </dl>
+    </section>
+
+    <div class="studio-grid">
+      <section class="panel panel--wide companion-themed-surface">
+        <h2>空间预设</h2>
+        <label>选择完整空间风格
+          <select data-preset-select aria-label="空间预设"></select>
+        </label>
+        <p data-preset-description></p>
+        <div class="preset-preview" data-preset-preview aria-label="预设预览"></div>
+        <button type="button" class="button" data-preset-apply>应用预设</button>
+      </section>
+
+      <section class="panel companion-themed-surface">
+        <h2>氛围设置</h2>
+        <label>环境模式
+          <select data-atmosphere-mode>
+            <option value="auto">自动</option>
+            <option value="day">白天</option>
+            <option value="night">夜晚</option>
+          </select>
+        </label>
+        <p>当前空间状态</p>
+        <strong class="atmosphere-status" data-atmosphere-status></strong>
+      </section>
+
+      <section class="panel companion-themed-surface">
+        <h2>主题设置</h2>
+        <label>日夜模式
+          <select data-theme-mode>
+            <option value="night">night · 紫月夜</option>
+            <option value="day">day · 柔光白昼</option>
+            <option value="auto">auto · 跟随系统</option>
+          </select>
+        </label>
+        <label>主色
+          <select data-theme-color>
+            <option value="purple">紫月</option>
+            <option value="rose">雾粉</option>
+            <option value="blue">星蓝</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="panel companion-themed-surface">
+        <h2>背景设置</h2>
+        <label>上传背景图片
+          <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" data-background-upload>
+        </label>
+        <label>透明度
+          <input type="range" min="0" max="1" step="0.05" data-background-opacity>
+        </label>
+        <label>模糊程度
+          <input type="range" min="0" max="24" step="1" data-background-blur>
+        </label>
+        <button type="button" class="button button--quiet" data-background-clear>清除背景</button>
+      </section>
+
+      <section class="panel companion-themed-surface">
+        <h2>字体设置</h2>
+        <p>当前字体：<strong data-profile-font></strong></p>
+        <label>字体切换
+          <select data-font-family>
+            <option value="default">默认</option>
+            <option value="serif">衬线</option>
+            <option value="rounded">圆体</option>
+          </select>
+        </label>
+        <label>自定义字体名称
+          <input type="text" maxlength="80" placeholder="例如 Chen Custom" data-font-custom-family>
+        </label>
+        <label>自定义字体 URL（仅预览）
+          <input type="url" maxlength="2048" placeholder="/assets/font.woff2" data-font-custom-url>
+        </label>
+        <button type="button" class="button" data-font-apply>预览字体</button>
+      </section>
+
+      <section class="panel companion-themed-surface">
+        <h2>头像设置</h2>
+        <label>上传头像
+          <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" data-avatar-upload>
+        </label>
+        <label>缩放
+          <input type="range" min="1" max="3" step="0.05" data-avatar-scale>
+        </label>
+        <label>水平裁剪
+          <input type="range" min="0" max="100" step="1" data-avatar-x>
+        </label>
+        <label>垂直裁剪
+          <input type="range" min="0" max="100" step="1" data-avatar-y>
+        </label>
+        <label>边框
+          <select data-avatar-frame>
+            <option value="moon">月光</option>
+            <option value="soft">柔和</option>
+            <option value="minimal">简约</option>
+            <option value="none">无边框</option>
+          </select>
+        </label>
+      </section>
+    </div>
+    <p class="studio-status" role="status" aria-live="polite" data-studio-status>配置仅在当前运行期间生效</p>
+  </main>
+  <script src="../../theme/theme-engine.js"></script>
+  <script src="../../avatar/avatar-studio.js"></script>
+  <script src="../space-profile.js"></script>
+  <script src="../presets/presets.js"></script>
+  <script src="../presets/preset-manager.js"></script>
+  <script src="../atmosphere/atmosphere-presets.js"></script>
+  <script src="../atmosphere/atmosphere-engine.js"></script>
+  <script src="./studio.js"></script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#251b31">
+  <meta name="description" content="沉的小世界 · Space Studio">
+  <link rel="stylesheet" href="../theme/theme.css">
+  <link rel="stylesheet" href="../avatar/avatar.css">
+  <link rel="stylesheet" href="space.css">
+  <title>沉的小世界 · Space Studio</title>
+</head>
+<body class="companion-themed-page">
+  <main class="space-shell">
+    <header class="page-header">
+      <div>
+        <p>COMPANION SPACE</p>
+        <h1>沉的小世界</h1>
+      </div>
+      <span data-space-mode>紫月夜</span>
+    </header>
+
+    <section class="preview-card companion-themed-surface" aria-labelledby="preview-title">
+      <div class="moon" aria-hidden="true"></div>
+      <div class="avatar-stage" data-avatar-stage></div>
+      <div>
+        <p class="eyebrow">SPACE PREVIEW</p>
+        <h2 id="preview-title">欢迎回来</h2>
+        <p>这里的主题、头像、字体和背景只属于当前页面会话。</p>
+      </div>
+    </section>
+
+    <section class="studio-card companion-themed-surface" aria-labelledby="studio-title">
+      <header class="section-heading">
+        <div>
+          <p>SPACE STUDIO</p>
+          <h2 id="studio-title">空间设置</h2>
+        </div>
+        <button type="button" data-reset-space>恢复默认</button>
+      </header>
+
+      <div class="settings-grid">
+        <fieldset>
+          <legend>主题模式</legend>
+          <div class="segmented" data-theme-modes>
+            <button type="button" data-theme-mode="auto">自动</button>
+            <button type="button" data-theme-mode="day">白昼</button>
+            <button type="button" data-theme-mode="night">紫月夜</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>头像</legend>
+          <label class="file-control">
+            <span>选择头像图片</span>
+            <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" data-avatar-upload>
+          </label>
+          <label>
+            缩放
+            <input type="range" min="1" max="3" step=".05" value="1" data-avatar-zoom>
+          </label>
+          <div class="crop-grid">
+            <label>水平<input type="range" min="0" max="100" value="50" data-avatar-x></label>
+            <label>垂直<input type="range" min="0" max="100" value="50" data-avatar-y></label>
+          </div>
+          <label>
+            边框
+            <select data-avatar-border>
+              <option value="moon">月光环</option>
+              <option value="soft">柔和</option>
+              <option value="minimal">极简</option>
+              <option value="none">无边框</option>
+            </select>
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>背景</legend>
+          <label>
+            图片 URL
+            <input type="url" placeholder="https://… 或 /assets/…" data-background-url>
+          </label>
+          <div class="button-row">
+            <button type="button" data-apply-background>应用背景</button>
+            <button type="button" data-clear-background>清除背景</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>字体加载</legend>
+          <label>
+            字体名称
+            <input type="text" maxlength="80" placeholder="Companion Serif" data-font-family>
+          </label>
+          <label>
+            字体 URL
+            <input type="url" placeholder="/assets/fonts/companion.woff2" data-font-url>
+          </label>
+          <button type="button" data-load-font>加载并应用</button>
+        </fieldset>
+      </div>
+
+      <p class="space-status" data-space-status aria-live="polite"></p>
+    </section>
+  </main>
+
+  <script src="../theme/theme-engine.js"></script>
+  <script src="../avatar/avatar-studio.js"></script>
+  <script src="presets.js"></script>
+  <script src="space-profile.js"></script>
+  <script src="space.js"></script>
+</body>
+</html>

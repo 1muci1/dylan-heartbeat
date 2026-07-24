@@ -1,0 +1,81 @@
+:root,
+:root[data-companion-theme="night"] {
+  color-scheme: dark;
+  --theme-name: "purple-moon-night";
+  --theme-mode: night;
+  --theme-font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --theme-color-text: #f3edf8;
+  --theme-color-text-muted: #b9abc4;
+  --theme-color-primary: #b899d2;
+  --theme-color-primary-strong: #8b65ac;
+  --theme-color-surface: rgba(39, 28, 50, .88);
+  --theme-color-surface-soft: rgba(65, 47, 78, .72);
+  --theme-color-border: rgba(224, 202, 239, .16);
+  --theme-color-focus: rgba(193, 155, 220, .38);
+  --theme-color-danger: #e6a6b4;
+  --theme-shadow: 0 20px 55px rgba(13, 8, 20, .3);
+  --theme-background-image: none;
+  --theme-background-position: center;
+  --theme-background-size: cover;
+  --theme-background-overlay: rgba(18, 11, 27, .46);
+  --theme-background-blur: 0px;
+  --theme-background:
+    linear-gradient(var(--theme-background-overlay), var(--theme-background-overlay)),
+    var(--theme-background-image),
+    radial-gradient(circle at 16% 8%, #5e4474 0, transparent 34%),
+    radial-gradient(circle at 88% 20%, #3b365d 0, transparent 30%),
+    linear-gradient(180deg, #251b31, #17121f);
+}
+
+:root[data-companion-theme="day"] {
+  color-scheme: light;
+  --theme-name: "purple-moon-day";
+  --theme-mode: day;
+  --theme-color-text: #51475a;
+  --theme-color-text-muted: #918697;
+  --theme-color-primary: #76618a;
+  --theme-color-primary-strong: #594766;
+  --theme-color-surface: rgba(255, 255, 255, .88);
+  --theme-color-surface-soft: rgba(242, 235, 247, .78);
+  --theme-color-border: rgba(103, 78, 119, .13);
+  --theme-color-focus: rgba(146, 120, 165, .22);
+  --theme-color-danger: #9b6470;
+  --theme-shadow: 0 18px 50px rgba(71, 52, 84, .09);
+  --theme-background-overlay: rgba(255, 252, 255, .3);
+  --theme-background:
+    linear-gradient(var(--theme-background-overlay), var(--theme-background-overlay)),
+    var(--theme-background-image),
+    radial-gradient(circle at 12% 3%, #e2d4ef 0, transparent 30%),
+    radial-gradient(circle at 92% 24%, #eadfee 0, transparent 25%),
+    linear-gradient(180deg, #fbf9fc, #f2edf6);
+}
+
+.companion-themed-surface {
+  color: var(--theme-color-text);
+  background: var(--theme-color-surface);
+  border: 1px solid var(--theme-color-border);
+  box-shadow: var(--theme-shadow);
+  font-family: var(--theme-font-family);
+}
+
+.companion-themed-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  color: var(--theme-color-text);
+  background-color: #17121f;
+  background-image: var(--theme-background);
+  background-position: var(--theme-background-position);
+  background-size: var(--theme-background-size);
+  background-attachment: fixed;
+  font-family: var(--theme-font-family);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .companion-themed-page *,
+  .companion-themed-page *::before,
+  .companion-themed-page *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+  }
+}

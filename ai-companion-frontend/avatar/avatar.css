@@ -1,0 +1,90 @@
+:root {
+  --avatar-size: 72px;
+  --avatar-border-width: 3px;
+  --avatar-border-color: var(--theme-color-primary, #b899d2);
+  --avatar-ring-color: rgba(205, 174, 226, .28);
+  --avatar-surface: linear-gradient(145deg, #8f71a8, #574368);
+  --avatar-text-color: #fff;
+  --avatar-shadow: 0 10px 28px rgba(20, 12, 29, .28);
+}
+
+:root[data-companion-theme="day"] {
+  --avatar-border-color: var(--theme-color-primary, #76618a);
+  --avatar-ring-color: rgba(118, 97, 138, .18);
+  --avatar-surface: linear-gradient(145deg, #b49bc5, #76618a);
+  --avatar-shadow: 0 9px 24px rgba(71, 52, 84, .15);
+}
+
+:root[data-companion-theme="night"] {
+  --avatar-border-color: var(--theme-color-primary, #b899d2);
+  --avatar-ring-color: rgba(205, 174, 226, .3);
+  --avatar-surface: linear-gradient(145deg, #9273ad, #4c395d);
+  --avatar-shadow: 0 10px 28px rgba(13, 8, 20, .34);
+}
+
+.companion-avatar {
+  position: relative;
+  display: grid;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  flex: 0 0 var(--avatar-size);
+  place-items: center;
+  overflow: hidden;
+  border: var(--avatar-border-width) solid var(--avatar-border-color);
+  border-radius: 50%;
+  color: var(--avatar-text-color);
+  background: var(--avatar-surface);
+  box-shadow: var(--avatar-shadow);
+  font-family: var(--theme-font-family, sans-serif);
+  font-weight: 700;
+  isolation: isolate;
+}
+
+.companion-avatar img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: var(--avatar-crop-x, 50%) var(--avatar-crop-y, 50%);
+  transform:
+    translate(-50%, -50%)
+    scale(var(--avatar-zoom, 1));
+  transform-origin: var(--avatar-crop-x, 50%) var(--avatar-crop-y, 50%);
+}
+
+.companion-avatar__fallback {
+  position: relative;
+  z-index: 0;
+  font-size: calc(var(--avatar-size) * .34);
+}
+
+.companion-avatar[data-avatar-shape="rounded"] { border-radius: 24%; }
+.companion-avatar[data-avatar-shape="square"] { border-radius: 8%; }
+
+.companion-avatar[data-avatar-border="moon"] {
+  box-shadow:
+    0 0 0 5px var(--avatar-ring-color),
+    var(--avatar-shadow);
+}
+
+.companion-avatar[data-avatar-border="soft"] {
+  --avatar-border-width: 2px;
+  border-color: color-mix(in srgb, var(--avatar-border-color), transparent 35%);
+}
+
+.companion-avatar[data-avatar-border="minimal"] {
+  --avatar-border-width: 1px;
+  box-shadow: none;
+}
+
+.companion-avatar[data-avatar-border="none"] {
+  --avatar-border-width: 0px;
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .companion-avatar img { transition: none !important; }
+}

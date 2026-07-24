@@ -77,6 +77,18 @@ const EVENT_DEFINITIONS = Object.freeze({
     category: "proactive",
     allowedSources: Object.freeze(["proactive-feedback-store"])
   }),
+  "mood_selected": Object.freeze({
+    category: "game",
+    allowedSources: Object.freeze(["game-event-service"])
+  }),
+  "mini_game_completed": Object.freeze({
+    category: "game",
+    allowedSources: Object.freeze(["game-event-service"])
+  }),
+  "room_interaction": Object.freeze({
+    category: "game",
+    allowedSources: Object.freeze(["game-event-service"])
+  }),
   "tool.requested": Object.freeze({
     category: "tool",
     allowedSources: Object.freeze(["tool-audit-store"])

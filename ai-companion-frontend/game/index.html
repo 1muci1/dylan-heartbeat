@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f3fb">
+  <meta name="description" content="沉的小世界 · 沉的小屋">
+  <link rel="stylesheet" href="game.css">
+  <title>沉的小屋</title>
+</head>
+<body>
+  <main class="game-shell">
+    <header class="game-header">
+      <div>
+        <p>CHEN'S LITTLE WORLD</p>
+        <h1>沉的小屋</h1>
+      </div>
+      <time data-current-date></time>
+    </header>
+
+    <section class="room-card" aria-label="沉的小屋场景">
+      <div class="room-sky" aria-hidden="true">
+        <span class="star star--one"></span>
+        <span class="star star--two"></span>
+        <span class="star star--three"></span>
+        <span class="moon"></span>
+      </div>
+      <div class="room-scene" aria-hidden="true">
+        <div class="window"><span></span></div>
+        <div class="shelf"><i></i><i></i><i></i></div>
+        <div class="lamp"><span></span></div>
+        <div class="sofa"><span></span></div>
+        <div class="rug"></div>
+        <div class="table"><span></span></div>
+      </div>
+      <div class="companion">
+        <div class="companion__portrait" aria-hidden="true">
+          <span class="companion__moon"></span>
+          <strong>沉</strong>
+        </div>
+        <div>
+          <span class="presence"><i></i>正在小屋里</span>
+          <p data-companion-line>今天也一起慢慢待一会儿吧。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="activity-panel" data-panel="games" aria-labelledby="activity-title">
+      <div class="section-heading">
+        <div>
+          <p>一起玩</p>
+          <h2 id="activity-title">小小互动</h2>
+        </div>
+        <span>本地体验</span>
+      </div>
+
+      <article class="game-card number-game">
+        <div class="game-card__heading">
+          <span class="game-icon">#</span>
+          <div><h3>猜数字</h3><p>沉想了一个 1–100 的数字</p></div>
+        </div>
+        <form data-guess-form>
+          <label for="guess-number">输入你的猜测</label>
+          <div class="guess-row">
+            <input id="guess-number" name="guess" type="number" min="1" max="100" inputmode="numeric" required>
+            <button type="submit">猜一下</button>
+          </div>
+        </form>
+        <p class="result" data-guess-result aria-live="polite">准备好了就开始吧。</p>
+        <button class="text-button" type="button" data-new-number>换一个数字</button>
+      </article>
+
+      <article class="game-card mood-game">
+        <div class="game-card__heading">
+          <span class="game-icon">☁</span>
+          <div><h3>今日心情</h3><p>此刻更接近哪一种感受？</p></div>
+        </div>
+        <div class="mood-options" data-mood-options>
+          <button type="button" data-mood="开心">开心</button>
+          <button type="button" data-mood="平静">平静</button>
+          <button type="button" data-mood="疲惫">疲惫</button>
+          <button type="button" data-mood="低落">低落</button>
+        </div>
+        <p class="result" data-mood-result aria-live="polite">不用急，选最接近的一种就好。</p>
+      </article>
+
+      <article class="game-card event-game">
+        <div class="game-card__heading">
+          <span class="game-icon">✦</span>
+          <div><h3>随机事件</h3><p>看看今天会发生什么小事</p></div>
+        </div>
+        <div class="event-result" data-event-result>轻轻点一下，让今天多一点惊喜。</div>
+        <button class="primary-button" type="button" data-random-event>抽取今日事件</button>
+      </article>
+    </section>
+
+    <section class="activity-panel record-panel" data-panel="record" aria-labelledby="record-title" hidden>
+      <div class="section-heading">
+        <div><p>只保留在当前页面</p><h2 id="record-title">今日记录</h2></div>
+        <span>MOCK</span>
+      </div>
+      <dl>
+        <div><dt>今日心情</dt><dd data-record-mood>还没有选择</dd></div>
+        <div><dt>小屋事件</dt><dd data-record-event>还没有发生</dd></div>
+        <div><dt>猜数字</dt><dd data-record-guess>还没有开始</dd></div>
+      </dl>
+      <p class="privacy-note">第一阶段不会上传或保存这些记录。</p>
+    </section>
+  </main>
+
+  <nav class="game-nav" aria-label="小屋导航">
+    <a href="/chat.html">
+      <span aria-hidden="true">◌</span>
+      聊天
+    </a>
+    <button class="is-active" type="button" data-show-panel="games">
+      <span aria-hidden="true">◇</span>
+      小游戏
+    </button>
+    <button type="button" data-show-panel="record">
+      <span aria-hidden="true">□</span>
+      今日记录
+    </button>
+  </nav>
+
+  <script src="/assets/js/data.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

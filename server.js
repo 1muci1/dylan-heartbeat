@@ -25,6 +25,8 @@ const { OpenAIJsonAdapter } = require("./model-adapter");
 const { registerAiRoutes } = require("./ai-routes");
 const { EventStore } = require("./event-store");
 const { registerEventRoutes } = require("./event-routes");
+const { GameEventService } = require("./game-event-service");
+const { registerGameEventRoutes } = require("./game-event-routes");
 const { StateStore } = require("./state-store");
 const { StateProjector } = require("./state-projector");
 const { registerStateRoutes } = require("./state-routes");
@@ -89,6 +91,7 @@ const databaseConnection = openDatabase(process.env.SESSION_DB_FILE || "./chat-s
 const stateStore = new StateStore({ database: databaseConnection.db });
 const stateProjector = new StateProjector({ stateStore });
 const eventStore = new EventStore({ database: databaseConnection.db, stateProjector, logger: app.log });
+const gameEventService = new GameEventService({ eventStore });
 const sessionStore = new SessionStore({ database: databaseConnection.db, filename: databaseConnection.filename });
 const structuredMemoryStore = new StructuredMemoryStore({ database: databaseConnection.db, filename: databaseConnection.filename, eventStore, logger: app.log });
 const agentMemoryRetriever = new AgentMemoryRetriever({
@@ -143,6 +146,7 @@ registerMemoryRoutes(app, { store: structuredMemoryStore });
 registerMediaRoutes(app, { store: mediaStore, sessionStore });
 registerAiRoutes(app, { store: aiMemoryStore, runner: aiTaskRunner, config: aiConfig, adapter: aiAdapter });
 registerEventRoutes(app, { store: eventStore });
+registerGameEventRoutes(app, { service: gameEventService });
 registerStateRoutes(app, { store: stateStore });
 registerRelationshipRoutes(app, { service: relationshipViewService });
 registerWakeDecisionRoutes(app, { gate: wakeDecisionGate, snapshotClient: wakeDecisionSnapshotClient });

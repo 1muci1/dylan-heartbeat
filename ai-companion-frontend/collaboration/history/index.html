@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f3fb">
+  <meta name="description" content="沉的小世界 · 议事厅历史">
+  <link rel="stylesheet" href="history.css">
+  <title>议事厅记录 · Collaboration History</title>
+</head>
+<body>
+  <main class="history-shell">
+    <header class="page-header">
+      <div>
+        <p>COUNCIL ARCHIVE</p>
+        <h1>议事厅记录</h1>
+      </div>
+      <a href="../">返回圆桌</a>
+    </header>
+
+    <section class="history-card" aria-labelledby="history-title">
+      <header class="section-heading">
+        <div>
+          <p>MEETING HISTORY</p>
+          <h2 id="history-title">历史会议</h2>
+        </div>
+        <button type="button" data-refresh-history>刷新</button>
+      </header>
+
+      <p class="status" data-history-status aria-live="polite">正在读取议事记录…</p>
+      <div class="history-list" data-history-list></div>
+      <div class="empty-state" data-history-empty hidden>
+        <span aria-hidden="true">◯</span>
+        <p>还没有可查看的议事记录。</p>
+      </div>
+    </section>
+
+    <section class="detail-card" data-history-detail aria-labelledby="detail-title" hidden>
+      <header class="detail-heading">
+        <div>
+          <p>COUNCIL RECORD</p>
+          <h2 id="detail-title" data-detail-topic></h2>
+        </div>
+        <time data-detail-created-at></time>
+      </header>
+
+      <div class="participants" data-detail-participants aria-label="参与 Agent"></div>
+
+      <article class="summary">
+        <p>SUMMARY</p>
+        <h3>会议总结</h3>
+        <div data-detail-summary></div>
+      </article>
+    </section>
+  </main>
+
+  <script src="/assets/js/data.js"></script>
+  <script src="history.js"></script>
+</body>
+</html>

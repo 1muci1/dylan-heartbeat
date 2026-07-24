@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f3fb">
+  <meta name="description" content="沉的小世界 · Collaboration Room">
+  <link rel="stylesheet" href="collaboration.css">
+  <title>圆桌 · Collaboration Room</title>
+</head>
+<body>
+  <main class="collaboration-shell">
+    <header class="page-header">
+      <div>
+        <p>COLLABORATION ROOM</p>
+        <h1>圆桌</h1>
+      </div>
+      <a href="../game/">返回小屋</a>
+    </header>
+
+    <section class="intro-card" aria-labelledby="intro-title">
+      <div class="roundtable-mark" aria-hidden="true">
+        <span>沉</span>
+        <i></i>
+        <span>GPT</span>
+      </div>
+      <div>
+        <p class="eyebrow">独立讨论空间</p>
+        <h2 id="intro-title">把一个问题放到桌面中央</h2>
+        <p>每个房间拥有独立的主题、参与者、消息和总结，并通过 Companion Gateway 发起真实讨论。</p>
+      </div>
+    </section>
+
+    <section class="create-card" aria-labelledby="create-title">
+      <div class="section-heading">
+        <div>
+          <p>NEW ROOM</p>
+          <h2 id="create-title">创建讨论房间</h2>
+        </div>
+        <span>GATEWAY</span>
+      </div>
+
+      <form data-room-form>
+        <label for="discussion-topic">讨论主题</label>
+        <textarea
+          id="discussion-topic"
+          name="topic"
+          rows="3"
+          maxlength="240"
+          placeholder="例如：怎样让沉的小世界更有陪伴感？"
+          required
+        ></textarea>
+
+        <fieldset>
+          <legend>参与 Agent</legend>
+          <label class="agent-option agent-option--chen">
+            <input type="checkbox" name="agents" value="chen" checked>
+            <span class="agent-avatar">沉</span>
+            <span><strong>chen</strong><small>AI Companion</small></span>
+          </label>
+          <label class="agent-option agent-option--gpt">
+            <input type="checkbox" name="agents" value="chatgpt" checked>
+            <span class="agent-avatar">G</span>
+            <span><strong>chatgpt</strong><small>协作 Agent</small></span>
+          </label>
+        </fieldset>
+
+        <button class="primary-button" type="submit">创建房间</button>
+        <p class="form-status" data-form-status aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section class="room-card" data-room-view aria-labelledby="room-title" hidden>
+      <header class="room-header">
+        <div>
+          <p>ROOM <span data-room-id></span></p>
+          <h2 id="room-title" data-room-topic></h2>
+        </div>
+        <div class="participant-stack" data-participants aria-label="房间参与者"></div>
+      </header>
+
+      <div class="room-context">
+        <span>独立上下文</span>
+        <span>内存 Session</span>
+        <span>Gateway API</span>
+      </div>
+
+      <div class="message-list" data-message-list aria-live="polite"></div>
+
+      <div class="empty-room" data-empty-room>
+        <span aria-hidden="true">◯</span>
+        <p>房间已经准备好，开始一轮讨论吧。</p>
+      </div>
+
+      <div class="room-actions">
+        <button class="secondary-button" type="button" data-run-discussion>开始讨论</button>
+        <button class="primary-button" type="button" data-generate-summary disabled>查看总结</button>
+      </div>
+      <p class="room-status" data-room-status aria-live="polite"></p>
+
+      <aside class="summary-card" data-summary-card hidden>
+        <p>ROOM SUMMARY</p>
+        <h3>讨论总结</h3>
+        <div data-summary-text></div>
+      </aside>
+    </section>
+  </main>
+
+  <script src="/assets/js/data.js"></script>
+  <script src="collaboration.js"></script>
+</body>
+</html>

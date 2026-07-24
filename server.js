@@ -48,6 +48,16 @@ const { registerToolAuditRoutes } = require("./tool-audit-routes");
 const { DeviceIdentityStore } = require("./device-identity-store");
 const { DevicePairingService } = require("./device-pairing-service");
 const { registerDevicePairingRoutes } = require("./device-pairing-routes");
+const { CollaborationSessionService } = require("./collaboration-session-service");
+const {
+  ChatGptCollaborationAgentAdapter,
+  ChenCollaborationAgentAdapter,
+  CollaborationAgentAdapter
+} = require("./collaboration-agent-adapter");
+const { CollaborationRuntime } = require("./collaboration-runtime");
+const { registerCollaborationRoutes } = require("./collaboration-routes");
+const { CollaborationHistoryService } = require("./collaboration-history-service");
+const { registerCollaborationHistoryRoutes } = require("./collaboration-history-routes");
 
 const DEFAULT_BODY_LIMIT_MB = 50;
 
@@ -107,6 +117,21 @@ const agentMemoryWriteHook = Object.freeze({
 app.decorate("agentMemoryWriteHook", agentMemoryWriteHook);
 const agentIdentityBoundaryBuilder = new AgentIdentityBoundaryBuilder({ agentName: "沉" });
 const agentIdentityContextBuilder = new AgentIdentityContextBuilder({ database: databaseConnection.db });
+const collaborationSessionService = new CollaborationSessionService();
+const collaborationAgentAdapter = new CollaborationAgentAdapter({
+  chen: new ChenCollaborationAgentAdapter({
+    gateway: { generate: invokeCollaborationChen },
+    gatewayProvidesMemoryContext: true
+  }),
+  chatgpt: new ChatGptCollaborationAgentAdapter({
+    adapter: { generate: invokeCollaborationChatGpt }
+  })
+});
+const collaborationRuntime = new CollaborationRuntime({
+  sessionService: collaborationSessionService,
+  agentAdapter: collaborationAgentAdapter
+});
+const collaborationHistoryService = new CollaborationHistoryService();
 const mediaStore = new MediaStore({
   database: databaseConnection.db,
   imageDir: process.env.CHAT_IMAGE_UPLOAD_DIR || "./uploads/chat-images",
@@ -154,6 +179,11 @@ registerProactiveDeliveryRoutes(app, { deliveryStore, settings: proactiveContact
 registerProactiveExplanationRoutes(app, { explanationView: proactiveExplanationView });
 registerToolAuditRoutes(app, { eventStore });
 registerDevicePairingRoutes(app, { pairingService: devicePairingService });
+registerCollaborationRoutes(app, {
+  runtime: collaborationRuntime,
+  sessionService: collaborationSessionService
+});
+registerCollaborationHistoryRoutes(app, { service: collaborationHistoryService });
 registerMemoryAdmin(app, {
   structuredStore: structuredMemoryStore,
   database: databaseConnection.db,
@@ -166,6 +196,74 @@ const TARGET_API_URL = process.env.TARGET_API_URL;
 const TIMELINE_FILE = process.env.TIMELINE_FILE || "enhanced_messages.json";
 const TIMESTAMP_DB_FILE = process.env.TIMESTAMP_DB_FILE || "./message_timestamps.json";
 const DEFAULT_RESTART_COMMAND = "pm2 restart gateway wake-up";
+
+async function invokeCollaborationChen({ messages }) {
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/chat/completions",
+    headers: process.env.GATEWAY_API_KEY
+      ? { authorization: `Bearer ${process.env.GATEWAY_API_KEY}` }
+      : {},
+    payload: {
+      model: process.env.MODEL_NAME,
+      stream: false,
+      messages
+    }
+  });
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw Object.assign(new Error("chen Gateway 调用失败"), {
+      code: "COLLABORATION_CHEN_GATEWAY_FAILED",
+      statusCode: 502
+    });
+  }
+  const content = response.json()?.choices?.[0]?.message?.content;
+  return { content };
+}
+
+async function invokeCollaborationChatGpt({ messages, signal }) {
+  const url = process.env.COLLABORATION_CHATGPT_API_URL || process.env.TARGET_API_URL;
+  const apiKey = process.env.COLLABORATION_CHATGPT_API_KEY || process.env.TARGET_API_KEY;
+  const model = process.env.COLLABORATION_CHATGPT_MODEL || process.env.MODEL_NAME;
+  if (!url || !apiKey || !model) {
+    throw Object.assign(new Error("chatgpt adapter 未配置"), {
+      code: "COLLABORATION_CHATGPT_NOT_CONFIGURED",
+      statusCode: 503
+    });
+  }
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({ model, stream: false, messages }),
+      signal
+    });
+  } catch {
+    throw Object.assign(new Error("chatgpt adapter 调用失败"), {
+      code: "COLLABORATION_CHATGPT_UNAVAILABLE",
+      statusCode: 502
+    });
+  }
+  if (!response.ok) {
+    throw Object.assign(new Error("chatgpt adapter 调用失败"), {
+      code: "COLLABORATION_CHATGPT_UPSTREAM_ERROR",
+      statusCode: 502
+    });
+  }
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    throw Object.assign(new Error("chatgpt adapter 响应无效"), {
+      code: "COLLABORATION_CHATGPT_RESPONSE_INVALID",
+      statusCode: 502
+    });
+  }
+  return { content: payload?.choices?.[0]?.message?.content };
+}
 
 // ========================
 // 多模态消息处理

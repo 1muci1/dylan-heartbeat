@@ -1,0 +1,171 @@
+:root {
+  color-scheme: light;
+  --ink: #51475a;
+  --muted: #918697;
+  --purple: #76618a;
+  --paper: rgba(255, 255, 255, .88);
+  --line: rgba(103, 78, 119, .13);
+  --shadow: 0 18px 50px rgba(71, 52, 84, .09);
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  min-width: 280px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 12% 3%, rgba(226, 212, 239, .92), transparent 30%),
+    radial-gradient(circle at 92% 24%, rgba(233, 221, 238, .58), transparent 25%),
+    linear-gradient(180deg, #fbf9fc, #f2edf6);
+}
+
+button { font: inherit; cursor: pointer; }
+
+.history-shell {
+  width: min(100%, 820px);
+  margin: 0 auto;
+  padding: max(22px, env(safe-area-inset-top)) 16px calc(42px + env(safe-area-inset-bottom));
+}
+
+.page-header,
+.section-heading,
+.detail-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.page-header { margin-bottom: 18px; }
+
+.page-header p,
+.section-heading p,
+.detail-heading p,
+.summary > p {
+  margin: 0 0 5px;
+  color: #998ba2;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .16em;
+}
+
+.page-header h1,
+.section-heading h2,
+.detail-heading h2,
+.summary h3 {
+  margin: 0;
+  font-family: "Songti SC", "STSong", serif;
+  font-weight: 600;
+}
+
+.page-header h1 { font-size: clamp(28px, 8vw, 38px); letter-spacing: .08em; }
+.section-heading h2,
+.detail-heading h2 { font-size: 21px; overflow-wrap: anywhere; }
+
+.page-header a,
+.section-heading button {
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--purple);
+  background: rgba(255, 255, 255, .68);
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.history-card,
+.detail-card {
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, .9);
+  border-radius: 28px;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+
+.detail-card { margin-top: 18px; }
+.status { min-height: 18px; margin: 14px 0 8px; color: var(--muted); font-size: 11px; }
+.status.is-error { color: #9b6470; }
+
+.history-list { display: grid; gap: 10px; margin-top: 12px; }
+
+.history-item {
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  color: inherit;
+  background: rgba(248, 245, 250, .78);
+  text-align: left;
+}
+
+.history-item:focus-visible {
+  outline: 3px solid rgba(146, 120, 165, .18);
+  border-color: #9278a5;
+}
+
+.history-item strong { display: block; font-size: 13px; }
+.history-item span { display: block; margin-top: 5px; color: var(--muted); font-size: 10px; }
+.history-item p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 8px 0 0;
+  color: #716577;
+  font-size: 11px;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.empty-state {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  align-content: center;
+  color: var(--muted);
+  text-align: center;
+}
+
+.empty-state span { font-size: 38px; opacity: .42; }
+.empty-state p { margin: 8px 0 0; font-size: 11px; }
+
+.detail-heading { align-items: center; }
+.detail-heading > div { min-width: 0; }
+.detail-heading time { flex: 0 0 auto; color: var(--muted); font-size: 10px; }
+
+.participants { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px; }
+.participant {
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #7a6983;
+  background: #f0e9f4;
+  font-size: 10px;
+}
+
+.summary {
+  margin-top: 16px;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(145deg, #f6f0f8, #fff);
+}
+
+.summary h3 { font-size: 17px; }
+.summary div { margin-top: 8px; color: #706477; font-size: 12px; line-height: 1.75; white-space: pre-wrap; }
+
+[hidden] { display: none !important; }
+
+@media (max-width: 560px) {
+  .detail-heading { align-items: flex-start; flex-direction: column; }
+}
+
+@media (max-width: 359px) {
+  .history-shell { padding-right: 11px; padding-left: 11px; }
+  .history-card,
+  .detail-card { padding: 16px; border-radius: 22px; }
+  .page-header { align-items: center; }
+  .page-header a { padding: 7px 9px; }
+}

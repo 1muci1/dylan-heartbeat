@@ -225,3 +225,67 @@ test("Agent Memory Retriever returns only active categorized whitelist fields wi
   assert.equal(preferences.items[0].category, "preference");
   assert.ok(preferences.meta.usedCharacters <= 8);
 });
+
+test("Agent Memory Retriever reserves relationship and fact before preference and event", () => {
+  const candidates = [
+    ...Array.from({ length: 6 }, (_, index) => ({
+      id: `preference-${index}`,
+      type: "MEMORY",
+      title: `Preference ${index}`,
+      content: "preferred",
+      importance: 5,
+      source: `memory-import:v1:preference:test-${index}`
+    })),
+    {
+      id: "event-1",
+      type: "EVENT",
+      title: "Event",
+      content: "event",
+      importance: 5,
+      source: "memory-import:v1:event:test"
+    },
+    {
+      id: "relationship-1",
+      type: "MEMORY",
+      title: "Relationship",
+      content: "relationship",
+      importance: 1,
+      source: "memory-import:v1:relationship:test"
+    },
+    {
+      id: "fact-1",
+      type: "MEMORY",
+      title: "Fact",
+      content: "fact",
+      importance: 1,
+      source: "memory-import:v1:fact:test"
+    }
+  ];
+  const store = {
+    list() {
+      return { items: candidates, meta: { totalPages: 1 } };
+    }
+  };
+
+  const result = new AgentMemoryRetriever({ store }).retrieve({ limit: 8, characterBudget: 3000 });
+  const categories = result.items.map(item => item.category);
+
+  assert.equal(result.items.length, 8);
+  assert.ok(categories.includes("relationship"));
+  assert.ok(categories.includes("fact"));
+  assert.ok(categories.some(category => category === "preference" || category === "event"));
+  assert.equal(categories[0], "relationship");
+  assert.equal(categories[1], "fact");
+  assert.ok(result.meta.usedCharacters <= 3000);
+});
+
+test("Agent Memory Retriever leaves empty stores empty", () => {
+  const store = {
+    list() {
+      return { items: [], meta: { totalPages: 0 } };
+    }
+  };
+  const result = new AgentMemoryRetriever({ store }).retrieve({ limit: 8, characterBudget: 3000 });
+  assert.deepEqual(result.items, []);
+  assert.equal(result.meta.usedCharacters, 0);
+});

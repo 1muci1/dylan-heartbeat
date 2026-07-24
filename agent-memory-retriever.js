@@ -8,6 +8,8 @@ const MAX_LIMIT = 20;
 const DEFAULT_CHARACTER_BUDGET = 8000;
 const MAX_CHARACTER_BUDGET = 20000;
 const MAX_SCAN_ITEMS = 10000;
+const COMPANION_RELATIONSHIP_RESERVE = 2;
+const COMPANION_FACT_RESERVE = 2;
 
 function categorySource(memory) {
   return /^memory-import:v1:(fact|preference|event|relationship):/.test(memory.source || "")
@@ -18,6 +20,37 @@ function categorySource(memory) {
 function boundedText(value, remaining) {
   const text = typeof value === "string" ? value : "";
   return text.slice(0, Math.max(0, remaining));
+}
+
+function selectCompanionCandidates(candidates, limit) {
+  const selected = [];
+  const selectedIds = new Set();
+  const add = memory => {
+    if (!memory || selected.length >= limit || selectedIds.has(memory.id)) return;
+    selected.push(memory);
+    selectedIds.add(memory.id);
+  };
+  const categorized = candidates.map(memory => ({ memory, category: categoryOfMemory(memory) }));
+
+  categorized
+    .filter(value => value.category === "relationship")
+    .slice(0, COMPANION_RELATIONSHIP_RESERVE)
+    .forEach(value => add(value.memory));
+  categorized
+    .filter(value => value.category === "fact")
+    .slice(0, COMPANION_FACT_RESERVE)
+    .forEach(value => add(value.memory));
+  categorized
+    .filter(value => value.category === "preference" || value.category === "event")
+    .forEach(value => add(value.memory));
+  candidates.forEach(add);
+  return selected;
+}
+
+function minimumItemCharacters(memory) {
+  const title = typeof memory.title === "string" ? memory.title : "";
+  const content = typeof memory.content === "string" ? memory.content : "";
+  return title.length + (content.length ? 1 : 0);
 }
 
 class AgentMemoryRetriever {
@@ -61,15 +94,24 @@ class AgentMemoryRetriever {
       page++;
     }
 
+    const filteredCandidates = category
+      ? candidates.filter(memory => categoryOfMemory(memory) === category).slice(0, limit)
+      : selectCompanionCandidates(candidates, limit);
     const items = [];
     let usedCharacters = 0;
-    for (const memory of candidates) {
+    for (let index = 0; index < filteredCandidates.length; index++) {
+      const memory = filteredCandidates[index];
       const memoryCategory = categoryOfMemory(memory);
-      if (category && memoryCategory !== category) continue;
       const remaining = characterBudget - usedCharacters;
       if (remaining <= 0 || items.length >= limit) break;
-      const title = boundedText(memory.title, remaining);
-      const content = boundedText(memory.content, remaining - title.length);
+      const reservedForLater = category
+        ? 0
+        : filteredCandidates
+          .slice(index + 1)
+          .reduce((total, candidate) => total + minimumItemCharacters(candidate), 0);
+      const itemBudget = Math.max(0, remaining - Math.min(remaining, reservedForLater));
+      const title = boundedText(memory.title, itemBudget);
+      const content = boundedText(memory.content, itemBudget - title.length);
       if (!title && !content) break;
       usedCharacters += title.length + content.length;
       items.push({
@@ -90,6 +132,8 @@ class AgentMemoryRetriever {
 }
 
 module.exports = {
+  COMPANION_FACT_RESERVE,
+  COMPANION_RELATIONSHIP_RESERVE,
   AgentMemoryRetriever,
   DEFAULT_CHARACTER_BUDGET,
   DEFAULT_LIMIT,

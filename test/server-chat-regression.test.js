@@ -21,6 +21,13 @@ fs.writeFileSync(process.env.TIMESTAMP_DB_FILE, "{}\n");
 const { app } = require("../server");
 const auth = { authorization: "Bearer gateway-test-key" };
 
+test("chat runtime reserves a create-only internal Memory write hook", () => {
+  assert.equal(typeof app.agentMemoryWriteHook?.create, "function");
+  assert.equal(app.agentMemoryWriteHook.update, undefined);
+  assert.equal(app.agentMemoryWriteHook.delete, undefined);
+  assert.equal(app.agentMemoryWriteHook.archive, undefined);
+});
+
 function jsonUpstream(content = "json reply", status = 200, thinking = null) {
   global.fetch = async () => new Response(JSON.stringify({
     id: "chatcmpl-test",
@@ -72,6 +79,44 @@ test("legacy chat without X-Session-Id remains non-persistent for stream:false",
   assert.equal(response.json().choices[0].message.content, "json reply");
   const sessions = await app.inject({ method: "GET", url: "/api/v1/chat/sessions", headers: auth });
   assert.deepEqual(sessions.json().sessions, []);
+});
+
+test("empty Memory chat receives the Agent identity boundary without a provider identity", async () => {
+  let forwarded = null;
+  global.fetch = async (_url, options) => {
+    forwarded = JSON.parse(options.body);
+    return new Response(JSON.stringify({
+      choices: [{ message: { role: "assistant", content: "identity reply" } }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/chat/completions",
+    payload: {
+      model: "test",
+      stream: false,
+      messages: [
+        { role: "system", content: "client system marker" },
+        { role: "user", content: "你是谁" }
+      ]
+    }
+  });
+
+  assert.equal(response.statusCode, 200);
+  const boundary = forwarded.messages.find(message =>
+    message.role === "system" && message.content.includes("<agent_identity_boundary")
+  );
+  assert.ok(boundary);
+  assert.equal(boundary.content.includes('"name":"沉"'), true);
+  assert.equal(/kiro/iu.test(boundary.content), false);
+  assert.equal(forwarded.messages.some(message =>
+    message.content?.includes("<identity_reference_data") ||
+    message.content?.includes("<memory_reference_data")
+  ), false);
+  assert.deepEqual(forwarded.messages.map(message =>
+    message === boundary ? "identity_boundary" : message.role
+  ), ["system", "identity_boundary", "user"]);
 });
 
 test("stream:false persists a completed Session turn", async () => {
@@ -219,19 +264,25 @@ test("chat consumes memory context without logging or persisting memory content"
   const identityContext = forwarded.messages.find(message =>
     message.role === "system" && message.content.includes("<identity_reference_data")
   );
+  const identityBoundary = forwarded.messages.find(message =>
+    message.role === "system" && message.content.includes("<agent_identity_boundary")
+  );
   assert.ok(context);
   assert.ok(identityContext);
+  assert.ok(identityBoundary);
   assert.match(context.content, new RegExp(memoryContent));
   assert.match(identityContext.content, new RegExp(identityContent));
   assert.match(identityContext.content, new RegExp(nicknameContent));
+  const boundaryIndex = forwarded.messages.indexOf(identityBoundary);
   const identityIndex = forwarded.messages.indexOf(identityContext);
   const memoryIndex = forwarded.messages.indexOf(context);
   const conversationIndex = forwarded.messages.findIndex(message => message.role === "user");
-  assert.ok(identityIndex < memoryIndex && memoryIndex < conversationIndex);
+  assert.ok(boundaryIndex < identityIndex && identityIndex < memoryIndex && memoryIndex < conversationIndex);
   const logged = logs.join("\n");
   assert.equal(logged.includes(memoryContent), false);
   assert.equal(logged.includes(identityContent), false);
   assert.equal(logged.includes(nicknameContent), false);
+  assert.equal(logged.includes("<agent_identity_boundary"), false);
   assert.deepEqual((await history(id)).map(message => message.content), [
     "context user",
     "memory-aware reply"

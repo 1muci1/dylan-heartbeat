@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN" data-companion-theme="night">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#251b31">
+  <meta name="description" content="沉的小世界首页">
+  <title>沉的小世界</title>
+  <link rel="stylesheet" href="../theme/theme.css">
+  <link rel="stylesheet" href="../avatar/avatar.css">
+  <link rel="stylesheet" href="./home.css">
+</head>
+<body class="companion-themed-page home-page">
+  <main class="home-shell" data-home-shell>
+    <header class="home-masthead">
+      <div>
+        <p>CHEN'S LITTLE WORLD</p>
+        <h1>沉的小世界</h1>
+      </div>
+      <div class="home-masthead__meta">
+        <span class="home-pill" data-home-date>2026年07月24日</span>
+        <span class="home-pill home-pill--soft" data-home-clock>21:00</span>
+      </div>
+    </header>
+
+    <section class="home-hero companion-themed-surface" data-home-hero aria-labelledby="home-title">
+      <div class="home-hero__backdrop"></div>
+      <div class="home-hero__orb home-hero__orb--one"></div>
+      <div class="home-hero__orb home-hero__orb--two"></div>
+      <div class="home-hero__content">
+        <div class="home-avatar-stack" aria-label="空间头像展示">
+          <div class="home-avatar-chip home-avatar-chip--user" data-home-user-avatar></div>
+          <div class="home-avatar-chip home-avatar-chip--chen" data-home-avatar></div>
+        </div>
+        <div class="home-hero__copy">
+          <p class="home-eyebrow" data-home-presence>沉正在这里</p>
+          <h2 id="home-title" data-home-space-title>🌙 紫月小屋</h2>
+          <strong data-home-atmosphere>夜晚 · 月光氛围</strong>
+          <p class="home-hero__meta">
+            <span data-home-profile>紫月小屋</span>
+            <span aria-hidden="true">·</span>
+            <span data-home-moment>夜晚</span>
+          </p>
+        </div>
+      </div>
+      <div class="home-hero__panel">
+        <article class="home-stat">
+          <small>当前 Preset</small>
+          <strong data-home-preset-name>紫月小屋</strong>
+          <p data-home-preset-description>紫色主题、夜间模式、月光头像边框和柔和背景。</p>
+        </article>
+        <article class="home-stat">
+          <small>当前主题</small>
+          <strong data-home-theme>紫月 · night</strong>
+          <p>空间、头像、字体与氛围共同组成此刻的小世界。</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="home-section" aria-label="快捷入口">
+      <div class="home-section__heading">
+        <div>
+          <p>ENTER</p>
+          <h3>一切都从这里开始</h3>
+        </div>
+      </div>
+      <div class="home-cards">
+        <a class="home-card" href="/chat.html">
+          <span>💬</span>
+          <strong>和沉聊天</strong>
+          <small>随时打开对话。</small>
+        </a>
+        <a class="home-card" href="../space/">
+          <span>🏠</span>
+          <strong>空间设置</strong>
+          <small>回到小屋，调节空间风格。</small>
+        </a>
+        <a class="home-card" href="../collaboration/">
+          <span>🏛</span>
+          <strong>和 AI 一起讨论</strong>
+          <small>进入议事厅，开始圆桌会话。</small>
+        </a>
+        <a class="home-card" href="../game/">
+          <span>🎮</span>
+          <strong>一起玩</strong>
+          <small>进入沉的小世界游戏模块。</small>
+        </a>
+        <a class="home-card home-card--memory" href="/frontend-p4b/memory.html">
+          <span>📖</span>
+          <strong>共同记忆</strong>
+          <small>回顾你们一起留下的长期记忆。</small>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <script src="../theme/theme-engine.js"></script>
+  <script src="../avatar/avatar-studio.js"></script>
+  <script src="../space/space-profile.js"></script>
+  <script src="../space/presets/presets.js"></script>
+  <script src="../space/presets/preset-manager.js"></script>
+  <script src="../space/atmosphere/atmosphere-presets.js"></script>
+  <script src="../space/atmosphere/atmosphere-engine.js"></script>
+  <script src="./home.js"></script>
+</body>
+</html>

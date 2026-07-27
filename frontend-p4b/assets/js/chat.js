@@ -4,6 +4,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const api = window.AppAPI;
   const sessions = window.AppSessions;
   const messageProtocol = window.MessageProtocol;
+  const ChatHistoryStore = window.ChatHistoryStore;
+  const ChatSyncController = window.CompanionChatSync?.ChatSyncController;
   if (!data || !store || !api || !messageProtocol) return;
 
   const { ai, user } = data;
@@ -169,6 +171,9 @@ document.addEventListener("DOMContentLoaded", () => {
     finally { button.disabled = false; }
   };
   let legacyMessages = [];
+  let localHistory = null;
+  let localHistorySessionId = "";
+  let chatSync = null;
 
   const openSessions = (open) => {
     if (!sessionDrawer || !sessionOverlay || !sessionToggle) return;
@@ -240,13 +245,21 @@ document.addEventListener("DOMContentLoaded", () => {
   async function switchSession(id) {
     if (!sessionApiAvailable || api.loading) return;
     try {
-      const history = await sessions.messages(id);
+      const synchronized = chatSync
+        ? await chatSync.select(id)
+        : null;
+      const history = synchronized
+        ? synchronized.serverMessages
+        : await sessions.messages(id);
       activeSessionId = id;
       sessions.setActiveId(id);
       const state = store.getState();
-      state.messages = history.map(formatServerMessage).filter(message => message.content);
+      state.messages = synchronized
+        ? synchronized.messages
+        : history.map(formatServerMessage).filter(message => message.content);
       store.saveState(state);
       renderMessages(state.messages);
+      if (!synchronized) persistLocalMessages(state.messages);
       await showSummary(id);
       renderSessionList();
       openSessions(false);
@@ -277,6 +290,16 @@ document.addEventListener("DOMContentLoaded", () => {
         state.messages = legacyMessages;
         store.saveState(state);
         renderMessages(state.messages);
+        persistLocalMessages(state.messages);
+        if (localHistory && localHistorySessionId) {
+          await localHistory.updateSyncState(localHistorySessionId, {
+            serverSessionId: null,
+            lastServerMessageId: null,
+            lastSyncedAt: null,
+            syncState: "local-only"
+          });
+        }
+        chatSync = null;
       }
       renderSessionList();
     } catch { useLocalFallback(); }
@@ -296,16 +319,33 @@ document.addEventListener("DOMContentLoaded", () => {
   const initializeSessions = async () => {
     if (!sessions) return useLocalFallback();
     try {
-      serverSessions = await sessions.list();
+      if (localHistory && localHistorySessionId && ChatSyncController) {
+        chatSync = new ChatSyncController({
+          historyStore: localHistory,
+          sessionApi: sessions,
+          localSessionId: localHistorySessionId,
+          mapMessage: formatServerMessage
+        });
+        const synchronized = await chatSync.connect();
+        serverSessions = synchronized.sessions;
+        activeSessionId = synchronized.serverSessionId;
+        sessions.setActiveId(activeSessionId);
+        const state = store.getState();
+        state.messages = synchronized.messages;
+        store.saveState(state);
+        renderMessages(state.messages);
+      } else {
+        serverSessions = await sessions.list();
+      }
       sessionApiAvailable = true;
       if (sessionStatus) sessionStatus.textContent = "服务器历史已连接";
       if (sessionFallback) sessionFallback.hidden = true;
       if (sessionNew) sessionNew.disabled = false;
       await refreshAiConfiguration();
       renderSessionList();
-      if (activeSessionId && serverSessions.some(session => session.id === activeSessionId)) {
+      if (!chatSync && activeSessionId && serverSessions.some(session => session.id === activeSessionId)) {
         await switchSession(activeSessionId);
-      } else {
+      } else if (!activeSessionId) {
         activeSessionId = "";
         sessions.setActiveId("");
       }
@@ -333,6 +373,35 @@ document.addEventListener("DOMContentLoaded", () => {
     if (updateState) updateState(state);
     const savedState = messageProtocol.saveConversationHistory(state.messages, state);
     renderMessages(savedState.messages);
+    persistLocalMessages(savedState.messages);
+  };
+
+  const initializeLocalHistory = async (initialMessages) => {
+    if (!ChatHistoryStore) return;
+    try {
+      localHistory = new ChatHistoryStore();
+      const recent = (await localHistory.listSessions())[0];
+      const session = recent
+        ? await localHistory.loadSession(recent.id)
+        : await localHistory.createSession("最近会话");
+      localHistorySessionId = session.id;
+      if (session.messages.length) {
+        const state = store.getState();
+        state.messages = messageProtocol.saveConversationHistory(session.messages, state).messages;
+        legacyMessages = state.messages.map(message => ({ ...message }));
+        renderMessages(state.messages);
+      } else {
+        await localHistory.saveMessages(session.id, initialMessages);
+      }
+    } catch {
+      localHistory = null;
+      localHistorySessionId = "";
+    }
+  };
+
+  const persistLocalMessages = messages => {
+    if (!localHistory || !localHistorySessionId) return;
+    localHistory.saveMessages(localHistorySessionId, messages).catch(() => {});
   };
 
   const requestAssistantReply = async (userMessage) => {
@@ -391,6 +460,17 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         nextState.memory.recent = nextState.memory.recent.slice(0, 5);
       });
+      if (chatSync && sessionApiAvailable && activeSessionId === chatSync.serverSessionId) {
+        try {
+          const synchronized = await chatSync.pull();
+          const state = store.getState();
+          state.messages = synchronized.messages;
+          store.saveState(state);
+          renderMessages(state.messages);
+        } catch {
+          // 保留刚写入 IndexedDB 的本地消息，下一次进入页面时再同步。
+        }
+      }
     } catch (error) {
       pendingRow.remove();
       const errorMessage = messageProtocol.createAssistantMessage(
@@ -468,7 +548,7 @@ document.addEventListener("DOMContentLoaded", () => {
   sessionNew?.addEventListener("click", createSession);
   document.querySelector("[data-generate-summary]")?.addEventListener("click", () => runSessionAi("summary"));
   document.querySelector("[data-generate-candidates]")?.addEventListener("click", () => runSessionAi("candidates"));
-  initializeSessions();
+  initializeLocalHistory(initialState.messages).finally(initializeSessions);
   api.onLoadingChange(setRequestState);
   sendButton.addEventListener("click", handleSend);
   imageButton?.addEventListener("click", () => picker?.click());

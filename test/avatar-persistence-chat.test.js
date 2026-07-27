@@ -47,11 +47,15 @@ test("chat exposes Chen avatar editor and background preference hooks", () => {
   assert.match(script, /saveAvatar/);
   assert.match(script, /querySelectorAll\("\.chat-avatar, \.message-avatar"\)/);
   assert.match(script, /applyTo/);
-  assert.match(script, /store\.loadSync\(\)\.avatar/);
+  assert.match(script, /getImage/);
+  assert.match(script, /getChenAvatarImage/);
+  assert.doesNotMatch(script, /if \(avatar\?\.imageData\)/);
+  assert.match(script, /store\.loadSync\(\)/);
   assert.match(script, /store\.subscribe\(applyAvatars\)/);
   assert.match(script, /store\.load\(\)\.then\(applyAvatars\)\.catch/);
   assert.match(chat, /CompanionChatAvatars\?\.apply\(\)/);
-  assert.match(chat, /CompanionChatAvatars\?\.applyTo\(avatar\)/);
+  assert.match(chat, /CompanionChatAvatars\?\.getImage\(\)/);
+  assert.match(chat, /CompanionChatAvatars\?\.applyTo\(avatar, chenAvatarImage\)/);
   assert.match(chat, /avatar\.textContent = "沉"/);
   assert.doesNotMatch(chat, /avatar\.textContent = ai\.avatar\.label/);
   assert.match(chat, /CompanionChatPreferences\?\.apply\(\)/);

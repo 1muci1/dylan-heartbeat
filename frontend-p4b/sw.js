@@ -1,5 +1,8 @@
-const CACHE_NAME = "xinban-shell-v22-p4b";
-const PREVIOUS_CACHE_NAME = "xinban-shell-v21-p4b";
+const CACHE_NAME = "xinban-shell-v23-p4b";
+const STALE_CACHE_NAMES = new Set([
+  "xinban-shell-v21-p4b",
+  "xinban-shell-v22-p4b"
+]);
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -50,7 +53,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) => Promise.all(
-      keys.filter((key) => key === PREVIOUS_CACHE_NAME).map((key) => caches.delete(key))
+      keys.filter((key) => STALE_CACHE_NAMES.has(key)).map((key) => caches.delete(key))
     ))
   );
   self.clients.claim();

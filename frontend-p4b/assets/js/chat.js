@@ -111,7 +111,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const avatar = document.createElement("div");
       avatar.className = "message-avatar";
       avatar.setAttribute("aria-hidden", "true");
-      if (!window.CompanionChatAvatars?.applyTo(avatar)) avatar.textContent = "沉";
+      const chenAvatarImage = window.CompanionChatAvatars?.getImage();
+      if (!window.CompanionChatAvatars?.applyTo(avatar, chenAvatarImage)) avatar.textContent = "沉";
       row.append(avatar);
     }
 

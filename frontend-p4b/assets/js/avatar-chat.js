@@ -4,10 +4,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const Store = window.CompanionUserPreferences?.UserPreferenceStore;
   if (!Store) return;
   const store = new Store();
-  const applyAvatar = (node, avatar) => {
+  const applyAvatar = (node, image, avatar = {}) => {
     if (!node) return false;
-    if (avatar?.imageData) {
-      node.style.backgroundImage = `url(${JSON.stringify(avatar.imageData)})`;
+    if (image) {
+      node.style.backgroundImage = `url(${JSON.stringify(image)})`;
       node.style.backgroundPosition = `${avatar.crop?.x ?? 50}% ${avatar.crop?.y ?? 50}%`;
       node.style.backgroundSize = `${Math.max(1, Number(avatar.scale) || 1) * 100}%`;
       node.classList.add("has-avatar-image");
@@ -21,15 +21,19 @@ document.addEventListener("DOMContentLoaded", () => {
     return false;
   };
   const applyAvatars = preferences => {
-    const avatar = preferences?.avatar || store.loadSync().avatar;
+    const value = preferences || store.loadSync();
+    const avatar = value.avatar;
     const chen = avatar.chenAvatar || avatar;
-    document.querySelectorAll(".chat-avatar, .message-avatar").forEach(node => applyAvatar(node, chen));
+    const image = store.getChenAvatarImage(value);
+    document.querySelectorAll(".chat-avatar, .message-avatar").forEach(node => applyAvatar(node, image, chen));
   };
-  const applyTo = node => {
-    const avatar = store.loadSync().avatar;
-    return applyAvatar(node, avatar.chenAvatar || avatar);
+  const getImage = preferences => store.getChenAvatarImage(preferences || store.loadSync());
+  const applyTo = (node, image = getImage()) => {
+    const preferences = store.loadSync();
+    const avatar = preferences.avatar;
+    return applyAvatar(node, image, avatar.chenAvatar || avatar);
   };
-  window.CompanionChatAvatars = Object.freeze({ apply: applyAvatars, applyTo });
+  window.CompanionChatAvatars = Object.freeze({ apply: applyAvatars, applyTo, getImage });
   applyAvatars(store.loadSync());
   store.subscribe(applyAvatars);
   store.load().then(applyAvatars).catch(() => {

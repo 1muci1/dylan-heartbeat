@@ -103,10 +103,12 @@
     defaultChen() {
       const preferences = this.#preferences?.loadSync?.().avatar;
       const stored = preferences?.chenAvatar || preferences;
-      if (!stored || !stored.imageData) return cloneConfig(DEFAULT_CHEN_AVATAR);
+      const imageUrl = this.#preferences?.getChenAvatarImage?.({ avatar: preferences }) ||
+        (stored?.imageData && !String(stored.imageData).startsWith("blob:") ? stored.imageData : null);
+      if (!stored || !imageUrl) return cloneConfig(DEFAULT_CHEN_AVATAR);
       return {
         ...cloneConfig(DEFAULT_CHEN_AVATAR),
-        imageUrl: stored.imageData,
+        imageUrl,
         source: stored.source === "upload" ? "upload" : "default",
         crop: normalizeCrop({ ...DEFAULT_CHEN_AVATAR.crop, ...(stored.crop || {}) }),
         frame: normalizeFrame({

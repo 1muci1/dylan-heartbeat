@@ -2,7 +2,12 @@
 
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
-const { CHANGE_EVENT, DEFAULTS, UserPreferenceStore } = require("../ai-companion-frontend/storage/user-preference-store");
+const {
+  CHANGE_EVENT,
+  DEFAULTS,
+  UserPreferenceStore,
+  getChenAvatarImage
+} = require("../ai-companion-frontend/storage/user-preference-store");
 
 const storage = () => {
   const values = new Map();
@@ -114,4 +119,29 @@ test("preference changes notify same-page subscribers and can be unsubscribed", 
   unsubscribe();
   store.reset();
   assert.equal(changes.length, 2);
+});
+
+test("Chen avatar image resolver supports the current and legacy persistent fields", () => {
+  const imageData = "data:image/png;base64,AAAA";
+  assert.equal(getChenAvatarImage({ avatar: { chenAvatar: { imageData } } }), imageData);
+  for (const field of ["dataUrl", "imageUrl", "url", "src"]) {
+    const value = field === "dataUrl" ? "data:image/webp;base64,BBBB" :
+      field === "imageUrl" ? "https://cdn.example/avatar.webp" : "/avatars/chen.webp";
+    assert.equal(getChenAvatarImage({ avatar: { chenAvatar: { [field]: value } } }), value);
+  }
+  assert.equal(getChenAvatarImage({ avatar: { imageData } }), imageData);
+});
+
+test("Chen avatar image resolver rejects transient and unsafe URLs", () => {
+  for (const value of ["blob:https://example.test/transient", "http://example.test/avatar.png", "javascript:alert(1)", ""]) {
+    assert.equal(getChenAvatarImage({ avatar: { chenAvatar: { imageData: value } } }), null);
+  }
+  const shared = storage();
+  new UserPreferenceStore({ storage: shared }).saveAvatar({
+    source: "upload",
+    imageData: "blob:https://example.test/transient"
+  }, "chen");
+  const restored = new UserPreferenceStore({ storage: shared });
+  assert.equal(restored.getChenAvatarImage(), null);
+  assert.equal(restored.loadSync().avatar.chenAvatar.imageData, null);
 });

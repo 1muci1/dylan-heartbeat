@@ -21,6 +21,23 @@
   });
   const clone = value => JSON.parse(JSON.stringify(value));
   const isObject = value => value && typeof value === "object" && !Array.isArray(value);
+  const isPersistentAvatarImage = value => {
+    const image = String(value || "").trim();
+    return /^data:image\//iu.test(image) || image.startsWith("https://") || image.startsWith("/");
+  };
+  const getChenAvatarImage = preferences => {
+    const avatar = isObject(preferences?.avatar) ? preferences.avatar : {};
+    const chen = isObject(avatar.chenAvatar) ? avatar.chenAvatar : {};
+    const candidates = [
+      chen.imageData,
+      chen.dataUrl,
+      chen.imageUrl,
+      chen.url,
+      chen.src,
+      avatar.imageData
+    ];
+    return candidates.find(isPersistentAvatarImage) || null;
+  };
   const forbidden = /^(?:token|password|apiKey|api_key|authorization|bearer|secret|chat|messages|memory|identity|gatewaySecret)$/iu;
   const stripSensitive = value => {
     if (typeof value === "string" && value.startsWith("blob:")) return null;
@@ -100,6 +117,9 @@
       const value = this.loadSync().avatar;
       return clone(value[target === "user" ? "userAvatar" : "chenAvatar"] || value);
     }
+    getChenAvatarImage(preferences = this.loadSync()) {
+      return getChenAvatarImage(preferences);
+    }
     saveChatBackground(value = {}) {
       if (value.imageData && this.imageBytes(value.imageData) > this.#maxImageBytes) {
         const error = new Error("聊天背景图片超过本地保存大小限制（2MB）");
@@ -148,5 +168,15 @@
       };
     }
   }
-  return { CHANGE_EVENT, DEFAULTS, MAX_IMAGE_BYTES, STORAGE_KEY, UserPreferenceStore, normalize, stripSensitive };
+  return {
+    CHANGE_EVENT,
+    DEFAULTS,
+    MAX_IMAGE_BYTES,
+    STORAGE_KEY,
+    UserPreferenceStore,
+    getChenAvatarImage,
+    isPersistentAvatarImage,
+    normalize,
+    stripSensitive
+  };
 });

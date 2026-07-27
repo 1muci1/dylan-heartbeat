@@ -41,7 +41,7 @@ test("avatar crop, scale, border, and image data are restored", () => {
   assert.equal(avatar.imageData, "data:image/png;base64,AAAA");
 });
 
-test("model selection is restored independently of chat state", () => {
+test("mirrored model selection is restored independently of chat state", () => {
   const shared = storage();
   new UserPreferenceStore({ storage: shared }).saveModel("gpt-5");
   const restored = new UserPreferenceStore({ storage: shared }).loadSync();

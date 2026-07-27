@@ -1,8 +1,8 @@
 // 前端统一模拟数据层。
 // 当前数据仅用于界面开发，不包含 API、后端请求或持久化逻辑。
 (() => {
-  const DEFAULT_PROVIDER_MODEL = "[脆卷-kiro-0.08]claude-opus-4-6-thinking";
-  const LEGACY_DEFAULT_PROVIDER_MODEL = "claude-opus-4-6";
+  const DEFAULT_PROVIDER_MODEL = "claude-opus-4-6";
+  const LEGACY_DEFAULT_PROVIDER_MODEL = "[脆卷-kiro-0.08]claude-opus-4-6-thinking";
 
   const appData = {
     ai: {

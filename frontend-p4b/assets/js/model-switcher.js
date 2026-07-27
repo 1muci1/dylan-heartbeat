@@ -24,8 +24,7 @@
     list() { return this.#registry.list({ enabledOnly: true }); }
     current() {
       const config = this.#config.getProviderConfig();
-      const storedId = this.#preferences?.loadSync?.().model?.selectedModelId;
-      return this.#registry.byId(storedId) || this.#registry.byId(config.model) || null;
+      return this.#registry.byId(config.model) || null;
     }
     config() { return this.#config.getProviderConfig(); }
     select(id) {
@@ -36,7 +35,7 @@
         model: id,
         defaultModel: id
       });
-      this.#preferences?.saveModel?.(id);
+      this.#preferences?.saveModel?.(next.model);
       return next;
     }
     setAutoSelect(enabled) {

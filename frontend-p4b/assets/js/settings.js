@@ -98,6 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
     realMode: form.elements.realMode
   };
   const storedConfig = configStore.getProviderConfig();
+  preferenceStore?.saveModel(storedConfig.model);
   fields.baseUrl.value = storedConfig.baseUrl;
   fields.model.value = storedConfig.model;
   fields.token.value = storedConfig.auth.token;
@@ -131,6 +132,7 @@ document.addEventListener("DOMContentLoaded", () => {
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     const config = configStore.saveProviderConfig(readFormConfig());
+    preferenceStore?.saveModel(config.model);
     showResult(
       config.mode === "real" ? "配置已保存，真实模式已开启。" : "配置已保存，当前为 mock 模式。",
       "success"
@@ -157,7 +159,8 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   debugButton.addEventListener("click", async () => {
-    configStore.saveProviderConfig(readFormConfig());
+    const config = configStore.saveProviderConfig(readFormConfig());
+    preferenceStore?.saveModel(config.model);
     debugButton.disabled = true;
     const originalLabel = debugButton.textContent;
     debugButton.textContent = "请求中…";

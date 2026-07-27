@@ -15,7 +15,7 @@
     avatar: Object.freeze({ source: "default", crop: Object.freeze({ x: 50, y: 50 }), scale: 1, border: "moon", imageData: null, userAvatar: null, chenAvatar: null }),
     chatBackground: Object.freeze({ imageData: null, position: "center", size: "cover", overlay: 0.35 }),
     space: Object.freeze({ profileId: "default-space", presetId: null, profile: null }),
-    model: Object.freeze({ selectedModelId: "claude-opus-4-6" }),
+    model: Object.freeze({ selectedModelId: null }),
     ui: Object.freeze({})
   });
   const clone = value => JSON.parse(JSON.stringify(value));

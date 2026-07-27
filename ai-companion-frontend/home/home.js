@@ -18,18 +18,26 @@
     sunset: { label: "黄昏", icon: "🌇", atmosphere: "暮色氛围" },
     night: { label: "夜晚", icon: "🌙", atmosphere: "月光氛围" }
   });
+  const RELATIONSHIP_START_DATE = "2026-07-01";
 
   const clone = value => structuredClone(value);
 
   const overlayFor = profile => profile.theme.mode === "day"
     ? `rgba(255, 252, 255, ${profile.background.opacity})`
-    : `rgba(18, 11, 27, ${profile.background.opacity})`;
+    : `rgba(5, 5, 8, ${profile.background.opacity})`;
 
   const pad = value => String(value).padStart(2, "0");
 
   const formatClock = date => `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 
   const formatDate = date => `${date.getFullYear()}年${pad(date.getMonth() + 1)}月${pad(date.getDate())}日`;
+
+  const relationshipDays = (date, startDate = RELATIONSHIP_START_DATE) => {
+    const start = String(startDate).split("-").map(Number);
+    const begin = new Date(start[0], start[1] - 1, start[2]);
+    const today = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    return Math.max(1, Math.floor((today - begin) / 86400000) + 1);
+  };
 
   const resolveMoment = date => {
     const hour = date.getHours();
@@ -134,6 +142,7 @@
         themeName: buildThemeName(profile),
         heroTitle: buildHeroTitle(profile, moment),
         heroPresence: "沉正在这里",
+        relationshipDays: relationshipDays(now),
         heroAtmosphere: `${moment.label} · ${describeAtmosphere(atmosphere)}`,
         moment: {
           key: moment.key,
@@ -180,22 +189,26 @@
     const SpacePresetManager =
       windowRef?.CompanionSpacePresetManager?.SpacePresetManager;
     const AtmosphereEngine = windowRef?.CompanionAtmosphere?.AtmosphereEngine;
+    const PreferenceStore = windowRef?.CompanionUserPreferences?.UserPreferenceStore;
     if (!ThemeEngine || !AvatarStudio || !SpaceProfileManager ||
         !SpacePresetManager || !AtmosphereEngine) return null;
 
+    const preferences = PreferenceStore ? new PreferenceStore() : null;
     const themeEngine = new ThemeEngine({
       documentRef,
+      persistenceAdapter: preferences,
       matchMedia: windowRef.matchMedia?.bind(windowRef),
       fontFaceFactory: windowRef.FontFace
         ? (family, source, descriptors) => new windowRef.FontFace(family, source, descriptors)
         : undefined
     });
     const avatarStudio = new AvatarStudio({
+      persistenceAdapter: preferences,
       createObjectURL: windowRef.URL.createObjectURL.bind(windowRef.URL),
       revokeObjectURL: windowRef.URL.revokeObjectURL.bind(windowRef.URL)
     });
     const controller = new SpaceHomeController({
-      profileManager: new SpaceProfileManager(),
+      profileManager: new SpaceProfileManager({ persistenceAdapter: preferences?.adapter?.() }),
       themeEngine,
       avatarStudio,
       atmosphereEngine: new AtmosphereEngine(),
@@ -203,6 +216,7 @@
       clock: () => new windowRef.Date()
     });
     const state = controller.load();
+    documentRef.body.classList.add("is-home-ready");
     const setText = (selector, value) => {
       const node = documentRef.querySelector(selector);
       if (node) node.textContent = value;
@@ -212,6 +226,8 @@
     setText("[data-home-profile]", state.profile.name);
     setText("[data-home-space-title]", state.heroTitle);
     setText("[data-home-presence]", state.heroPresence);
+    setText("[data-home-days]", state.relationshipDays);
+    setText("[data-home-companionship-days]", state.relationshipDays);
     setText("[data-home-atmosphere]", state.heroAtmosphere);
     setText("[data-home-preset]", state.preset.name);
     setText("[data-home-preset-name]", state.preset.name);
@@ -224,6 +240,7 @@
     if (userAvatar) renderUserAvatar(documentRef, userAvatar);
     const hero = documentRef.querySelector("[data-home-hero]");
     if (hero) {
+      hero.classList.add("is-home-hero-animated");
       hero.dataset.homeMoment = state.moment.key;
       hero.dataset.homeAnimation = state.atmosphere.animation;
       hero.dataset.homeTint = state.atmosphere.lighting.tint;
@@ -236,6 +253,23 @@
     if (shell) {
       shell.dataset.homeMoment = state.moment.key;
     }
+    const animatedNodes = [
+      "[data-home-user-avatar]",
+      "[data-home-avatar]",
+      "[data-home-space-title]",
+      "[data-home-atmosphere]",
+      "[data-home-preset-name]",
+      "[data-home-preset-description]",
+      "[data-home-theme]",
+      ".home-card"
+    ];
+    animatedNodes.forEach(selector => {
+      documentRef.querySelectorAll(selector).forEach((node, index) => {
+        const target = node.closest?.(".home-stat") || node;
+        target.classList.add("is-home-entering");
+        target.style.setProperty("--home-stagger-index", String(index));
+      });
+    });
     return controller;
   };
 
@@ -249,6 +283,8 @@
     formatDate,
     mount,
     overlayFor,
-    resolveMoment
+    resolveMoment,
+    relationshipDays,
+    RELATIONSHIP_START_DATE
   };
 });

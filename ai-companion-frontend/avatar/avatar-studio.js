@@ -7,7 +7,7 @@
 })(typeof window !== "undefined" ? window : null, () => {
   const AVATAR_SHAPES = Object.freeze(["circle", "rounded", "square"]);
   const AVATAR_BORDERS = Object.freeze(["moon", "soft", "minimal", "none"]);
-  const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+  const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
   const IMAGE_TYPE_PATTERN = /^image\/(?:png|jpeg|webp|gif|avif)$/iu;
 
   const DEFAULT_CHEN_AVATAR = Object.freeze({
@@ -83,13 +83,15 @@
   class AvatarStudio {
     #createObjectURL;
     #revokeObjectURL;
+    #preferences;
     #ownedUrls = new Set();
 
-    constructor({ createObjectURL, revokeObjectURL } = {}) {
+    constructor({ createObjectURL, revokeObjectURL, persistenceAdapter = null } = {}) {
       this.#createObjectURL = createObjectURL ||
         (file => URL.createObjectURL(file));
       this.#revokeObjectURL = revokeObjectURL ||
         (url => URL.revokeObjectURL(url));
+      this.#preferences = persistenceAdapter;
       if (
         typeof this.#createObjectURL !== "function" ||
         typeof this.#revokeObjectURL !== "function"
@@ -99,7 +101,20 @@
     }
 
     defaultChen() {
-      return cloneConfig(DEFAULT_CHEN_AVATAR);
+      const preferences = this.#preferences?.loadSync?.().avatar;
+      const stored = preferences?.chenAvatar || preferences;
+      if (!stored || !stored.imageData) return cloneConfig(DEFAULT_CHEN_AVATAR);
+      return {
+        ...cloneConfig(DEFAULT_CHEN_AVATAR),
+        imageUrl: stored.imageData,
+        source: stored.source === "upload" ? "upload" : "default",
+        crop: normalizeCrop({ ...DEFAULT_CHEN_AVATAR.crop, ...(stored.crop || {}) }),
+        frame: normalizeFrame({
+          ...DEFAULT_CHEN_AVATAR.frame,
+          border: stored.border || DEFAULT_CHEN_AVATAR.frame.border,
+          ...(stored.frame || {})
+        })
+      };
     }
 
     fromUpload(file, {
@@ -143,6 +158,17 @@
 
     setFrame(config, frame) {
       return { ...cloneConfig(config), frame: normalizeFrame(frame) };
+    }
+
+    save(config, { imageData = null } = {}) {
+      const value = cloneConfig(config);
+      return this.#preferences?.saveAvatar?.({
+        source: value.source,
+        crop: value.crop,
+        scale: value.crop.zoom,
+        border: value.frame.border,
+        imageData
+      }, value.id === "user" ? "user" : "chen") || null;
     }
 
     render(documentRef, container, config) {

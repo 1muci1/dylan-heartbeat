@@ -14,20 +14,24 @@
     const ThemeEngine = windowRef?.CompanionTheme?.ThemeEngine;
     const AvatarStudio = windowRef?.AvatarStudio?.AvatarStudio;
     const SpaceProfileManager = windowRef?.CompanionSpaceProfile?.SpaceProfileManager;
+    const PreferenceStore = windowRef?.CompanionUserPreferences?.UserPreferenceStore;
     if (!ThemeEngine || !AvatarStudio || !SpaceProfileManager) return null;
 
+    const preferences = PreferenceStore ? new PreferenceStore() : null;
     const theme = new ThemeEngine({
       documentRef,
+      persistenceAdapter: preferences,
       matchMedia: windowRef.matchMedia?.bind(windowRef),
       fontFaceFactory: windowRef.FontFace
         ? (family, source, descriptors) => new windowRef.FontFace(family, source, descriptors)
         : undefined
     });
     const avatarStudio = new AvatarStudio({
+      persistenceAdapter: preferences,
       createObjectURL: windowRef.URL.createObjectURL.bind(windowRef.URL),
       revokeObjectURL: windowRef.URL.revokeObjectURL.bind(windowRef.URL)
     });
-    const profileManager = new SpaceProfileManager();
+    const profileManager = new SpaceProfileManager({ persistenceAdapter: preferences?.adapter?.() });
     let profile = profileManager.snapshot();
     let avatar = avatarStudio.defaultChen();
 
@@ -38,6 +42,13 @@
       target.textContent = message;
       target.classList.toggle("is-error", error);
     };
+    const saveProfile = () => profileManager.save().catch(() => false);
+    const fileDataUrl = file => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("头像读取失败"));
+      reader.readAsDataURL(file);
+    });
     const renderAvatar = () => {
       const stage = select("[data-avatar-stage]");
       if (!stage) return;
@@ -91,6 +102,7 @@
       applyAvatarConfig();
       syncControls();
       setStatus("已恢复紫月小屋默认配置");
+      saveProfile();
     };
 
     documentRef.querySelectorAll("[data-theme-mode]").forEach(button => {
@@ -101,10 +113,11 @@
         theme.setMode(profile.theme.mode);
         theme.setAccent(profile.theme.color);
         syncControls();
+        saveProfile();
       });
     });
 
-    select("[data-avatar-upload]")?.addEventListener("change", event => {
+    select("[data-avatar-upload]")?.addEventListener("change", async event => {
       const file = event.target.files?.[0];
       if (!file) return;
       try {
@@ -125,8 +138,10 @@
         profile = profileManager.update(profile.id, {
           avatar: { type: "upload" }
         });
+        avatarStudio.save(avatar, { imageData: await fileDataUrl(file) });
         renderAvatar();
         setStatus("头像已载入当前空间");
+        saveProfile();
       } catch (error) {
         setStatus(error.message, true);
       }
@@ -143,6 +158,7 @@
         }
       });
       try { applyAvatarConfig(); } catch (error) { setStatus(error.message, true); }
+      saveProfile();
     };
     ["[data-avatar-x]", "[data-avatar-y]", "[data-avatar-zoom]"].forEach(selector => {
       select(selector)?.addEventListener("input", updateCrop);
@@ -152,6 +168,7 @@
         avatar: { frame: event.target.value }
       });
       try { applyAvatarConfig(); } catch (error) { setStatus(error.message, true); }
+      saveProfile();
     });
 
     select("[data-apply-background]")?.addEventListener("click", () => {
@@ -172,6 +189,7 @@
           }
         });
         setStatus("背景已应用到当前空间");
+        saveProfile();
       } catch (error) {
         setStatus(error.message, true);
       }
@@ -184,6 +202,7 @@
       const input = select("[data-background-url]");
       if (input) input.value = "";
       setStatus("已清除自定义背景");
+      saveProfile();
     });
 
     select("[data-load-font]")?.addEventListener("click", async () => {
@@ -200,6 +219,7 @@
           }
         });
         setStatus("字体已加载并应用");
+        saveProfile();
       } catch (error) {
         setStatus(error.message, true);
       }

@@ -1,4 +1,86 @@
 document.addEventListener("DOMContentLoaded", () => {
+  const appearance = window.CompanionAppearance;
+  if (appearance) {
+    const current = appearance.read();
+    const resultNode = document.querySelector("[data-appearance-result]");
+    const activate = (selector, value) => document.querySelectorAll(`${selector} [data-value]`).forEach(button => {
+      button.classList.toggle("is-active", button.dataset.value === value);
+    });
+    activate("[data-appearance-mode]", current.mode || "night");
+    activate("[data-appearance-style]", current.style || "purple");
+    const fontSelect = document.querySelector("[data-appearance-font]");
+    if (fontSelect) fontSelect.value = current.font || "default";
+    document.querySelectorAll("[data-appearance-mode] [data-value]").forEach(button => button.addEventListener("click", () => {
+      appearance.save({ mode: button.dataset.value });
+      activate("[data-appearance-mode]", button.dataset.value);
+      if (resultNode) resultNode.textContent = "主题模式已更新";
+    }));
+    document.querySelectorAll("[data-appearance-style] [data-value]").forEach(button => button.addEventListener("click", () => {
+      appearance.save({ style: button.dataset.value });
+      activate("[data-appearance-style]", button.dataset.value);
+      if (resultNode) resultNode.textContent = "主题风格已更新";
+    }));
+    fontSelect?.addEventListener("change", () => {
+      appearance.save({ font: fontSelect.value });
+      if (resultNode) resultNode.textContent = "字体已更新";
+    });
+  }
+  const preferenceStore = window.CompanionUserPreferences?.UserPreferenceStore
+    ? new window.CompanionUserPreferences.UserPreferenceStore() : null;
+  const preferenceResult = document.querySelector("[data-preference-result]");
+  const preferenceMessage = message => { if (preferenceResult) preferenceResult.textContent = message; };
+  document.querySelector("[data-preference-save]")?.addEventListener("click", () => {
+    if (!preferenceStore) return;
+    preferenceStore.save(preferenceStore.loadSync());
+    preferenceMessage("设置已保存到本设备");
+  });
+  document.querySelector("[data-preference-reset]")?.addEventListener("click", () => {
+    if (!preferenceStore) return;
+    preferenceStore.reset();
+    preferenceMessage("已恢复默认设置");
+  });
+  document.querySelector("[data-preference-clear]")?.addEventListener("click", () => {
+    if (!preferenceStore || !window.confirm("清除本地主题、头像、空间和模型偏好吗？Provider 配置不会被删除。")) return;
+    preferenceStore.clear();
+    preferenceMessage("本地偏好已清除");
+  });
+  const backgroundFile = document.querySelector("[data-chat-background-file]");
+  const backgroundPreview = document.querySelector("[data-chat-background-preview]");
+  const backgroundSave = document.querySelector("[data-chat-background-save]");
+  const backgroundResult = document.querySelector("[data-chat-background-result]");
+  let pendingBackground = null;
+  const showBackgroundResult = message => { if (backgroundResult) backgroundResult.textContent = message; };
+  backgroundFile?.addEventListener("change", () => {
+    const file = backgroundFile.files?.[0];
+    if (!file) return;
+    if (!/^image\/(?:png|jpeg|webp)$/iu.test(file.type) || file.size > 2 * 1024 * 1024) {
+      pendingBackground = null;
+      if (backgroundSave) backgroundSave.disabled = true;
+      showBackgroundResult("请选择 2MB 以内的 PNG、JPG 或 WebP 图片");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      pendingBackground = String(reader.result || "");
+      if (backgroundPreview) { backgroundPreview.hidden = false; backgroundPreview.style.backgroundImage = `url(${JSON.stringify(pendingBackground)})`; }
+      if (backgroundSave) backgroundSave.disabled = false;
+      showBackgroundResult("已预览，点击应用背景保存");
+    };
+    reader.readAsDataURL(file);
+  });
+  backgroundSave?.addEventListener("click", () => {
+    if (!preferenceStore || !pendingBackground) return;
+    preferenceStore.saveChatBackground({ imageData: pendingBackground, position: "center", size: "cover", overlay: .35 });
+    showBackgroundResult("聊天背景已应用");
+  });
+  document.querySelector("[data-chat-background-clear]")?.addEventListener("click", () => {
+    if (!preferenceStore) return;
+    preferenceStore.saveChatBackground({ imageData: null, position: "center", size: "cover", overlay: .35 });
+    pendingBackground = null;
+    if (backgroundPreview) { backgroundPreview.hidden = true; backgroundPreview.style.backgroundImage = "none"; }
+    if (backgroundSave) backgroundSave.disabled = true;
+    showBackgroundResult("聊天背景已清除");
+  });
   const configStore = window.AppConfig;
   const provider = window.AppProvider;
   const form = document.querySelector(".provider-form");

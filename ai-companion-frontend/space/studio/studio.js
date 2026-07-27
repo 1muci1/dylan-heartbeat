@@ -8,6 +8,12 @@
 })(typeof window !== "undefined" ? window : null, () => {
   const IMAGE_TYPE_PATTERN = /^image\/(?:png|jpeg|webp|gif|avif)$/iu;
   const MAX_BACKGROUND_BYTES = 10 * 1024 * 1024;
+  const readFileDataUrl = file => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("图片读取失败"));
+    reader.readAsDataURL(file);
+  });
 
   const overlayFor = profile => profile.theme.mode === "day"
     ? `rgba(255, 252, 255, ${profile.background.opacity})`
@@ -23,6 +29,7 @@
     #revokeObjectURL;
     #avatar;
     #backgroundUrl = null;
+    #preferences;
 
     constructor({
       profileManager,
@@ -31,7 +38,8 @@
       presetManager = null,
       atmosphereEngine = null,
       createObjectURL,
-      revokeObjectURL
+      revokeObjectURL,
+      persistenceAdapter = null
     } = {}) {
       if (!profileManager?.snapshot || !profileManager?.update || !profileManager?.reset) {
         throw new TypeError("Space Profile Manager 必填");
@@ -49,6 +57,7 @@
       this.#atmosphere = atmosphereEngine;
       this.#createObjectURL = createObjectURL;
       this.#revokeObjectURL = revokeObjectURL;
+      this.#preferences = persistenceAdapter;
       this.#avatar = avatarStudio.defaultChen();
       this.applyProfile();
     }
@@ -81,6 +90,16 @@
 
     getAtmosphere() {
       return this.#atmosphere?.apply?.(this.snapshot()) || null;
+    }
+
+    async save() {
+      return this.#profiles.save();
+    }
+
+    async persistAvatarUpload(file) {
+      const dataUrl = await readFileDataUrl(file);
+      this.#avatars.save(this.#avatar, { imageData: dataUrl });
+      return dataUrl;
     }
 
     applyPreset(id) {
@@ -206,6 +225,12 @@
       return profile;
     }
 
+    async persistBackgroundUpload(file) {
+      const dataUrl = await readFileDataUrl(file);
+      this.#preferences?.saveBackground?.({ url: dataUrl });
+      return dataUrl;
+    }
+
     setBackgroundAppearance({ opacity, blur }) {
       const current = this.snapshot();
       const profile = this.#profiles.update(current.id, {
@@ -281,26 +306,31 @@
     const SpacePresetManager =
       windowRef?.CompanionSpacePresetManager?.SpacePresetManager;
     const AtmosphereEngine = windowRef?.CompanionAtmosphere?.AtmosphereEngine;
+    const PreferenceStore = windowRef?.CompanionUserPreferences?.UserPreferenceStore;
     if (!ThemeEngine || !AvatarStudio || !SpaceProfileManager ||
         !SpacePresetManager || !AtmosphereEngine) return null;
 
+    const preferences = PreferenceStore ? new PreferenceStore() : null;
     const themeEngine = new ThemeEngine({
       documentRef,
+      persistenceAdapter: preferences,
       matchMedia: windowRef.matchMedia?.bind(windowRef),
       fontFaceFactory: windowRef.FontFace
         ? (family, source, descriptors) => new windowRef.FontFace(family, source, descriptors)
         : undefined
     });
     const avatarStudio = new AvatarStudio({
+      persistenceAdapter: preferences,
       createObjectURL: windowRef.URL.createObjectURL.bind(windowRef.URL),
       revokeObjectURL: windowRef.URL.revokeObjectURL.bind(windowRef.URL)
     });
     const controller = new SpaceStudioController({
-      profileManager: new SpaceProfileManager(),
+      profileManager: new SpaceProfileManager({ persistenceAdapter: preferences?.adapter?.() }),
       presetManager: new SpacePresetManager(),
       atmosphereEngine: new AtmosphereEngine(),
       themeEngine,
       avatarStudio,
+      persistenceAdapter: preferences,
       createObjectURL: windowRef.URL.createObjectURL.bind(windowRef.URL),
       revokeObjectURL: windowRef.URL.revokeObjectURL.bind(windowRef.URL)
     });
@@ -389,9 +419,10 @@
       try {
         const result = action();
         if (result?.then) {
-          result.then(() => { render(); status("空间配置已更新"); })
+          result.then(() => controller.save()).then(() => { render(); status("空间配置已更新"); })
             .catch(error => status(error.message, true));
         } else {
+          controller.save().catch(error => status(error.message, true));
           render();
           status("空间配置已更新");
         }
@@ -406,7 +437,7 @@
       safely(() => controller.setTheme({ color: event.target.value })));
     select("[data-background-upload]")?.addEventListener("change", event => {
       const file = event.target.files?.[0];
-      if (file) safely(() => controller.setBackgroundFile(file));
+      if (file) safely(async () => { controller.setBackgroundFile(file); await controller.persistBackgroundUpload(file); });
     });
     select("[data-background-clear]")?.addEventListener("click", () =>
       safely(() => controller.clearBackground()));
@@ -418,7 +449,7 @@
     select("[data-background-blur]")?.addEventListener("input", updateBackground);
     select("[data-avatar-upload]")?.addEventListener("change", event => {
       const file = event.target.files?.[0];
-      if (file) safely(() => controller.setAvatarFile(file));
+      if (file) safely(async () => { controller.setAvatarFile(file); await controller.persistAvatarUpload(file); });
     });
     const updateAvatar = () => safely(() => controller.setAvatarAppearance({
       scale: Number(select("[data-avatar-scale]")?.value),

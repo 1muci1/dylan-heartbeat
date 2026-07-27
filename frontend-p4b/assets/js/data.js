@@ -1,7 +1,7 @@
 // 前端统一模拟数据层。
 // 当前数据仅用于界面开发，不包含 API、后端请求或持久化逻辑。
 (() => {
-  const DEFAULT_PROVIDER_MODEL = "[脆卷-kiro-0.08]claude-opus-4-6-thinking";
+  const DEFAULT_PROVIDER_MODEL = "claude-opus-4-6";
 
   const appData = {
     ai: {
@@ -230,7 +230,9 @@
   const PROVIDER_STORAGE_KEY = "xinban-provider-config-v1";
   const createDefaultProviderConfig = () => ({
     ...clone(appData.PROVIDER_CONFIG),
-    model: appData.PROVIDER_CONFIG.model || appData.MODEL_CONFIG.model
+    model: appData.PROVIDER_CONFIG.model || appData.MODEL_CONFIG.model,
+    defaultModel: appData.PROVIDER_CONFIG.model || appData.MODEL_CONFIG.model,
+    autoSelectModel: false
   });
   const normalizeProviderConfig = (config) => {
     const defaults = createDefaultProviderConfig();
@@ -240,6 +242,8 @@
       baseUrl: String(config?.baseUrl || defaults.baseUrl).trim(),
       endpoint: defaults.endpoint,
       model: String(config?.model || defaults.model).trim(),
+      defaultModel: String(config?.defaultModel || config?.model || defaults.defaultModel).trim(),
+      autoSelectModel: Boolean(config?.autoSelectModel),
       auth: {
         type: "bearer",
         token: String(config?.auth?.token || "").trim()

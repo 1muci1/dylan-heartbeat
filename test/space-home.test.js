@@ -21,6 +21,7 @@ const {
 } = require("../ai-companion-frontend/home/home");
 
 const homeRoot = path.join(__dirname, "..", "ai-companion-frontend", "home");
+const appRoot = path.join(__dirname, "..", "ai-companion-frontend");
 const fixedNow = () => new Date("2026-07-24T21:05:00.000Z");
 
 function fixture() {
@@ -76,6 +77,8 @@ function fakeDocument() {
 
 test("Space Home page loads the upgraded hero and navigation structure", () => {
   const html = fs.readFileSync(path.join(homeRoot, "index.html"), "utf8");
+  const css = fs.readFileSync(path.join(homeRoot, "home.css"), "utf8");
+  const js = fs.readFileSync(path.join(homeRoot, "home.js"), "utf8");
   for (const token of [
     "data-home-shell",
     "data-home-hero",
@@ -99,6 +102,36 @@ test("Space Home page loads the upgraded hero and navigation structure", () => {
     "home.js"
   ]) {
     assert.match(html, new RegExp(source.replace(".", "\\.")));
+  }
+  assert.match(css + js, /is-home-hero-animated/);
+  assert.match(css + js, /is-home-entering/);
+});
+
+test("Root entry redirects into Home while preserving AppConfig bootstrap", () => {
+  const html = fs.readFileSync(path.join(appRoot, "index.html"), "utf8");
+  assert.match(html, /landing-card/);
+  assert.match(html, /loading__bars/);
+  assert.match(html, /\/assets\/js\/data\.js/);
+  assert.match(html, /window\.AppConfig/);
+  assert.match(html, /setTimeout\(\(\) => window\.location\.replace\("home\/"\), 720\)/);
+  assert.match(html, /location\.replace\("home\/"\)/);
+  assert.match(html, /正在进入沉的小世界/);
+});
+
+test("Home animation hooks exist for atmosphere, avatar, title, and cards", () => {
+  const html = fs.readFileSync(path.join(homeRoot, "index.html"), "utf8");
+  const css = fs.readFileSync(path.join(homeRoot, "home.css"), "utf8");
+  const js = fs.readFileSync(path.join(homeRoot, "home.js"), "utf8");
+  for (const token of [
+    "home-shell-fade",
+    "home-hero-rise",
+    "home-atmosphere-fade",
+    "home-card-rise",
+    "home-fade-up",
+    "home-pop",
+    "is-home-ready"
+  ]) {
+    assert.match(html + css + js, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
 });
 
@@ -162,7 +195,7 @@ test("Home contains all documented cards and no runtime backdoors", () => {
     ['href="../space/"', "空间设置"],
     ['href="../collaboration/"', "和 AI 一起讨论"],
     ['href="../game/"', "一起玩"],
-    ['href="/frontend-p4b/memory.html"', "共同记忆"]
+    ['href="../memory.html"', "共同记忆"]
   ];
   for (const [href, label] of entries) {
     assert.match(html, new RegExp(href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));

@@ -7,7 +7,7 @@
 })(typeof window !== "undefined" ? window : null, () => {
   const THEME_MODES = Object.freeze(["auto", "day", "night"]);
   const ACCENT_PALETTES = Object.freeze({
-    purple: Object.freeze({ primary: "#b899d2", strong: "#8b65ac" }),
+    purple: Object.freeze({ primary: "#a78bfa", strong: "#8b5cf6" }),
     rose: Object.freeze({ primary: "#d5a0b8", strong: "#a96785" }),
     blue: Object.freeze({ primary: "#91b9dd", strong: "#5d89b1" }),
     beige: Object.freeze({ primary: "#c7ad83", strong: "#8c704d" })
@@ -59,19 +59,22 @@
     #root;
     #mediaQuery;
     #fontFaceFactory;
+    #preferences;
     #mode = "night";
     #onSystemChange;
 
     constructor({
       documentRef,
       matchMedia,
-      fontFaceFactory
+      fontFaceFactory,
+      persistenceAdapter = null
     } = {}) {
       if (!documentRef?.documentElement?.style) {
         throw new TypeError("documentRef 必填");
       }
       this.#document = documentRef;
       this.#root = documentRef.documentElement;
+      this.#preferences = persistenceAdapter;
       this.#mediaQuery = typeof matchMedia === "function"
         ? matchMedia("(prefers-color-scheme: dark)")
         : null;
@@ -81,7 +84,8 @@
         if (this.#mode === "auto") this.#applyResolvedMode();
       };
       this.#mediaQuery?.addEventListener?.("change", this.#onSystemChange);
-      this.setMode("night");
+      const storedMode = this.#preferences?.loadSync?.().theme?.mode;
+      this.setMode(THEME_MODES.includes(storedMode) ? storedMode : "night");
     }
 
     #applyResolvedMode() {
@@ -98,7 +102,9 @@
         throw new ThemeEngineError("主题模式无效", "THEME_MODE_INVALID");
       }
       this.#mode = mode;
-      return this.#applyResolvedMode();
+      const resolved = this.#applyResolvedMode();
+      this.#preferences?.saveTheme?.({ mode, preset: this.#root.dataset.companionThemeAccent || "purple" });
+      return resolved;
     }
 
     getMode() {
@@ -116,6 +122,7 @@
       this.#root.dataset.companionThemeAccent = name;
       this.#root.style.setProperty("--theme-color-primary", palette.primary);
       this.#root.style.setProperty("--theme-color-primary-strong", palette.strong);
+      this.#preferences?.saveTheme?.({ mode: this.#mode, preset: name });
       return Object.freeze({ name, ...palette });
     }
 
@@ -125,6 +132,7 @@
         ? DEFAULT_FONT_STACK
         : `${JSON.stringify(safeFamily)}, ${DEFAULT_FONT_STACK}`;
       this.#root.style.setProperty("--theme-font-family", value);
+      this.#preferences?.save?.({ ui: { font: { family: safeFamily } } });
       return Object.freeze({ family: safeFamily });
     }
 
@@ -191,6 +199,7 @@
       this.#root.style.setProperty("--theme-background-size", size);
       this.#root.style.setProperty("--theme-background-overlay", overlay.trim());
       this.#root.style.setProperty("--theme-background-blur", `${blurValue}px`);
+      this.#preferences?.saveBackground?.({ url, position, size, blur: blurValue });
       return Object.freeze({
         imageUrl: url,
         position,
@@ -202,6 +211,7 @@
 
     clearBackground() {
       this.#root.style.setProperty("--theme-background-image", "none");
+      this.#preferences?.saveBackground?.({ url: null });
       return Object.freeze({ imageUrl: null });
     }
 

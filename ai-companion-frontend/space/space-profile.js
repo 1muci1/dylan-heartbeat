@@ -230,6 +230,16 @@
       this.#profiles.set(this.#defaultProfile.id, this.#defaultProfile);
       this.#activeId = this.#defaultProfile.id;
       this.setPersistenceAdapter(persistenceAdapter);
+      const persisted = this.#adapter?.loadSync?.();
+      if (persisted != null) {
+        try {
+          const value = validateProfile(persisted);
+          this.#profiles.set(value.id, value);
+          this.#activeId = value.id;
+        } catch {
+          // Invalid or outdated local preferences fall back to the default profile.
+        }
+      }
     }
 
     setPersistenceAdapter(adapter) {

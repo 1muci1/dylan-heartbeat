@@ -109,10 +109,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (message.role === "assistant") {
       const avatar = document.createElement("div");
-      avatar.className = "message-avatar";
+      avatar.className = "message-avatar message-avatar--assistant";
       avatar.setAttribute("aria-hidden", "true");
-      const chenAvatarImage = window.CompanionChatAvatars?.getImage();
-      if (!window.CompanionChatAvatars?.applyTo(avatar, chenAvatarImage)) avatar.textContent = "沉";
+      const chenAvatarImage = window.CompanionChatAvatars?.getImage("chen");
+      if (!window.CompanionChatAvatars?.applyTo(avatar, "chen", chenAvatarImage)) avatar.textContent = "沉";
       row.append(avatar);
     }
 
@@ -148,6 +148,14 @@ document.addEventListener("DOMContentLoaded", () => {
     group.append(bubble, time);
     if (!message.actionsDisabled) group.append(createActionBar(message));
     row.append(group);
+    if (message.role === "user") {
+      const avatar = document.createElement("div");
+      avatar.className = "message-avatar message-avatar--user";
+      avatar.setAttribute("aria-hidden", "true");
+      const userAvatarImage = window.CompanionChatAvatars?.getImage("user");
+      if (!window.CompanionChatAvatars?.applyTo(avatar, "user", userAvatarImage)) avatar.textContent = "我";
+      row.append(avatar);
+    }
     return row;
   };
 

@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const Store = window.CompanionUserPreferences?.UserPreferenceStore;
   if (!Store) return;
   const store = new Store();
-  const applyAvatar = (node, image, avatar = {}) => {
+  const applyAvatar = (node, image, avatar = {}, fallback = "沉") => {
     if (!node) return false;
     if (image) {
       node.style.backgroundImage = `url(${JSON.stringify(image)})`;
@@ -17,21 +17,34 @@ document.addEventListener("DOMContentLoaded", () => {
     node.style.removeProperty("background-position");
     node.style.removeProperty("background-size");
     node.classList.remove("has-avatar-image");
-    if (node.classList.contains("message-avatar")) node.textContent = "沉";
+    if (node.classList.contains("message-avatar")) node.textContent = fallback;
     return false;
   };
+  const avatarConfig = (preferences, kind) => {
+    const avatar = preferences.avatar;
+    if (kind === "user") return avatar.userAvatar || avatar.meAvatar || avatar.ownerAvatar || {};
+    return avatar.chenAvatar || avatar;
+  };
+  const getImage = (kind = "chen", preferences = store.loadSync()) => kind === "user"
+    ? store.getUserAvatarImage(preferences)
+    : store.getChenAvatarImage(preferences);
   const applyAvatars = preferences => {
     const value = preferences || store.loadSync();
-    const avatar = value.avatar;
-    const chen = avatar.chenAvatar || avatar;
-    const image = store.getChenAvatarImage(value);
-    document.querySelectorAll(".chat-avatar, .message-avatar").forEach(node => applyAvatar(node, image, chen));
+    const chen = avatarConfig(value, "chen");
+    const user = avatarConfig(value, "user");
+    document.querySelectorAll(".chat-avatar, .message-avatar--assistant")
+      .forEach(node => applyAvatar(node, getImage("chen", value), chen, "沉"));
+    document.querySelectorAll(".message-avatar--user")
+      .forEach(node => applyAvatar(node, getImage("user", value), user, "我"));
   };
-  const getImage = preferences => store.getChenAvatarImage(preferences || store.loadSync());
-  const applyTo = (node, image = getImage()) => {
+  const applyTo = (node, kind = "chen", image = getImage(kind)) => {
     const preferences = store.loadSync();
-    const avatar = preferences.avatar;
-    return applyAvatar(node, image, avatar.chenAvatar || avatar);
+    return applyAvatar(
+      node,
+      image,
+      avatarConfig(preferences, kind),
+      kind === "user" ? "我" : "沉"
+    );
   };
   window.CompanionChatAvatars = Object.freeze({ apply: applyAvatars, applyTo, getImage });
   applyAvatars(store.loadSync());

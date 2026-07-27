@@ -25,6 +25,7 @@
     const image = String(value || "").trim();
     return /^data:image\//iu.test(image) || image.startsWith("https://") || image.startsWith("/");
   };
+  const firstPersistentImage = candidates => candidates.find(isPersistentAvatarImage) || null;
   const getChenAvatarImage = preferences => {
     const avatar = isObject(preferences?.avatar) ? preferences.avatar : {};
     const chen = isObject(avatar.chenAvatar) ? avatar.chenAvatar : {};
@@ -36,7 +37,56 @@
       chen.src,
       avatar.imageData
     ];
-    return candidates.find(isPersistentAvatarImage) || null;
+    return firstPersistentImage(candidates);
+  };
+  const getUserAvatarImage = preferences => {
+    const avatar = isObject(preferences?.avatar) ? preferences.avatar : {};
+    const user = isObject(avatar.userAvatar) ? avatar.userAvatar : {};
+    const me = isObject(avatar.meAvatar) ? avatar.meAvatar : {};
+    const owner = isObject(avatar.ownerAvatar) ? avatar.ownerAvatar : {};
+    return firstPersistentImage([
+      user.imageData,
+      user.dataUrl,
+      user.imageUrl,
+      user.url,
+      user.src,
+      me.imageData,
+      owner.imageData
+    ]);
+  };
+  const finiteNumber = (value, fallback, min, max) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
+  };
+  const getChatBackground = preferences => {
+    const sources = [
+      preferences?.chatBackground,
+      preferences?.background,
+      preferences?.space?.profile?.background
+    ].filter(isObject);
+    const source = sources.find(candidate => firstPersistentImage([
+      candidate.imageData,
+      candidate.dataUrl,
+      candidate.imageUrl,
+      candidate.url,
+      candidate.src
+    ])) || sources[0] || {};
+    const image = firstPersistentImage([
+      source.imageData,
+      source.dataUrl,
+      source.imageUrl,
+      source.url,
+      source.src
+    ]);
+    return {
+      image,
+      color: typeof source.color === "string" && source.color.trim() ? source.color.trim() : null,
+      overlay: finiteNumber(source.overlay ?? source.opacity, image ? 0.35 : 0, 0, 1),
+      blur: finiteNumber(source.blur, 0, 0, 40),
+      opacity: finiteNumber(source.imageOpacity, 1, 0, 1),
+      position: typeof source.position === "string" && source.position.trim() ? source.position.trim() : "center",
+      size: typeof source.size === "string" && source.size.trim() ? source.size.trim() : "cover"
+    };
   };
   const forbidden = /^(?:token|password|apiKey|api_key|authorization|bearer|secret|chat|messages|memory|identity|gatewaySecret)$/iu;
   const stripSensitive = value => {
@@ -120,6 +170,12 @@
     getChenAvatarImage(preferences = this.loadSync()) {
       return getChenAvatarImage(preferences);
     }
+    getUserAvatarImage(preferences = this.loadSync()) {
+      return getUserAvatarImage(preferences);
+    }
+    getChatBackground(preferences = this.loadSync()) {
+      return getChatBackground(preferences);
+    }
     saveChatBackground(value = {}) {
       if (value.imageData && this.imageBytes(value.imageData) > this.#maxImageBytes) {
         const error = new Error("聊天背景图片超过本地保存大小限制（2MB）");
@@ -174,7 +230,9 @@
     MAX_IMAGE_BYTES,
     STORAGE_KEY,
     UserPreferenceStore,
+    getChatBackground,
     getChenAvatarImage,
+    getUserAvatarImage,
     isPersistentAvatarImage,
     normalize,
     stripSensitive

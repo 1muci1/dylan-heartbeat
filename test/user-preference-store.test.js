@@ -6,6 +6,8 @@ const {
   CHANGE_EVENT,
   DEFAULTS,
   UserPreferenceStore,
+  getChatBackground,
+  getUserAvatarImage,
   getChenAvatarImage
 } = require("../ai-companion-frontend/storage/user-preference-store");
 
@@ -144,4 +146,62 @@ test("Chen avatar image resolver rejects transient and unsafe URLs", () => {
   const restored = new UserPreferenceStore({ storage: shared });
   assert.equal(restored.getChenAvatarImage(), null);
   assert.equal(restored.loadSync().avatar.chenAvatar.imageData, null);
+});
+
+test("user avatar resolver supports current and legacy fields with a null fallback", () => {
+  const imageData = "data:image/png;base64,USER";
+  assert.equal(getUserAvatarImage({ avatar: { userAvatar: { imageData } } }), imageData);
+  for (const [field, value] of [
+    ["dataUrl", "data:image/webp;base64,USER"],
+    ["imageUrl", "https://cdn.example/user.webp"],
+    ["url", "/avatars/user.webp"],
+    ["src", "/avatars/legacy-user.webp"]
+  ]) {
+    assert.equal(getUserAvatarImage({ avatar: { userAvatar: { [field]: value } } }), value);
+  }
+  assert.equal(getUserAvatarImage({ avatar: { meAvatar: { imageData } } }), imageData);
+  assert.equal(getUserAvatarImage({ avatar: { ownerAvatar: { imageData } } }), imageData);
+  assert.equal(getUserAvatarImage({ avatar: {} }), null);
+});
+
+test("user avatar resolver rejects blob, http, empty, and non-image values", () => {
+  for (const value of ["blob:https://example.test/user", "http://example.test/user.png", "", "not-an-image"]) {
+    assert.equal(getUserAvatarImage({ avatar: { userAvatar: { imageData: value } } }), null);
+  }
+});
+
+test("chat background resolver normalizes the real chat and space preference fields", () => {
+  const chat = getChatBackground({
+    chatBackground: {
+      imageData: "data:image/png;base64,BG",
+      position: "top center",
+      size: "cover",
+      overlay: 0.42
+    }
+  });
+  assert.equal(chat.image, "data:image/png;base64,BG");
+  assert.equal(chat.position, "top center");
+  assert.equal(chat.overlay, 0.42);
+
+  const rootBackground = getChatBackground({
+    chatBackground: { imageData: null },
+    background: { url: "/images/room.webp", blur: 6, opacity: 0.28 }
+  });
+  assert.equal(rootBackground.image, "/images/room.webp");
+  assert.equal(rootBackground.blur, 6);
+  assert.equal(rootBackground.overlay, 0.28);
+  assert.equal(rootBackground.opacity, 1);
+
+  assert.equal(getChatBackground({
+    space: { profile: { background: { url: "https://cdn.example/room.webp" } } }
+  }).image, "https://cdn.example/room.webp");
+});
+
+test("chat background resolver rejects transient images and preserves the default state", () => {
+  const background = getChatBackground({
+    chatBackground: { imageData: "blob:https://example.test/background" }
+  });
+  assert.equal(background.image, null);
+  assert.equal(background.overlay, 0);
+  assert.equal(getChatBackground({}).image, null);
 });

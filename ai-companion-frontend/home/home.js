@@ -164,7 +164,7 @@
     }
   }
 
-  const renderUserAvatar = (documentRef, container, config = null) => {
+  const renderUserAvatar = (documentRef, container, config = null, image = null) => {
     if (!documentRef?.createElement || !container?.replaceChildren) {
       return null;
     }
@@ -174,8 +174,8 @@
     const glyph = documentRef.createElement("span");
     glyph.className = "home-user-avatar__glyph";
     glyph.textContent = "你";
-    if (config?.imageData) {
-      glyph.style.backgroundImage = `url(${JSON.stringify(config.imageData)})`;
+    if (image) {
+      glyph.style.backgroundImage = `url(${JSON.stringify(image)})`;
       glyph.style.backgroundPosition = `${config.crop?.x ?? 50}% ${config.crop?.y ?? 50}%`;
       glyph.style.backgroundSize = `${Math.max(1, Number(config.scale) || 1) * 100}%`;
       glyph.textContent = "";
@@ -249,7 +249,14 @@
         avatarStudio.render(documentRef, avatar, avatarStudio.defaultChen());
       }
       const userAvatar = documentRef.querySelector("[data-home-user-avatar]");
-      if (userAvatar) renderUserAvatar(documentRef, userAvatar, preferenceAvatar.userAvatar);
+      if (userAvatar) {
+        renderUserAvatar(
+          documentRef,
+          userAvatar,
+          preferenceAvatar.userAvatar,
+          preferences?.getUserAvatarImage?.(preferenceValue)
+        );
+      }
     };
     renderPreferenceAvatars(preferences?.loadSync?.());
     preferences?.subscribe?.(renderPreferenceAvatars);

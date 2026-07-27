@@ -16,16 +16,33 @@
   flex-direction: column;
   padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom));
   background:
-    linear-gradient(rgba(9,9,13,var(--chat-background-overlay,0)), rgba(9,9,13,var(--chat-background-overlay,0))),
-    var(--chat-background-image, none),
     radial-gradient(circle at 18% 16%, rgba(128,88,211,.13), transparent 34%),
     radial-gradient(circle at 88% 52%, rgba(75,87,159,.08), transparent 30%),
     linear-gradient(180deg,#0d0c12,#09090d);
+  isolation: isolate;
 }
-.chat-shell.has-chat-background {
-  background-position: var(--chat-background-position, center);
-  background-size: var(--chat-background-size, cover);
-  background-attachment: fixed;
+.chat-shell::before {
+  position: absolute;
+  z-index: 0;
+  inset: -40px;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      rgba(9,9,13,var(--chat-bg-overlay,0)),
+      rgba(9,9,13,var(--chat-bg-overlay,0))
+    ),
+    var(--chat-bg-image, none),
+    var(--chat-bg-color, transparent);
+  background-position: var(--chat-bg-position, center);
+  background-size: var(--chat-bg-size, cover);
+  filter: blur(var(--chat-bg-blur, 0));
+  opacity: var(--chat-bg-opacity, 1);
+  content: "";
+}
+.chat-shell:not(.has-chat-background)::before { display: none; }
+.chat-shell > * {
+  position: relative;
+  z-index: 1;
 }
 
 .chat-header {
@@ -246,6 +263,10 @@
   font-size: 9px;
   background-position: center;
   background-size: cover;
+}
+.message-avatar--user {
+  border-color: rgba(225,210,241,.9);
+  background: linear-gradient(145deg, #806c91, #554861);
 }
 
 .message-group { min-width: 0; max-width: 100%; }

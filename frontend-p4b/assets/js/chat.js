@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const composer = document.querySelector(".composer");
   const input = document.querySelector("#message-input");
   const sendButton = document.querySelector(".composer__send");
+  const toast = document.querySelector(".chat-toast");
   const media = window.AppMedia;
   if (!messageList || !messageContent || !composer || !input || !sendButton) return;
 
@@ -37,6 +38,54 @@ document.addEventListener("DOMContentLoaded", () => {
     statusLine.replaceChildren(dot, text);
   };
 
+  let toastTimer = 0;
+  const showToast = (message) => {
+    if (!toast) return;
+    window.clearTimeout(toastTimer);
+    toast.textContent = message;
+    toast.hidden = false;
+    toast.classList.add("is-visible");
+    toastTimer = window.setTimeout(() => {
+      toast.classList.remove("is-visible");
+      toast.hidden = true;
+    }, 1600);
+  };
+
+  const actionIcons = {
+    copy: '<rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>',
+    regenerate: '<path d="M20 7v5h-5"></path><path d="M18.5 15a7 7 0 1 1-.2-6.2L20 12"></path>',
+    voice: '<path d="M5 10v4h3l4 4V6L8 10H5Z"></path><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"></path>',
+    translate: '<circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"></path>',
+    more: '<circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle>',
+    edit: '<path d="m4 20 4.2-1 10.6-10.6a2 2 0 0 0-2.8-2.8L5.4 16.2 4 20Z"></path><path d="m14.5 7.1 2.8 2.8"></path>',
+    resend: '<path d="m4 12 16-7-6 14-2.5-5L4 12Z"></path><path d="m11.5 14 8.5-9"></path>'
+  };
+
+  const createActionBar = (message) => {
+    const bar = document.createElement("div");
+    bar.className = "message-actions";
+    bar.setAttribute("role", "group");
+    bar.setAttribute("aria-label", message.role === "assistant" ? "助理消息操作" : "用户消息操作");
+    const actions = message.role === "assistant"
+      ? [["copy", "复制"], ["regenerate", "重新生成"], ["voice", "语音播放"], ["translate", "翻译"], ["more", "更多"]]
+      : [["copy", "复制"], ["edit", "编辑"], ["resend", "重新发送"], ["more", "更多"]];
+    actions.forEach(([action, label]) => {
+      const button = document.createElement("button");
+      button.className = "message-action";
+      button.type = "button";
+      button.dataset.messageAction = action;
+      button.setAttribute("aria-label", label);
+      button.title = label;
+      const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      icon.setAttribute("viewBox", "0 0 24 24");
+      icon.setAttribute("aria-hidden", "true");
+      icon.innerHTML = actionIcons[action];
+      button.append(icon);
+      bar.append(button);
+    });
+    return bar;
+  };
+
   const setRequestState = (isLoading) => {
     composer.setAttribute("aria-busy", String(isLoading));
     messageList.setAttribute("aria-busy", String(isLoading));
@@ -55,6 +104,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const row = document.createElement("article");
     row.className = `message-row message-row--${message.role === "assistant" ? "ai" : "user"}`;
     row.dataset.messageId = message.id;
+    if (message.retryUserMessageId) row.dataset.retryUserMessageId = message.retryUserMessageId;
     if (isLast) row.classList.add("message-row--last");
 
     if (message.role === "assistant") {
@@ -95,6 +145,7 @@ document.addEventListener("DOMContentLoaded", () => {
     time.dateTime = message.timestamp;
     time.textContent = message.time;
     group.append(bubble, time);
+    if (!message.actionsDisabled) group.append(createActionBar(message));
     row.append(group);
     return row;
   };
@@ -433,9 +484,10 @@ document.addEventListener("DOMContentLoaded", () => {
     localHistory.saveMessages(localHistorySessionId, messages).catch(() => {});
   };
 
-  const requestAssistantReply = async (userMessage) => {
+  const requestAssistantReply = async (userMessage, requestHistory = null) => {
     const state = store.getState();
-    const pendingMessage = messageProtocol.createAssistantMessage("…", { transient: true });
+    const history = Array.isArray(requestHistory) ? requestHistory : state.messages;
+    const pendingMessage = messageProtocol.createAssistantMessage("…", { transient: true, actionsDisabled: true });
     document.querySelector(".message-row--last")?.classList.remove("message-row--last");
     const pendingRow = createMessageElement(pendingMessage, true);
     messageContent.append(pendingRow);
@@ -453,7 +505,7 @@ document.addEventListener("DOMContentLoaded", () => {
         useLocalFallback();
       }
       for await (const chunk of api.sendStreamMessage(userMessage.content, {
-        history: state.messages,
+        history,
         chatCount: state.stats.chatCount,
         headers: serverSessionId
           ? { "X-Session-Id": serverSessionId }
@@ -517,7 +569,7 @@ document.addEventListener("DOMContentLoaded", () => {
         error?.code === "CONFIG_ERROR"
           ? "连接还没有配置好，请稍后再试。"
           : "连接暂时中断了，请检查网络后再试。",
-        { transient: true }
+        { transient: true, retryUserMessageId: userMessage.id }
       );
       messageContent.querySelector(".message-row--last")?.classList.remove("message-row--last");
       messageContent.append(createMessageElement(errorMessage, true));
@@ -578,6 +630,90 @@ document.addEventListener("DOMContentLoaded", () => {
     input.focus();
     requestAssistantReply(message);
   };
+
+  const findMessageContext = (messageId) => {
+    const messages = store.getState().messages;
+    const index = messages.findIndex(message => message.id === messageId);
+    return { messages, index, message: index >= 0 ? messages[index] : null };
+  };
+
+  const copyText = async (text) => {
+    const value = String(text || "");
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(value);
+      else {
+        const helper = document.createElement("textarea");
+        helper.value = value;
+        helper.setAttribute("readonly", "");
+        helper.className = "clipboard-helper";
+        document.body.append(helper);
+        helper.select();
+        if (!document.execCommand("copy")) throw new Error("copy failed");
+        helper.remove();
+      }
+      showToast("已复制");
+    } catch {
+      showToast("复制失败，请重试");
+    }
+  };
+
+  const retryFromUserMessage = (userMessage, messages, index) => {
+    if (!userMessage || userMessage.role !== "user") {
+      showToast("找不到可重试的消息");
+      return;
+    }
+    if (api.loading) {
+      showToast("请等待当前回复完成");
+      return;
+    }
+    requestAssistantReply(userMessage, messages.slice(0, index + 1));
+  };
+
+  messageContent.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-message-action]");
+    const row = button?.closest(".message-row");
+    if (!button || !row) return;
+    const { messages, index, message } = findMessageContext(row.dataset.messageId);
+    const action = button.dataset.messageAction;
+
+    if (action === "copy") {
+      copyText(message?.content || row.querySelector(".message-bubble")?.textContent);
+      return;
+    }
+    if (action === "regenerate") {
+      const retryId = message?.retryUserMessageId || row.dataset.retryUserMessageId;
+      const userIndex = retryId
+        ? messages.findIndex(item => item.id === retryId)
+        : messages.slice(0, index).findLastIndex(item => item.role === "user");
+      retryFromUserMessage(messages[userIndex], messages, userIndex);
+      return;
+    }
+    if (action === "resend") {
+      retryFromUserMessage(message, messages, index);
+      return;
+    }
+    if (action === "edit") {
+      if (!message || message.role !== "user") return;
+      input.value = message.content;
+      input.dispatchEvent(new Event("input"));
+      input.focus();
+      showToast("已放入输入框，可修改后发送");
+      return;
+    }
+    if (action === "voice") {
+      if (!message?.content || !("speechSynthesis" in window)) {
+        showToast("当前浏览器不支持语音播放");
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(message.content);
+      utterance.lang = "zh-CN";
+      window.speechSynthesis.speak(utterance);
+      showToast("正在播放");
+      return;
+    }
+    showToast(action === "translate" ? "翻译功能即将开放" : "更多操作即将开放");
+  });
 
   const initialState = store.saveState(store.getState());
   legacyMessages = initialState.messages.map(message => ({ ...message }));

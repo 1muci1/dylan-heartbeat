@@ -6,6 +6,7 @@
   if (root) root.CompanionUserPreferences = Object.freeze(api);
 })(typeof window !== "undefined" ? window : null, () => {
   const STORAGE_KEY = "xinban-user-preferences-v1";
+  const CHANGE_EVENT = "user-preferences-change";
   const VERSION = 1;
   const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
   const DEFAULTS = Object.freeze({
@@ -56,10 +57,13 @@
     #storage;
     #key;
     #maxImageBytes;
-    constructor({ storage, key = STORAGE_KEY, maxImageBytes = MAX_IMAGE_BYTES } = {}) {
+    constructor({ storage, key = STORAGE_KEY, maxImageBytes = MAX_IMAGE_BYTES, eventTarget } = {}) {
       this.#storage = storage || (typeof localStorage !== "undefined" ? localStorage : null);
       this.#key = key;
       this.#maxImageBytes = maxImageBytes;
+      this.eventTarget = eventTarget === undefined
+        ? (typeof window !== "undefined" ? window : null)
+        : eventTarget;
     }
     loadSync() {
       if (!this.#storage) return clone(DEFAULTS);
@@ -71,12 +75,14 @@
       if (this.#storage) {
         try { this.#storage.setItem(this.#key, JSON.stringify(next)); } catch { /* storage unavailable */ }
       }
+      this.#notify(next);
       return clone(next);
     }
     reset() {
       if (this.#storage) {
         try { this.#storage.removeItem(this.#key); } catch { /* storage unavailable */ }
       }
+      this.#notify(DEFAULTS);
       return clone(DEFAULTS);
     }
     clear() { return this.reset(); }
@@ -112,6 +118,28 @@
       const payload = value.slice(value.indexOf(",") + 1).replace(/\s/g, "");
       return Math.floor(payload.length * 3 / 4) - (payload.endsWith("==") ? 2 : payload.endsWith("=") ? 1 : 0);
     }
+    subscribe(listener) {
+      if (typeof listener !== "function" || !this.eventTarget?.addEventListener) return () => {};
+      const onChange = event => listener(clone(event?.detail?.preferences || this.loadSync()));
+      const onStorage = event => {
+        if (event?.key === this.#key) listener(this.loadSync());
+      };
+      this.eventTarget.addEventListener(CHANGE_EVENT, onChange);
+      this.eventTarget.addEventListener("storage", onStorage);
+      return () => {
+        this.eventTarget?.removeEventListener?.(CHANGE_EVENT, onChange);
+        this.eventTarget?.removeEventListener?.("storage", onStorage);
+      };
+    }
+    #notify(preferences) {
+      if (!this.eventTarget?.dispatchEvent) return;
+      const EventConstructor = this.eventTarget.CustomEvent ||
+        (typeof CustomEvent !== "undefined" ? CustomEvent : null);
+      if (!EventConstructor) return;
+      this.eventTarget.dispatchEvent(new EventConstructor(CHANGE_EVENT, {
+        detail: { preferences: clone(preferences) }
+      }));
+    }
     adapter({ profileId = "default-space" } = {}) {
       return {
         loadSync: () => this.loadSync().space.profile?.id === profileId ? this.loadSync().space.profile : null,
@@ -120,5 +148,5 @@
       };
     }
   }
-  return { DEFAULTS, MAX_IMAGE_BYTES, STORAGE_KEY, UserPreferenceStore, normalize, stripSensitive };
+  return { CHANGE_EVENT, DEFAULTS, MAX_IMAGE_BYTES, STORAGE_KEY, UserPreferenceStore, normalize, stripSensitive };
 });

@@ -32,10 +32,31 @@ test("chat background persists and can be cleared", () => {
 
 test("chat exposes Chen avatar editor and background preference hooks", () => {
   const html = fs.readFileSync(path.join(frontend, "chat.html"), "utf8");
+  const chat = fs.readFileSync(path.join(frontend, "assets/js/chat.js"), "utf8");
   const script = fs.readFileSync(path.join(frontend, "assets/js/avatar-chat.js"), "utf8");
   const preferences = fs.readFileSync(path.join(frontend, "assets/js/chat-preferences.js"), "utf8");
+  const settings = fs.readFileSync(path.join(frontend, "assets/js/settings.js"), "utf8");
+  const home = fs.readFileSync(path.join(__dirname, "..", "ai-companion-frontend/home/home.js"), "utf8");
   assert.match(html, /data-avatar-target="chen"/);
+  assert.match(html, /data-chat-avatar-fallback/);
+  assert.doesNotMatch(html, /chat-avatar__moon/);
   assert.match(html, /assets\/js\/avatar-chat\.js/);
-  assert.match(preferences, /chatBackground/);
+  assert.match(preferences, /store\.subscribe\(apply\)/);
+  assert.match(preferences, /store\.load\(\)\.then\(apply\)\.catch/);
+  assert.match(preferences, /removeProperty\("--chat-background-image"\)/);
   assert.match(script, /saveAvatar/);
+  assert.match(script, /querySelectorAll\("\.chat-avatar, \.message-avatar"\)/);
+  assert.match(script, /applyTo/);
+  assert.match(script, /store\.loadSync\(\)\.avatar/);
+  assert.match(script, /store\.subscribe\(applyAvatars\)/);
+  assert.match(script, /store\.load\(\)\.then\(applyAvatars\)\.catch/);
+  assert.match(chat, /CompanionChatAvatars\?\.apply\(\)/);
+  assert.match(chat, /CompanionChatAvatars\?\.applyTo\(avatar\)/);
+  assert.match(chat, /avatar\.textContent = "沉"/);
+  assert.doesNotMatch(chat, /avatar\.textContent = ai\.avatar\.label/);
+  assert.match(chat, /CompanionChatPreferences\?\.apply\(\)/);
+  assert.doesNotMatch(chat, /saveAvatar|saveChatBackground/);
+  assert.match(settings, /preferenceStore\.saveChatBackground/);
+  assert.match(home, /preferences\?\.subscribe\?\.\(renderPreferenceAvatars\)/);
+  assert.match(home, /avatarStudio\.defaultChen\(\)/);
 });

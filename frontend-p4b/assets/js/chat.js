@@ -111,7 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const avatar = document.createElement("div");
       avatar.className = "message-avatar";
       avatar.setAttribute("aria-hidden", "true");
-      avatar.textContent = ai.avatar.label;
+      if (!window.CompanionChatAvatars?.applyTo(avatar)) avatar.textContent = "沉";
       row.append(avatar);
     }
 
@@ -156,6 +156,8 @@ document.addEventListener("DOMContentLoaded", () => {
     messages.forEach((message, index) => {
       messageContent.append(createMessageElement(message, index === messages.length - 1));
     });
+    window.CompanionChatAvatars?.apply();
+    window.CompanionChatPreferences?.apply();
     scrollToLatest();
   };
 

@@ -2,7 +2,7 @@
 
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
-const { DEFAULTS, UserPreferenceStore } = require("../ai-companion-frontend/storage/user-preference-store");
+const { CHANGE_EVENT, DEFAULTS, UserPreferenceStore } = require("../ai-companion-frontend/storage/user-preference-store");
 
 const storage = () => {
   const values = new Map();
@@ -85,4 +85,33 @@ test("space adapter persists profiles through the unified store", async () => {
   await adapter.save(profile);
   assert.equal((await adapter.load()).id, "default-space");
   assert.equal(new UserPreferenceStore({ storage: shared }).loadSync().space.profile.name, "小屋");
+});
+
+test("preference changes notify same-page subscribers and can be unsubscribed", () => {
+  const listeners = new Map();
+  class FakeCustomEvent {
+    constructor(type, options) { this.type = type; this.detail = options.detail; }
+  }
+  const eventTarget = {
+    CustomEvent: FakeCustomEvent,
+    addEventListener(type, listener) {
+      const values = listeners.get(type) || new Set();
+      values.add(listener);
+      listeners.set(type, values);
+    },
+    removeEventListener(type, listener) { listeners.get(type)?.delete(listener); },
+    dispatchEvent(event) { listeners.get(event.type)?.forEach(listener => listener(event)); }
+  };
+  const store = new UserPreferenceStore({ storage: storage(), eventTarget });
+  const changes = [];
+  const unsubscribe = store.subscribe(value => changes.push(value));
+  store.saveAvatar({ source: "upload", imageData: "data:image/png;base64,AAAA" }, "chen");
+  store.saveChatBackground({ imageData: "data:image/png;base64,BBBB" });
+  assert.equal(CHANGE_EVENT, "user-preferences-change");
+  assert.equal(changes.length, 2);
+  assert.equal(changes[0].avatar.chenAvatar.imageData, "data:image/png;base64,AAAA");
+  assert.equal(changes[1].chatBackground.imageData, "data:image/png;base64,BBBB");
+  unsubscribe();
+  store.reset();
+  assert.equal(changes.length, 2);
 });

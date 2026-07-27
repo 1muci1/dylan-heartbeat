@@ -4,6 +4,37 @@ document.addEventListener("DOMContentLoaded", () => {
   const Store = window.CompanionUserPreferences?.UserPreferenceStore;
   if (!Store) return;
   const store = new Store();
+  const applyAvatar = (node, avatar) => {
+    if (!node) return false;
+    if (avatar?.imageData) {
+      node.style.backgroundImage = `url(${JSON.stringify(avatar.imageData)})`;
+      node.style.backgroundPosition = `${avatar.crop?.x ?? 50}% ${avatar.crop?.y ?? 50}%`;
+      node.style.backgroundSize = `${Math.max(1, Number(avatar.scale) || 1) * 100}%`;
+      node.classList.add("has-avatar-image");
+      return true;
+    }
+    node.style.removeProperty("background-image");
+    node.style.removeProperty("background-position");
+    node.style.removeProperty("background-size");
+    node.classList.remove("has-avatar-image");
+    if (node.classList.contains("message-avatar")) node.textContent = "沉";
+    return false;
+  };
+  const applyAvatars = preferences => {
+    const avatar = preferences?.avatar || store.loadSync().avatar;
+    const chen = avatar.chenAvatar || avatar;
+    document.querySelectorAll(".chat-avatar, .message-avatar").forEach(node => applyAvatar(node, chen));
+  };
+  const applyTo = node => {
+    const avatar = store.loadSync().avatar;
+    return applyAvatar(node, avatar.chenAvatar || avatar);
+  };
+  window.CompanionChatAvatars = Object.freeze({ apply: applyAvatars, applyTo });
+  applyAvatars(store.loadSync());
+  store.subscribe(applyAvatars);
+  store.load().then(applyAvatars).catch(() => {
+    // 保留当前头像，异步恢复失败时不回退默认。
+  });
   let target = "chen";
   let pending = null;
   const modal = document.createElement("section");
@@ -29,7 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   saveButton?.addEventListener("click", () => {
     if (!pending) return;
-    try { store.saveAvatar({ source: "upload", imageData: pending, crop: { x: 50, y: 50 }, scale: 1, border: "moon" }, target); status.textContent = "头像已保存"; if (target === "chen") document.querySelectorAll(".chat-avatar").forEach(node => { node.style.backgroundImage = `url(${JSON.stringify(pending)})`; node.classList.add("has-avatar-image"); }); setTimeout(close, 350); }
+    try { store.saveAvatar({ source: "upload", imageData: pending, crop: { x: 50, y: 50 }, scale: 1, border: "moon" }, target); status.textContent = "头像已保存"; setTimeout(close, 350); }
     catch (error) { status.textContent = error.message || "头像保存失败"; }
   });
 });

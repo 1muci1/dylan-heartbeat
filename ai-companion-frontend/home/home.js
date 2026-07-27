@@ -164,7 +164,7 @@
     }
   }
 
-  const renderUserAvatar = (documentRef, container) => {
+  const renderUserAvatar = (documentRef, container, config = null) => {
     if (!documentRef?.createElement || !container?.replaceChildren) {
       return null;
     }
@@ -174,6 +174,13 @@
     const glyph = documentRef.createElement("span");
     glyph.className = "home-user-avatar__glyph";
     glyph.textContent = "你";
+    if (config?.imageData) {
+      glyph.style.backgroundImage = `url(${JSON.stringify(config.imageData)})`;
+      glyph.style.backgroundPosition = `${config.crop?.x ?? 50}% ${config.crop?.y ?? 50}%`;
+      glyph.style.backgroundSize = `${Math.max(1, Number(config.scale) || 1) * 100}%`;
+      glyph.textContent = "";
+      avatar.classList.add("has-avatar-image");
+    }
     const label = documentRef.createElement("span");
     label.className = "home-user-avatar__label";
     label.textContent = "用户头像";
@@ -234,10 +241,21 @@
     setText("[data-home-preset-description]", state.preset.description);
     setText("[data-home-theme]", state.themeName);
     setText("[data-home-moment]", state.moment.label);
-    const avatar = documentRef.querySelector("[data-home-avatar]");
-    if (avatar) controller.renderAvatar(documentRef, avatar);
-    const userAvatar = documentRef.querySelector("[data-home-user-avatar]");
-    if (userAvatar) renderUserAvatar(documentRef, userAvatar);
+    const renderPreferenceAvatars = preferenceValue => {
+      const preferenceAvatar = preferenceValue?.avatar || preferences?.loadSync?.().avatar || {};
+      const avatar = documentRef.querySelector("[data-home-avatar]");
+      if (avatar) {
+        avatar.replaceChildren();
+        avatarStudio.render(documentRef, avatar, avatarStudio.defaultChen());
+      }
+      const userAvatar = documentRef.querySelector("[data-home-user-avatar]");
+      if (userAvatar) renderUserAvatar(documentRef, userAvatar, preferenceAvatar.userAvatar);
+    };
+    renderPreferenceAvatars(preferences?.loadSync?.());
+    preferences?.subscribe?.(renderPreferenceAvatars);
+    preferences?.load?.().then(renderPreferenceAvatars).catch(() => {
+      // 保留同步读取后已呈现的头像，恢复失败时不回退默认。
+    });
     const hero = documentRef.querySelector("[data-home-hero]");
     if (hero) {
       hero.classList.add("is-home-hero-animated");

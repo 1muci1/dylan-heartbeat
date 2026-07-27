@@ -1,7 +1,8 @@
 // 前端统一模拟数据层。
 // 当前数据仅用于界面开发，不包含 API、后端请求或持久化逻辑。
 (() => {
-  const DEFAULT_PROVIDER_MODEL = "claude-opus-4-6";
+  const DEFAULT_PROVIDER_MODEL = "[脆卷-kiro-0.08]claude-opus-4-6-thinking";
+  const LEGACY_DEFAULT_PROVIDER_MODEL = "claude-opus-4-6";
 
   const appData = {
     ai: {
@@ -236,13 +237,19 @@
   });
   const normalizeProviderConfig = (config) => {
     const defaults = createDefaultProviderConfig();
+    const configuredModel = String(config?.model || "").trim();
+    const configuredDefaultModel = String(config?.defaultModel || "").trim();
+    const usesLegacyDefault = configuredModel === LEGACY_DEFAULT_PROVIDER_MODEL
+      && (!configuredDefaultModel || configuredDefaultModel === LEGACY_DEFAULT_PROVIDER_MODEL);
     return {
       type: "dylan",
       mode: config?.mode === "real" ? "real" : (defaults.mode || "mock"),
       baseUrl: String(config?.baseUrl || defaults.baseUrl).trim(),
       endpoint: defaults.endpoint,
-      model: String(config?.model || defaults.model).trim(),
-      defaultModel: String(config?.defaultModel || config?.model || defaults.defaultModel).trim(),
+      model: usesLegacyDefault ? defaults.model : (configuredModel || defaults.model),
+      defaultModel: usesLegacyDefault
+        ? defaults.defaultModel
+        : (configuredDefaultModel || configuredModel || defaults.defaultModel),
       autoSelectModel: Boolean(config?.autoSelectModel),
       auth: {
         type: "bearer",

@@ -7,7 +7,7 @@
 })(typeof window !== "undefined" ? window : null, () => {
   const MODELS = Object.freeze([
     Object.freeze({
-      id: "claude-opus-4-6",
+      id: "[脆卷-kiro-0.08]claude-opus-4-6-thinking",
       name: "Claude Opus 4.6",
       provider: "Anthropic",
       icon: "C",

@@ -322,6 +322,16 @@ function normalizeContentToText(content) {
   return "[非文本内容]";
 }
 
+function latestUserContentOf(messages) {
+  if (!Array.isArray(messages)) return "";
+  for (let index = messages.length - 1; index >= 0; index--) {
+    if (messages[index]?.role === "user") {
+      return normalizeContentToText(messages[index].content);
+    }
+  }
+  return "";
+}
+
 function normalizeMessageForTimeline(msg) {
   return { ...msg, content: normalizeContentToText(msg.content) };
 }
@@ -933,8 +943,13 @@ app.post("/v1/chat/completions", async (req, reply) => {
 
     const identityBoundaryContext = agentIdentityBoundaryBuilder.build();
     const identityContext = agentIdentityContextBuilder.build();
+    const latestUserContent = latestUserContentOf(kelivoMessages);
     const memoryContext = agentMemoryContextBuilder.build(
-      agentMemoryRetriever.retrieve({ limit: 8, characterBudget: 3000 })
+      agentMemoryRetriever.retrieve({
+        query: latestUserContent,
+        limit: 8,
+        characterBudget: 3000
+      })
     );
     const runtimeContexts = [identityBoundaryContext, identityContext, memoryContext].filter(Boolean);
     if (runtimeContexts.length) {
@@ -1915,4 +1930,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, aiTaskRunner };
+module.exports = { app, aiTaskRunner, latestUserContentOf };

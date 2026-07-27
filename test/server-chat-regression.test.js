@@ -18,7 +18,7 @@ process.env.STICKER_UPLOAD_DIR = path.join(dir, "stickers");
 fs.writeFileSync(process.env.TIMELINE_FILE, "[]\n");
 fs.writeFileSync(process.env.TIMESTAMP_DB_FILE, "{}\n");
 
-const { app } = require("../server");
+const { app, latestUserContentOf } = require("../server");
 const auth = { authorization: "Bearer gateway-test-key" };
 
 test("chat runtime reserves a create-only internal Memory write hook", () => {
@@ -26,6 +26,15 @@ test("chat runtime reserves a create-only internal Memory write hook", () => {
   assert.equal(app.agentMemoryWriteHook.update, undefined);
   assert.equal(app.agentMemoryWriteHook.delete, undefined);
   assert.equal(app.agentMemoryWriteHook.archive, undefined);
+});
+
+test("latest user content selects the current user message", () => {
+  assert.equal(latestUserContentOf([
+    { role: "user", content: "较早的问题" },
+    { role: "assistant", content: "较早的回答" },
+    { role: "user", content: "我们什么时候认识的？" }
+  ]), "我们什么时候认识的？");
+  assert.equal(latestUserContentOf([{ role: "assistant", content: "没有用户消息" }]), "");
 });
 
 function jsonUpstream(content = "json reply", status = 200, thinking = null) {
@@ -287,6 +296,116 @@ test("chat consumes memory context without logging or persisting memory content"
     "context user",
     "memory-aware reply"
   ]);
+});
+
+test("chat passes the latest user message to Memory Retriever and prioritizes relevant Memory", async () => {
+  const meetingContent = "CHAT_QUERY_MEETING_MEMORY_91f4";
+  const noiseContent = "CHAT_QUERY_UNRELATED_MEMORY_7a20";
+  for (const payload of [
+    {
+      type: "MEMORY",
+      title: "完全无关的重要事项",
+      content: noiseContent,
+      source: "memory-import:v1:relationship:chat-query-noise",
+      importance: 5
+    },
+    {
+      type: "MEMORY",
+      title: "相遇日期",
+      content: meetingContent,
+      source: "memory-import:v1:relationship:chat-query-meeting",
+      importance: 1
+    }
+  ]) {
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/v1/memories",
+      headers: auth,
+      payload
+    });
+    assert.equal(created.statusCode, 201);
+  }
+
+  let forwarded = null;
+  global.fetch = async (_url, options) => {
+    forwarded = JSON.parse(options.body);
+    return new Response(JSON.stringify({
+      choices: [{ message: { role: "assistant", content: "meeting reply" } }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/chat/completions",
+    payload: {
+      model: "test",
+      stream: false,
+      messages: [{ role: "user", content: "我们什么时候认识的？" }]
+    }
+  });
+  assert.equal(response.statusCode, 200);
+
+  const context = forwarded.messages.find(message =>
+    message.role === "system" && message.content.includes("<memory_reference_data")
+  );
+  assert.ok(context);
+  const matchingIndex = context.content.indexOf(meetingContent);
+  const unrelatedIndex = context.content.indexOf(noiseContent);
+  assert.ok(matchingIndex >= 0);
+  assert.ok(unrelatedIndex < 0 || matchingIndex < unrelatedIndex);
+});
+
+test("empty latest user content keeps Memory Retriever fallback", async () => {
+  const relationshipContent = "CHAT_QUERY_EMPTY_RELATIONSHIP_3c61";
+  const factContent = "CHAT_QUERY_EMPTY_FACT_d882";
+  for (const payload of [
+    {
+      type: "MEMORY",
+      title: "空查询关系回退",
+      content: relationshipContent,
+      source: "memory-import:v1:relationship:chat-query-empty",
+      importance: 5
+    },
+    {
+      type: "MEMORY",
+      title: "空查询事实回退",
+      content: factContent,
+      source: "memory-import:v1:fact:chat-query-empty",
+      importance: 5
+    }
+  ]) {
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/v1/memories",
+      headers: auth,
+      payload
+    });
+    assert.equal(created.statusCode, 201);
+  }
+
+  let forwarded = null;
+  global.fetch = async (_url, options) => {
+    forwarded = JSON.parse(options.body);
+    return new Response(JSON.stringify({
+      choices: [{ message: { role: "assistant", content: "fallback reply" } }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/chat/completions",
+    payload: {
+      model: "test",
+      stream: false,
+      messages: [{ role: "user", content: "   " }]
+    }
+  });
+  assert.equal(response.statusCode, 200);
+
+  const context = forwarded.messages.find(message =>
+    message.role === "system" && message.content.includes("<memory_reference_data")
+  );
+  assert.ok(context);
+  assert.match(context.content, new RegExp(relationshipContent));
+  assert.match(context.content, new RegExp(factContent));
 });
 
 test("upstream errors record error status instead of completed", async () => {

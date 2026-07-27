@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#251b31">
   <meta name="description" content="沉的小世界正在载入">
-  <link rel="preload" as="document" href="home/">
+  <link rel="preload" as="document" href="/home/">
   <link rel="icon" href="/assets/icons/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/assets/css/common.css">
   <style>
@@ -129,7 +129,7 @@
     <p>CHEN'S LITTLE WORLD</p>
     <h1 id="landing-title">正在进入沉的小世界</h1>
     <div class="loading">
-      <strong>AppConfig</strong> 已就绪，正在引导到 <a href="home/">Home</a> <em>…</em>
+      <strong>AppConfig</strong> 已就绪，正在引导到 <a href="/home/">Home</a> <em>…</em>
       <div class="loading__bars" aria-hidden="true"><span></span><span></span><span></span></div>
     </div>
   </main>
@@ -137,7 +137,7 @@
   <script>
     window.AppConfig?.getProviderConfig?.();
     document.body.classList.add("is-entering");
-    window.setTimeout(() => window.location.replace("home/"), 720);
+    window.setTimeout(() => window.location.replace("/home/"), 720);
   </script>
 </body>
 </html>

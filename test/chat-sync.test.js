@@ -152,13 +152,76 @@ test("empty server creates one session and sync helpers use server ordering", as
   assert.equal(api.createCalls, 1);
 });
 
+test("empty server creates a session even when IndexedDB is unavailable", async () => {
+  const api = serverApi([], {});
+  const sync = new ChatSyncController({
+    sessionApi: api,
+    mapMessage
+  });
+
+  const result = await sync.connect();
+  assert.equal(result.serverSessionId, "server-created");
+  assert.equal(sync.serverSessionId, "server-created");
+  assert.equal(api.createCalls, 1);
+  assert.equal(result.cacheAvailable, false);
+});
+
+test("IndexedDB read failure does not prevent creating a server session", async () => {
+  const cacheError = new Error("IndexedDB open failed");
+  const failingHistory = {
+    async loadSession() {
+      throw cacheError;
+    },
+    async updateSyncState() {
+      throw cacheError;
+    },
+    async saveMessages() {
+      throw cacheError;
+    }
+  };
+  const api = serverApi([], {});
+  const sync = new ChatSyncController({
+    historyStore: failingHistory,
+    sessionApi: api,
+    localSessionId: "local-failed",
+    mapMessage
+  });
+
+  const result = await sync.connect();
+  assert.equal(result.serverSessionId, "server-created");
+  assert.equal(api.createCalls, 1);
+  assert.equal(result.cacheAvailable, false);
+  assert.equal(result.cacheError, cacheError);
+});
+
+test("server session creation failure is surfaced for local-only fallback", async () => {
+  const api = serverApi([], {});
+  api.create = async () => {
+    api.createCalls += 1;
+    throw new Error("server create failed");
+  };
+  const sync = new ChatSyncController({ sessionApi: api, mapMessage });
+
+  await assert.rejects(sync.ensureServerSession(), /server create failed/);
+  assert.equal(sync.serverSessionId, "");
+  assert.equal(api.createCalls, 1);
+});
+
 test("chat integration only pulls server replies and keeps X-Session-Id flow", () => {
   const root = path.join(__dirname, "..", "frontend-p4b");
   const html = fs.readFileSync(path.join(root, "chat.html"), "utf8");
   const chat = fs.readFileSync(path.join(root, "assets/js/chat.js"), "utf8");
   assert.match(html, /assets\/js\/chat-sync\.js/);
   assert.match(chat, /ChatSyncController/);
-  assert.match(chat, /headers:[\s\S]*"X-Session-Id": activeSessionId/);
+  assert.match(chat, /const ensureServerSession = async/);
+  assert.match(chat, /serverSessionId = await ensureServerSession\(\)/);
+  assert.match(chat, /headers:[\s\S]*"X-Session-Id": serverSessionId/);
+  assert.ok(
+    chat.indexOf("serverSessionId = await ensureServerSession()") <
+    chat.indexOf("api.sendStreamMessage(userMessage.content")
+  );
+  assert.match(chat, /服务器 Session 创建或绑定失败，本次消息仅保存在本地/);
+  assert.match(chat, /本地缓存不可用，服务器同步仍可用/);
   assert.match(chat, /await chatSync\.pull\(\)/);
   assert.doesNotMatch(chat, /chatSync\.(?:push|upload|replay)/);
 });

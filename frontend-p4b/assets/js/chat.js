@@ -173,6 +173,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let legacyMessages = [];
   let localHistory = null;
   let localHistorySessionId = "";
+  let localCacheError = null;
   let chatSync = null;
 
   const openSessions = (open) => {
@@ -240,6 +241,41 @@ document.addEventListener("DOMContentLoaded", () => {
     if (sessionFallback) sessionFallback.hidden = false;
     if (sessionNew) sessionNew.disabled = true;
     sessions?.setActiveId?.("");
+  };
+
+  const showServerSyncStatus = () => {
+    if (sessionStatus) {
+      sessionStatus.textContent = localCacheError
+        ? "本地缓存不可用，服务器同步仍可用"
+        : "服务器历史已连接";
+    }
+    if (sessionFallback) sessionFallback.hidden = true;
+    if (sessionNew) sessionNew.disabled = false;
+  };
+
+  const ensureServerSession = async () => {
+    if (!sessions || !ChatSyncController) throw new Error("服务器 Session 同步组件不可用");
+    if (!chatSync) {
+      chatSync = new ChatSyncController({
+        historyStore: localHistory,
+        sessionApi: sessions,
+        localSessionId: localHistorySessionId,
+        mapMessage: formatServerMessage
+      });
+    }
+    if (activeSessionId && chatSync.serverSessionId === activeSessionId) return activeSessionId;
+    const ensured = await chatSync.ensureServerSession();
+    if (ensured.cacheError && !localCacheError) {
+      localCacheError = ensured.cacheError;
+      console.warn("Chat 本地缓存不可用，继续使用服务器 Session 同步。", ensured.cacheError);
+    }
+    serverSessions = ensured.sessions;
+    activeSessionId = ensured.serverSessionId;
+    sessions.setActiveId(activeSessionId);
+    sessionApiAvailable = true;
+    showServerSyncStatus();
+    renderSessionList();
+    return activeSessionId;
   };
 
   async function switchSession(id) {
@@ -319,37 +355,24 @@ document.addEventListener("DOMContentLoaded", () => {
   const initializeSessions = async () => {
     if (!sessions) return useLocalFallback();
     try {
-      if (localHistory && localHistorySessionId && ChatSyncController) {
-        chatSync = new ChatSyncController({
-          historyStore: localHistory,
-          sessionApi: sessions,
-          localSessionId: localHistorySessionId,
-          mapMessage: formatServerMessage
-        });
-        const synchronized = await chatSync.connect();
-        serverSessions = synchronized.sessions;
-        activeSessionId = synchronized.serverSessionId;
-        sessions.setActiveId(activeSessionId);
-        const state = store.getState();
-        state.messages = synchronized.messages;
-        store.saveState(state);
-        renderMessages(state.messages);
-      } else {
-        serverSessions = await sessions.list();
+      await ensureServerSession();
+      const synchronized = await chatSync.pull();
+      if (synchronized.cacheError && !localCacheError) {
+        localCacheError = synchronized.cacheError;
+        console.warn("Chat 本地缓存不可用，继续使用服务器 Session 同步。", synchronized.cacheError);
       }
+      const state = store.getState();
+      state.messages = synchronized.messages;
+      store.saveState(state);
+      renderMessages(state.messages);
       sessionApiAvailable = true;
-      if (sessionStatus) sessionStatus.textContent = "服务器历史已连接";
-      if (sessionFallback) sessionFallback.hidden = true;
-      if (sessionNew) sessionNew.disabled = false;
+      showServerSyncStatus();
       await refreshAiConfiguration();
       renderSessionList();
-      if (!chatSync && activeSessionId && serverSessions.some(session => session.id === activeSessionId)) {
-        await switchSession(activeSessionId);
-      } else if (!activeSessionId) {
-        activeSessionId = "";
-        sessions.setActiveId("");
-      }
-    } catch { useLocalFallback(); }
+    } catch (error) {
+      console.warn("服务器 Session 初始化失败，进入本地单会话模式。", error);
+      useLocalFallback();
+    }
   };
 
   const updateChatActivity = (state, message, time, timestamp) => {
@@ -377,7 +400,11 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const initializeLocalHistory = async (initialMessages) => {
-    if (!ChatHistoryStore) return;
+    if (!ChatHistoryStore) {
+      localCacheError = new Error("ChatHistoryStore 未加载");
+      console.warn("Chat 本地缓存不可用，仍将继续初始化服务器 Session。", localCacheError);
+      return;
+    }
     try {
       localHistory = new ChatHistoryStore();
       const recent = (await localHistory.listSessions())[0];
@@ -393,9 +420,11 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         await localHistory.saveMessages(session.id, initialMessages);
       }
-    } catch {
+    } catch (error) {
+      localCacheError = error;
       localHistory = null;
       localHistorySessionId = "";
+      console.warn("Chat 本地缓存初始化失败，仍将继续初始化服务器 Session。", error);
     }
   };
 
@@ -416,11 +445,18 @@ document.addEventListener("DOMContentLoaded", () => {
     scrollToLatest();
 
     try {
+      let serverSessionId = "";
+      try {
+        serverSessionId = await ensureServerSession();
+      } catch (error) {
+        console.warn("服务器 Session 创建或绑定失败，本次消息仅保存在本地。", error);
+        useLocalFallback();
+      }
       for await (const chunk of api.sendStreamMessage(userMessage.content, {
         history: state.messages,
         chatCount: state.stats.chatCount,
-        headers: sessionApiAvailable && activeSessionId
-          ? { "X-Session-Id": activeSessionId }
+        headers: serverSessionId
+          ? { "X-Session-Id": serverSessionId }
           : {}
       })) {
         const event = typeof chunk === "string" ? { type: "content", content: chunk } : chunk;
@@ -460,7 +496,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         nextState.memory.recent = nextState.memory.recent.slice(0, 5);
       });
-      if (chatSync && sessionApiAvailable && activeSessionId === chatSync.serverSessionId) {
+      if (serverSessionId && chatSync && serverSessionId === chatSync.serverSessionId) {
         try {
           const synchronized = await chatSync.pull();
           const state = store.getState();
@@ -470,6 +506,10 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch {
           // 保留刚写入 IndexedDB 的本地消息，下一次进入页面时再同步。
         }
+      } else if (localHistory && localHistorySessionId) {
+        localHistory.updateSyncState(localHistorySessionId, {
+          syncState: "local-only"
+        }).catch(() => {});
       }
     } catch (error) {
       pendingRow.remove();

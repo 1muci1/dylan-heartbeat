@@ -113,8 +113,8 @@ test("Root entry redirects into Home while preserving AppConfig bootstrap", () =
   assert.match(html, /loading__bars/);
   assert.match(html, /\/assets\/js\/data\.js/);
   assert.match(html, /window\.AppConfig/);
-  assert.match(html, /setTimeout\(\(\) => window\.location\.replace\("home\/"\), 720\)/);
-  assert.match(html, /location\.replace\("home\/"\)/);
+  assert.match(html, /setTimeout\(\(\) => window\.location\.replace\("\/home\/"\), 720\)/);
+  assert.match(html, /location\.replace\("\/home\/"\)/);
   assert.match(html, /正在进入沉的小世界/);
 });
 
@@ -191,11 +191,11 @@ test("Home helper functions resolve day, sunset, and night states deterministica
 test("Home contains all documented cards and no runtime backdoors", () => {
   const html = fs.readFileSync(path.join(homeRoot, "index.html"), "utf8");
   const entries = [
-    ['href="/chat.html"', "和沉聊天"],
-    ['href="../space/"', "空间设置"],
-    ['href="../collaboration/"', "和 AI 一起讨论"],
-    ['href="../game/"', "一起玩"],
-    ['href="../memory.html"', "共同记忆"]
+    ['href="/frontend-p4b/chat.html"', "和沉聊天"],
+    ['href="/space/"', "空间设置"],
+    ['href="/collaboration/"', "和 AI 一起讨论"],
+    ['href="/game/"', "一起玩"],
+    ['href="/frontend-p4b/memory.html"', "共同记忆"]
   ];
   for (const [href, label] of entries) {
     assert.match(html, new RegExp(href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));

@@ -14,7 +14,7 @@ test("新版 Calendar 页面和资源存在", () => {
 
 test("Space Home 日历入口指向新版 Calendar", () => {
   const home = fs.readFileSync(path.join(root, "home", "index.html"), "utf8");
-  assert.match(home, /href="\.\.\/calendar\/"/);
+  assert.match(home, /href="\/calendar\/"/);
   assert.doesNotMatch(home, /href="\.\.\/dashboard\.html"/);
 });
 

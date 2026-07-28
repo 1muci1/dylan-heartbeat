@@ -32,7 +32,7 @@ const fixture = (initial = { model: "claude-opus-4-6", mode: "mock" }) => {
 };
 
 test("switching a model updates only the compatible Provider config", () => {
-  const config = fixture({ model: "claude-opus-4-6", mode: "real", baseUrl: "https://example.test", auth: { token: "keep" } });
+  const config = fixture({ model: "claude-opus-4-6", mode: "real", baseUrl: "https://example.test", supportsImages: true, auth: { token: "keep" } });
   let mirroredModel = null;
   const preferences = { saveModel(id) { mirroredModel = id; } };
   const switcher = new ModelSwitcher({ configStore: config, modelRegistry: require("../frontend-p4b/assets/js/model-registry"), preferenceStore: preferences });
@@ -41,6 +41,7 @@ test("switching a model updates only the compatible Provider config", () => {
   assert.equal(result.defaultModel, "gpt-5");
   assert.equal(result.baseUrl, "https://example.test");
   assert.deepEqual(result.auth, { token: "keep" });
+  assert.equal(result.supportsImages, true);
   assert.equal("memory" in result, false);
   assert.equal(mirroredModel, "gpt-5");
 });
@@ -164,6 +165,7 @@ test("a saved Provider model survives refresh and matches the switcher and chat 
     baseUrl: "https://example.test",
     model: DEFAULT_REQUEST_MODEL,
     displayName: "Claude Opus 4.6",
+    supportsImages: true,
     defaultModel: DEFAULT_REQUEST_MODEL,
     auth: { token: "test-only" }
   });
@@ -172,6 +174,7 @@ test("a saved Provider model survives refresh and matches the switcher and chat 
   vm.runInNewContext(dataSource, refreshedPage);
   const refreshedConfig = refreshedPage.window.AppConfig.getProviderConfig();
   assert.equal(refreshedConfig.model, DEFAULT_REQUEST_MODEL);
+  assert.equal(refreshedConfig.supportsImages, true);
   const switcher = new ModelSwitcher({
     configStore: refreshedPage.window.AppConfig,
     modelRegistry: require("../frontend-p4b/assets/js/model-registry"),

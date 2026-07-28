@@ -37,8 +37,7 @@
         ...current,
         model: model.requestModel || id,
         displayName: model.name,
-        defaultModel: model.requestModel || id,
-        supportsImages: model.supportsImages === true
+        defaultModel: model.requestModel || id
       });
       this.#preferences?.saveModel?.(id);
       return next;

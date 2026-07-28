@@ -517,6 +517,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       for await (const chunk of api.sendStreamMessage(userMessage.content, {
         history,
+        imageMessageId: userMessage.attachments?.length ? userMessage.id : null,
         chatCount: state.stats.chatCount,
         headers: serverSessionId
           ? { "X-Session-Id": serverSessionId }
@@ -756,7 +757,7 @@ document.addEventListener("DOMContentLoaded", () => {
   imageButton?.addEventListener("click", () => {
     if (!supportsImages()) {
       clearPendingFiles();
-      const message = "当前模型未启用图片理解，请在模型设置中开启支持图片理解，或切换支持看图的模型。";
+      const message = "当前模型未启用图片理解。请到 模型设置 → 支持图片理解 开启，或切换支持看图的模型。";
       if (uploadStatus) uploadStatus.textContent = message;
       showToast(message);
       return;
@@ -766,7 +767,7 @@ document.addEventListener("DOMContentLoaded", () => {
   picker?.addEventListener("change", () => {
     if (!supportsImages()) {
       clearPendingFiles();
-      if (uploadStatus) uploadStatus.textContent = "当前模型未启用图片理解，请在模型设置中开启支持图片理解，或切换支持看图的模型。";
+      if (uploadStatus) uploadStatus.textContent = "当前模型未启用图片理解。请到 模型设置 → 支持图片理解 开启，或切换支持看图的模型。";
       return;
     }
     const files = [...picker.files];

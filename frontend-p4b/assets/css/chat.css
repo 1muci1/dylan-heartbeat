@@ -390,6 +390,7 @@
 }
 .composer-tools { display: flex; gap: 5px; }
 .composer .composer__image, .composer .composer__sticker { color: #786587; background: #eee8f3; }
+.image-picker { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 .attachment-tray, .sticker-panel { position: absolute; right: 12px; bottom: calc(100% + 7px); left: 12px; padding: 10px; border: 1px solid rgba(105,83,121,.1); border-radius: 15px; background: rgba(255,255,255,.97); box-shadow: 0 12px 35px rgba(54,39,66,.14); }
 .attachment-previews { display: flex; overflow-x: auto; gap: 8px; }
 .attachment-preview { position: relative; flex: 0 0 72px; }

@@ -49,12 +49,16 @@
 
   const getConversationHistory = () => normalizeHistory(store.getState().messages);
 
-  const OMITTED_IMAGE_TEXT = "[图片已省略：当前模型未启用多模态]";
-  const toOpenAIMessages = (history = getConversationHistory(), { supportsImages = false } = {}) => normalizeHistory(history)
-    .map(({ role, content, attachments, sticker }) => {
+  const OMITTED_IMAGE_TEXT = "[图片已省略：当前模型未启用图片理解]";
+  const OMITTED_HISTORY_IMAGE_TEXT = "[历史图片已省略：避免重复发送图片上下文]";
+  const toOpenAIMessages = (
+    history = getConversationHistory(),
+    { supportsImages = false, activeImageMessageId = null } = {}
+  ) => normalizeHistory(history)
+    .map(({ id, role, content, attachments, sticker }) => {
       if (role !== "user") return { role, content };
       if (Array.isArray(attachments) && attachments.length) {
-        if (supportsImages) return {
+        if (supportsImages && activeImageMessageId && id === activeImageMessageId) return {
           role,
           content: [
             ...(content && content !== "[图片]" ? [{ type: "text", text: content }] : []),
@@ -63,7 +67,8 @@
               .map(item => ({ type: "image_url", image_url: { url: item.url } }))
           ]
         };
-        const text = content && content !== "[图片]" ? `${content}\n${OMITTED_IMAGE_TEXT}` : OMITTED_IMAGE_TEXT;
+        const placeholder = supportsImages ? OMITTED_HISTORY_IMAGE_TEXT : OMITTED_IMAGE_TEXT;
+        const text = content && content !== "[图片]" ? `${content}\n${placeholder}` : placeholder;
         return { role, content: text };
       }
       if (sticker?.id) return { role, content: content || `[Sticker: ${sticker.label || "Sticker"}]` };

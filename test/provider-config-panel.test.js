@@ -23,6 +23,7 @@ test("shared Provider panel opens, masks secrets, and returns normalized fields"
     token: control(),
     displayName: control(),
     model: control(),
+    supportsImages: control(),
     enabled: control()
   };
   const form = { elements: fields };
@@ -44,7 +45,7 @@ test("shared Provider panel opens, masks secrets, and returns normalized fields"
     },
     querySelectorAll(selector) {
       if (selector === "[data-provider-custom]") {
-        return [fields.type, fields.baseUrl, fields.endpoint, fields.token, fields.displayName, fields.model, fields.enabled];
+        return [fields.type, fields.baseUrl, fields.endpoint, fields.token, fields.displayName, fields.model, fields.supportsImages, fields.enabled];
       }
       if (selector === "[data-provider-panel-close]") return [closeButton];
       return [];
@@ -64,6 +65,7 @@ test("shared Provider panel opens, masks secrets, and returns normalized fields"
       token: "masked-test-value",
       displayName: "Claude Opus 4.6",
       model: "[脆卷-kiro-0.08]claude-opus-4-6",
+      supportsImages: true,
       enabled: true
     }
   });
@@ -80,6 +82,7 @@ test("shared Provider panel opens, masks secrets, and returns normalized fields"
     endpoint: "/v1/messages",
     displayName: "Claude Opus 4.6",
     model: "[脆卷-kiro-0.08]claude-opus-4-6",
+    supportsImages: true,
     auth: { type: "bearer", token: true }
   });
   tokenButton.listeners.click({ currentTarget: tokenButton });

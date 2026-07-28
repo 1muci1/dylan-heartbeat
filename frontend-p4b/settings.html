@@ -135,6 +135,15 @@
         <span class="provider-config-secret"><input id="bearer-token" name="token" type="password" placeholder="短期访问令牌" autocomplete="new-password" data-provider-custom><button type="button" data-provider-panel-token aria-label="显示 API Key">显示</button></span>
       </label>
 
+      <label class="provider-mode provider-config-enabled" for="supports-images">
+        <span class="provider-mode__copy">
+          <strong>支持图片理解</strong>
+          <small>开启前请确认上游模型支持多模态/视觉</small>
+        </span>
+        <input id="supports-images" name="supportsImages" type="checkbox" data-provider-custom>
+        <span class="provider-mode__switch" aria-hidden="true"></span>
+      </label>
+
       <label class="provider-mode provider-config-enabled" for="real-mode">
         <span class="provider-mode__copy">
           <strong>真实模式</strong>

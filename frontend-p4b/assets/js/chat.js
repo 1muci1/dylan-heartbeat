@@ -600,6 +600,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const stickerGrid = document.querySelector(".sticker-grid");
   const stickerSearch = document.querySelector(".sticker-panel input");
   let pendingFiles = [];
+  const supportsImages = () => window.AppConfig?.getProviderConfig?.().supportsImages === true;
 
   const clearPendingFiles = () => {
     pendingFiles = [];
@@ -628,7 +629,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const content = input.value.trim();
     if (!content && !pendingFiles.length) return;
 
-    if (pendingFiles.length) {
+    if (pendingFiles.length && !supportsImages()) {
       if (uploadStatus) uploadStatus.textContent = "当前模型未启用图片理解，请切换支持多模态的模型或移除图片。";
       showToast("当前模型未启用图片理解");
       clearPendingFiles();
@@ -639,7 +640,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let attachments = [];
     if (pendingFiles.length) {
       try { attachments = await media.uploadImages(pendingFiles, sessionApiAvailable ? activeSessionId : "", text => { if (uploadStatus) uploadStatus.textContent = text; }); }
-      catch (error) { if (uploadStatus) uploadStatus.textContent = error.message; input.focus(); return; }
+      catch (error) { if (uploadStatus) uploadStatus.textContent = error.message; clearPendingFiles(); input.focus(); return; }
     }
 
     const message = messageProtocol.createUserMessage(content || "[图片]", { type: attachments.length ? "image" : "text", attachments });
@@ -752,8 +753,31 @@ document.addEventListener("DOMContentLoaded", () => {
   initializeLocalHistory(initialState.messages).finally(initializeSessions);
   api.onLoadingChange(setRequestState);
   sendButton.addEventListener("click", handleSend);
-  imageButton?.addEventListener("click", () => picker?.click());
-  picker?.addEventListener("change", () => { const files = [...picker.files]; if (files.length + pendingFiles.length > 4) { if (uploadStatus) uploadStatus.textContent = "每次最多选择 4 张图片"; } else { pendingFiles.push(...files); renderPendingFiles(); } picker.value = ""; });
+  imageButton?.addEventListener("click", () => {
+    if (!supportsImages()) {
+      clearPendingFiles();
+      const message = "当前模型未启用图片理解，请在模型设置中开启支持图片理解，或切换支持看图的模型。";
+      if (uploadStatus) uploadStatus.textContent = message;
+      showToast(message);
+      return;
+    }
+    picker?.click();
+  });
+  picker?.addEventListener("change", () => {
+    if (!supportsImages()) {
+      clearPendingFiles();
+      if (uploadStatus) uploadStatus.textContent = "当前模型未启用图片理解，请在模型设置中开启支持图片理解，或切换支持看图的模型。";
+      return;
+    }
+    const files = [...picker.files];
+    if (files.length + pendingFiles.length > 4) {
+      if (uploadStatus) uploadStatus.textContent = "每次最多选择 4 张图片";
+    } else {
+      pendingFiles.push(...files);
+      renderPendingFiles();
+    }
+    picker.value = "";
+  });
   stickerButton?.addEventListener("click", () => { stickerPanel.hidden = !stickerPanel.hidden; stickerButton.setAttribute("aria-expanded", String(!stickerPanel.hidden)); if (!stickerPanel.hidden) loadStickers(); });
   stickerSearch?.addEventListener("input", loadStickers);
   composer.addEventListener("submit", (event) => {

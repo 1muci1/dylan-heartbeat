@@ -100,6 +100,7 @@ test("AppConfig compatibility is preserved by the data normalizer", () => {
   assert.equal(config.model, DEFAULT_REQUEST_MODEL);
   assert.equal(config.displayName, "Claude Opus 4.6");
   assert.equal(typeof config.autoSelectModel, "boolean");
+  assert.equal(config.supportsImages, false);
   assert.equal(typeof context.window.AppConfig.saveProviderConfig, "function");
 });
 
@@ -223,6 +224,8 @@ test("settings keeps API keys masked and edits the same Provider config", () => 
   assert.match(html, /实际请求模型名/);
   assert.match(html, /model_not_found/);
   assert.match(html, /name="token" type="password"/);
+  assert.match(html, /name="supportsImages" type="checkbox"/);
+  assert.match(html, /支持图片理解/);
   assert.match(html, /data-provider-panel-token/);
   assert.match(script, /configStore\.saveProviderConfig\(readFormConfig\(\)\)/);
   assert.doesNotMatch(script, /console\.(?:log|info|debug)\([^)]*token/);
@@ -260,4 +263,22 @@ test("chat request body uses provider model and never displayName", () => {
   const body = context.window.AppAPI.buildRequestBody([{ role: "user", content: "test" }]);
   assert.equal(body.model, "real-upstream-model");
   assert.equal("displayName" in body, false);
+});
+
+test("legacy Provider configs gain a persisted supportsImages false capability", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "frontend-p4b", "assets", "js", "data.js"), "utf8");
+  let stored = JSON.stringify({ model: DEFAULT_REQUEST_MODEL, mode: "real" });
+  const context = {
+    window: {},
+    localStorage: {
+      getItem: () => stored,
+      setItem(_key, value) { stored = value; }
+    },
+    JSON, Object, String, Boolean, Set
+  };
+  vm.runInNewContext(source, context);
+  const config = context.window.AppConfig.getProviderConfig();
+  assert.equal(config.supportsImages, false);
+  assert.equal(JSON.parse(stored).supportsImages, false);
+  assert.equal(config.model, DEFAULT_REQUEST_MODEL);
 });

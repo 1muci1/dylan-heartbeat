@@ -130,6 +130,7 @@ document.addEventListener("DOMContentLoaded", () => {
     endpoint: fields.endpoint.value.trim(),
     displayName: fields.displayName.value.trim(),
     model: fields.model.value.trim(),
+    supportsImages: fields.supportsImages?.checked === true,
     auth: {
       type: "bearer",
       token: fields.token.value.trim()

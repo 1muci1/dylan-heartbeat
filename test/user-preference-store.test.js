@@ -170,6 +170,15 @@ test("user avatar resolver rejects blob, http, empty, and non-image values", () 
   }
 });
 
+test("user and Chen avatar persistence use independent preference fields", () => {
+  const store = new UserPreferenceStore({ storage: storage() });
+  store.saveAvatar({ source: "upload", imageData: "data:image/png;base64,USER" }, "user");
+  store.saveAvatar({ source: "upload", imageData: "data:image/png;base64,CHEN" }, "chen");
+  const preferences = store.loadSync();
+  assert.equal(preferences.avatar.userAvatar.imageData, "data:image/png;base64,USER");
+  assert.equal(preferences.avatar.chenAvatar.imageData, "data:image/png;base64,CHEN");
+});
+
 test("chat background resolver normalizes the real chat and space preference fields", () => {
   const chat = getChatBackground({
     chatBackground: {

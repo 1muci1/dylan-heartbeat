@@ -5,7 +5,7 @@
   if (typeof module === "object" && module.exports) module.exports = api;
   if (root) root.CompanionProviderConfigPanel = Object.freeze(api);
 })(typeof window !== "undefined" ? window : null, () => {
-  const fieldNames = ["source", "type", "baseUrl", "endpoint", "token", "displayName", "model", "enabled"];
+  const fieldNames = ["source", "type", "baseUrl", "endpoint", "token", "displayName", "model", "supportsImages", "enabled"];
   const bind = dialog => {
     if (!dialog?.querySelector) return null;
     const form = dialog.querySelector("[data-provider-config-form]");
@@ -34,6 +34,7 @@
       }
       if (fields.displayName) fields.displayName.value = value.displayName || "Claude Opus 4.6";
       if (fields.model) fields.model.value = value.model || "[脆卷-kiro-0.08]claude-opus-4-6";
+      if (fields.supportsImages) fields.supportsImages.checked = value.supportsImages === true;
       if (fields.enabled) fields.enabled.checked = value.enabled !== false;
       syncSource();
     };
@@ -45,6 +46,7 @@
       endpoint: String(fields.endpoint?.value || "").trim(),
       ...(fields.displayName ? { displayName: String(fields.displayName.value || "").trim() } : {}),
       model: String(fields.model?.value || "").trim(),
+      supportsImages: fields.supportsImages ? fields.supportsImages.checked : false,
       auth: { type: "bearer", token: String(fields.token?.value || "").trim() }
     });
     const close = () => {

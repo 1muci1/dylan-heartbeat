@@ -193,20 +193,24 @@
     return avatar;
   };
 
-  const mountFallbackUserAvatarPicker = ({ documentRef, windowRef, store } = {}) => {
-    const trigger = documentRef?.querySelector?.("[data-home-user-avatar]");
-    if (!trigger || !documentRef?.createElement || !documentRef?.body || !store?.saveAvatar) return null;
-    if (trigger.dataset.avatarPickerFallback === "bound") return null;
+  const mountFallbackAvatarPicker = ({ documentRef, windowRef, store } = {}) => {
+    const triggers = [...(documentRef?.querySelectorAll?.("[data-home-user-avatar], [data-home-chen-avatar]") || [])];
+    if (!triggers.length || !documentRef?.createElement || !documentRef?.body || !store?.saveAvatar) return null;
     const fileInput = documentRef.createElement("input");
     fileInput.type = "file";
     fileInput.accept = "image/png,image/jpeg,image/webp";
     fileInput.hidden = true;
     fileInput.setAttribute("data-home-user-avatar-file", "");
     documentRef.body.append(fileInput);
-    trigger.dataset.avatarPickerFallback = "bound";
-    trigger.addEventListener("click", () => {
-      fileInput.value = "";
-      fileInput.click();
+    let target = "user";
+    triggers.forEach(trigger => {
+      if (trigger.dataset.avatarPickerFallback === "bound") return;
+      trigger.dataset.avatarPickerFallback = "bound";
+      trigger.addEventListener("click", () => {
+        target = trigger.dataset.avatarTarget === "chen" ? "chen" : "user";
+        fileInput.value = "";
+        fileInput.click();
+      });
     });
     fileInput.addEventListener("change", () => {
       const file = fileInput.files?.[0];
@@ -223,11 +227,11 @@
           crop: { x: 50, y: 50 },
           scale: 1,
           border: "moon"
-        }, "user");
+        }, target);
       };
       reader.readAsDataURL(file);
     });
-    return Object.freeze({ fileInput, trigger });
+    return Object.freeze({ fileInput, triggers });
   };
 
   const mount = (documentRef, windowRef) => {
@@ -287,7 +291,17 @@
       const avatar = documentRef.querySelector("[data-home-avatar]");
       if (avatar) {
         avatar.replaceChildren();
-        avatarStudio.render(documentRef, avatar, avatarStudio.defaultChen());
+        const chenConfig = preferenceAvatar.chenAvatar || {};
+        avatarStudio.render(documentRef, avatar, {
+          ...avatarStudio.defaultChen(),
+          imageUrl: preferences?.getChenAvatarImage?.(preferenceValue),
+          source: chenConfig.source || "default",
+          crop: {
+            x: chenConfig.crop?.x ?? 50,
+            y: chenConfig.crop?.y ?? 50,
+            zoom: Math.max(1, Number(chenConfig.scale) || 1)
+          }
+        });
       }
       const userAvatar = documentRef.querySelector("[data-home-user-avatar]");
       if (userAvatar) {
@@ -310,12 +324,12 @@
         documentRef,
         windowRef,
         store: preferences,
-        selector: "[data-home-user-avatar]"
+        selector: "[data-home-user-avatar], [data-home-chen-avatar]"
       });
     } catch {
       avatarPicker = null;
     }
-    if (!avatarPicker) mountFallbackUserAvatarPicker({ documentRef, windowRef, store: preferences });
+    if (!avatarPicker) mountFallbackAvatarPicker({ documentRef, windowRef, store: preferences });
     const hero = documentRef.querySelector("[data-home-hero]");
     if (hero) {
       hero.classList.add("is-home-hero-animated");
@@ -360,7 +374,7 @@
     }
     const PreferenceStore = windowRef?.CompanionUserPreferences?.UserPreferenceStore;
     const preferences = PreferenceStore ? new PreferenceStore() : null;
-    return mountFallbackUserAvatarPicker({ documentRef, windowRef, store: preferences });
+    return mountFallbackAvatarPicker({ documentRef, windowRef, store: preferences });
   };
 
   return {
@@ -373,7 +387,7 @@
     formatClock,
     formatDate,
     mount,
-    mountFallbackUserAvatarPicker,
+    mountFallbackAvatarPicker,
     overlayFor,
     resolveMoment,
     relationshipDays,

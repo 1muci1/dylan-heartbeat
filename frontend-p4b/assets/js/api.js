@@ -6,10 +6,14 @@
   if (!data || !messageProtocol || !provider) return;
 
   const { MODEL_CONFIG } = data;
-  const getModelConfig = () => ({
-    ...MODEL_CONFIG,
-    model: window.AppConfig?.getProviderConfig().model || MODEL_CONFIG.model
-  });
+  const getModelConfig = () => {
+    const providerConfig = window.AppConfig?.getProviderConfig?.() || {};
+    return {
+      ...MODEL_CONFIG,
+      model: providerConfig.model || MODEL_CONFIG.model,
+      supportsImages: providerConfig.supportsImages === true
+    };
+  };
   const loadingListeners = new Set();
   let isLoading = false;
   let activeStreamController = null;
@@ -26,11 +30,16 @@
     return () => loadingListeners.delete(listener);
   };
 
-  const buildRequestBody = (history, stream = MODEL_CONFIG.stream) => ({
-    model: getModelConfig().model,
-    messages: messageProtocol.toOpenAIMessages(history),
-    stream
-  });
+  const buildRequestBody = (history, stream = MODEL_CONFIG.stream) => {
+    const modelConfig = getModelConfig();
+    return {
+      model: modelConfig.model,
+      messages: messageProtocol.toOpenAIMessages(history, {
+        supportsImages: modelConfig.supportsImages
+      }),
+      stream
+    };
+  };
 
   const request = async (body, options = {}) => {
     setLoading(true);

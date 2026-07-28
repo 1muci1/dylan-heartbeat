@@ -149,6 +149,7 @@
       endpoint: "/v1/chat/completions",
       model: DEFAULT_PROVIDER_MODEL,
       displayName: DEFAULT_PROVIDER_DISPLAY_NAME,
+      supportsImages: false,
       auth: {
         type: "bearer",
         token: ""
@@ -237,7 +238,8 @@
     model: appData.PROVIDER_CONFIG.model || appData.MODEL_CONFIG.model,
     displayName: appData.PROVIDER_CONFIG.displayName || DEFAULT_PROVIDER_DISPLAY_NAME,
     defaultModel: appData.PROVIDER_CONFIG.model || appData.MODEL_CONFIG.model,
-    autoSelectModel: false
+    autoSelectModel: false,
+    supportsImages: false
   });
   const normalizeProviderConfig = (config) => {
     const defaults = createDefaultProviderConfig();
@@ -269,6 +271,7 @@
         ? defaults.defaultModel
         : (configuredDefaultModel || configuredModel || defaults.defaultModel),
       autoSelectModel: Boolean(config?.autoSelectModel),
+      supportsImages: config?.supportsImages === true,
       auth: {
         type: "bearer",
         token: String(config?.auth?.token || "").trim()
@@ -281,8 +284,13 @@
 
     getProviderConfig() {
       try {
-        const storedConfig = JSON.parse(localStorage.getItem(PROVIDER_STORAGE_KEY));
-        return normalizeProviderConfig(storedConfig);
+        const rawConfig = localStorage.getItem(PROVIDER_STORAGE_KEY);
+        const storedConfig = JSON.parse(rawConfig);
+        const normalizedConfig = normalizeProviderConfig(storedConfig);
+        if (rawConfig && typeof storedConfig?.supportsImages !== "boolean") {
+          localStorage.setItem(PROVIDER_STORAGE_KEY, JSON.stringify(normalizedConfig));
+        }
+        return normalizedConfig;
       } catch {
         return createDefaultProviderConfig();
       }

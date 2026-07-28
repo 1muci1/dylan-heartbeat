@@ -15,6 +15,7 @@
       description: "适合深度推理、复杂任务与长上下文工作。",
       capabilities: Object.freeze(["reasoning", "coding", "long-context"]),
       capabilityLabels: Object.freeze(["深度推理", "长上下文", "复杂任务"]),
+      supportsImages: false,
       enabled: true
     }),
     Object.freeze({
@@ -26,6 +27,7 @@
       description: "综合能力均衡，适合代码、规划与日常协作。",
       capabilities: Object.freeze(["general", "coding", "planning"]),
       capabilityLabels: Object.freeze(["综合能力", "代码", "规划"]),
+      supportsImages: false,
       enabled: true
     }),
     Object.freeze({
@@ -37,6 +39,7 @@
       description: "小窝里的默认陪伴模型，适合日常聊天。",
       capabilities: Object.freeze(["conversation", "companion"]),
       capabilityLabels: Object.freeze(["日常聊天", "陪伴"]),
+      supportsImages: false,
       enabled: true
     })
   ]);

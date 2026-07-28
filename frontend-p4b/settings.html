@@ -117,10 +117,16 @@
         <input id="provider-endpoint" name="endpoint" type="text" value="/v1/chat/completions" autocomplete="off" data-provider-custom>
       </label>
 
+      <label class="provider-field" for="model-display-name">
+        <span>显示名称</span>
+        <small>仅用于页面展示，不会发送给 Provider</small>
+        <input id="model-display-name" name="displayName" type="text" placeholder="Claude Opus 4.6" autocomplete="off" data-provider-custom>
+      </label>
+
       <label class="provider-field" for="model-id">
-        <span>模型 ID</span>
-        <small>填写 Gateway 实际接受的 model 值</small>
-        <input id="model-id" name="model" type="text" placeholder="your-model-id" autocomplete="off" data-provider-custom>
+        <span>实际请求模型名</span>
+        <small>上游返回 model_not_found 时，请填写供应商提供的完整模型名</small>
+        <input id="model-id" name="model" type="text" placeholder="[供应商路由]模型名" autocomplete="off" data-provider-custom>
       </label>
 
       <label class="provider-field" for="bearer-token">
@@ -217,6 +223,7 @@
   <script src="assets/js/model-switcher.js"></script>
   <script src="assets/js/provider.js"></script>
   <script src="assets/js/common.js"></script>
+  <script src="/avatar/avatar-picker.js"></script>
   <script src="assets/js/avatar-chat.js"></script>
   <script src="assets/js/settings-return.js"></script>
   <script src="/shared/provider-config-panel.js"></script>

@@ -1,7 +1,9 @@
 // 前端统一模拟数据层。
 // 当前数据仅用于界面开发，不包含 API、后端请求或持久化逻辑。
 (() => {
-  const DEFAULT_PROVIDER_MODEL = "claude-opus-4-6";
+  const DEFAULT_PROVIDER_MODEL = "[脆卷-kiro-0.08]claude-opus-4-6";
+  const DEFAULT_PROVIDER_DISPLAY_NAME = "Claude Opus 4.6";
+  const LEGACY_SHORT_PROVIDER_MODEL = "claude-opus-4-6";
   const LEGACY_DEFAULT_PROVIDER_MODEL = "[脆卷-kiro-0.08]claude-opus-4-6-thinking";
 
   const appData = {
@@ -146,6 +148,7 @@
       baseUrl: "",
       endpoint: "/v1/chat/completions",
       model: DEFAULT_PROVIDER_MODEL,
+      displayName: DEFAULT_PROVIDER_DISPLAY_NAME,
       auth: {
         type: "bearer",
         token: ""
@@ -232,6 +235,7 @@
   const createDefaultProviderConfig = () => ({
     ...clone(appData.PROVIDER_CONFIG),
     model: appData.PROVIDER_CONFIG.model || appData.MODEL_CONFIG.model,
+    displayName: appData.PROVIDER_CONFIG.displayName || DEFAULT_PROVIDER_DISPLAY_NAME,
     defaultModel: appData.PROVIDER_CONFIG.model || appData.MODEL_CONFIG.model,
     autoSelectModel: false
   });
@@ -241,16 +245,27 @@
     const configuredType = String(config?.type || "").trim().toLowerCase();
     const configuredEndpoint = String(config?.endpoint || "").trim();
     const configuredModel = String(config?.model || "").trim();
+    const configuredDisplayName = String(config?.displayName || "").trim();
     const configuredDefaultModel = String(config?.defaultModel || "").trim();
     const usesLegacyDefault = configuredModel === LEGACY_DEFAULT_PROVIDER_MODEL
       && (!configuredDefaultModel || configuredDefaultModel === LEGACY_DEFAULT_PROVIDER_MODEL);
+    const usesLegacyShortDefault = configuredModel === LEGACY_SHORT_PROVIDER_MODEL
+      && !configuredDisplayName;
+    const requestModel = usesLegacyDefault || usesLegacyShortDefault
+      ? defaults.model
+      : (configuredModel || defaults.model);
     return {
       type: supportedTypes.has(configuredType) ? configuredType : defaults.type,
       mode: config?.mode === "real" ? "real" : (defaults.mode || "mock"),
       baseUrl: String(config?.baseUrl || defaults.baseUrl).trim(),
       endpoint: configuredEndpoint.startsWith("/") ? configuredEndpoint : defaults.endpoint,
-      model: usesLegacyDefault ? defaults.model : (configuredModel || defaults.model),
-      defaultModel: usesLegacyDefault
+      model: requestModel,
+      displayName: configuredDisplayName || (
+        !configuredModel || [defaults.model, LEGACY_SHORT_PROVIDER_MODEL, LEGACY_DEFAULT_PROVIDER_MODEL].includes(configuredModel)
+          ? defaults.displayName
+          : requestModel
+      ),
+      defaultModel: usesLegacyDefault || usesLegacyShortDefault
         ? defaults.defaultModel
         : (configuredDefaultModel || configuredModel || defaults.defaultModel),
       autoSelectModel: Boolean(config?.autoSelectModel),

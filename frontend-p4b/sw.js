@@ -1,4 +1,4 @@
-const CACHE_NAME = "xinban-shell-v28-p4b";
+const CACHE_NAME = "xinban-shell-v29-p4b";
 const STALE_CACHE_NAMES = new Set([
   "xinban-shell-v21-p4b",
   "xinban-shell-v22-p4b",
@@ -6,7 +6,8 @@ const STALE_CACHE_NAMES = new Set([
   "xinban-shell-v24-p4b",
   "xinban-shell-v25-p4b",
   "xinban-shell-v26-p4b",
-  "xinban-shell-v27-p4b"
+  "xinban-shell-v27-p4b",
+  "xinban-shell-v28-p4b"
 ]);
 const APP_SHELL = [
   "./",
@@ -43,6 +44,7 @@ const APP_SHELL = [
   "./assets/js/home.js",
   "./assets/js/chat-preferences.js",
   "./assets/js/avatar-chat.js",
+  "/avatar/avatar-picker.js",
   "./assets/js/settings-return.js",
   "./assets/js/settings-section.js",
   "/shared/provider-config-panel.js",

@@ -87,7 +87,7 @@ test("global model settings use the shared Provider configuration dialog", () =>
   const js = read("assets/js/settings.js");
   assert.match(html, /data-open-global-provider>配置模型/);
   assert.match(html, /data-global-provider-dialog/);
-  for (const field of ["type", "baseUrl", "endpoint", "token", "model", "enabled"]) {
+  for (const field of ["type", "baseUrl", "endpoint", "token", "displayName", "model", "enabled"]) {
     assert.match(html, new RegExp(`name="${field}"`));
   }
   assert.match(html, /data-provider-panel-token/);
@@ -107,4 +107,15 @@ test("settings and council load the same Provider panel controller and styleshee
   }
   assert.match(settings, /class="provider-config-dialog"/);
   assert.match(council, /class="provider-config-dialog"/);
+});
+
+test("appearance mode keeps the Avatar Studio above mobile navigation and safe areas", () => {
+  const html = read("settings.html");
+  const css = read("assets/css/settings.css");
+  assert.match(html, /data-avatar-target="user">更改我的头像/);
+  assert.match(html, /data-avatar-target="chen">更改沉沉头像/);
+  assert.match(html, /src="\/avatar\/avatar-picker\.js"/);
+  assert.match(css, /data-settings-section="appearance"[\s\S]*scroll-padding-bottom:calc\(156px \+ env\(safe-area-inset-bottom\)\)/);
+  assert.match(css, /data-settings-section="appearance"[\s\S]*settings-shell[\s\S]*padding-bottom:calc\(156px \+ env\(safe-area-inset-bottom\)\)/);
+  assert.doesNotMatch(css, /data-settings-section="appearance"[\s\S]{0,160}z-index/);
 });

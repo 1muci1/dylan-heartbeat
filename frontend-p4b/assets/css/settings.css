@@ -121,6 +121,9 @@
 .settings-page[data-settings-section="appearance"] .settings-zone--model,
 .settings-page[data-settings-section="appearance"] .preference-data-settings,
 .settings-page[data-settings-section="appearance"] .memory-import { display:none; }
+.settings-page[data-settings-section="appearance"] { scroll-padding-bottom:calc(156px + env(safe-area-inset-bottom)); }
+.settings-page[data-settings-section="appearance"] .settings-shell { padding-bottom:calc(156px + env(safe-area-inset-bottom)); }
+.settings-page[data-settings-section="appearance"] .avatar-settings { margin-bottom:24px; }
 .settings-page[data-settings-section="model"] .settings-zone--model,
 .settings-page[data-settings-section="appearance"] .settings-zone--appearance { min-height:calc(100dvh - 190px); }
 .provider-config-dialog .provider-form { margin:0; border:0; border-radius:0; background:transparent; box-shadow:none; }

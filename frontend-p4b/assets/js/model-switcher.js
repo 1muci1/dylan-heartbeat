@@ -24,18 +24,22 @@
     list() { return this.#registry.list({ enabledOnly: true }); }
     current() {
       const config = this.#config.getProviderConfig();
-      return this.#registry.byId(config.model) || null;
+      return this.#registry.byRequestModel?.(config.model)
+        || this.#registry.byId(config.model)
+        || null;
     }
     config() { return this.#config.getProviderConfig(); }
     select(id) {
       this.#registry.requireId(id);
+      const model = this.#registry.byId(id);
       const current = this.#config.getProviderConfig();
       const next = this.#config.saveProviderConfig({
         ...current,
-        model: id,
-        defaultModel: id
+        model: model.requestModel || id,
+        displayName: model.name,
+        defaultModel: model.requestModel || id
       });
-      this.#preferences?.saveModel?.(next.model);
+      this.#preferences?.saveModel?.(id);
       return next;
     }
     setAutoSelect(enabled) {

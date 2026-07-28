@@ -263,6 +263,12 @@
     preferences?.load?.().then(renderPreferenceAvatars).catch(() => {
       // 保留同步读取后已呈现的头像，恢复失败时不回退默认。
     });
+    windowRef?.CompanionAvatarPicker?.mount({
+      documentRef,
+      windowRef,
+      store: preferences,
+      selector: "[data-home-user-avatar]"
+    });
     const hero = documentRef.querySelector("[data-home-hero]");
     if (hero) {
       hero.classList.add("is-home-hero-animated");

@@ -10,6 +10,7 @@ const switcherSource = path.join(__dirname, "..", "frontend-p4b", "assets", "js"
 const { MODELS, byId, isValidId, requireId } = require(registrySource);
 const { ModelSwitcher } = require(switcherSource);
 const DEFAULT_MODEL = "claude-opus-4-6";
+const DEFAULT_REQUEST_MODEL = "[脆卷-kiro-0.08]claude-opus-4-6";
 const LEGACY_DEFAULT_MODEL = "[脆卷-kiro-0.08]claude-opus-4-6-thinking";
 
 test("Model Registry exposes enabled models with stable metadata", () => {
@@ -96,7 +97,8 @@ test("AppConfig compatibility is preserved by the data normalizer", () => {
   const context = { window: {}, localStorage: { getItem: () => null, setItem() {} }, JSON, Object, String, Boolean };
   vm.runInNewContext(source, context);
   const config = context.window.AppConfig.getProviderConfig();
-  assert.equal(config.model, DEFAULT_MODEL);
+  assert.equal(config.model, DEFAULT_REQUEST_MODEL);
+  assert.equal(config.displayName, "Claude Opus 4.6");
   assert.equal(typeof config.autoSelectModel, "boolean");
   assert.equal(typeof context.window.AppConfig.saveProviderConfig, "function");
 });
@@ -114,7 +116,7 @@ test("legacy default migrates while a user-selected model remains unchanged", ()
     JSON, Object, String, Boolean
   };
   vm.runInNewContext(source, context);
-  assert.equal(context.window.AppConfig.getProviderConfig().model, DEFAULT_MODEL);
+  assert.equal(context.window.AppConfig.getProviderConfig().model, DEFAULT_REQUEST_MODEL);
 
   context.window.AppConfig.saveProviderConfig({
     ...context.window.AppConfig.getProviderConfig(),
@@ -140,7 +142,7 @@ test("chat request body uses the migrated frontend default model", () => {
   context.window.AppProvider = { send() {}, stream() {} };
   vm.runInNewContext(apiSource, context);
   const body = context.window.AppAPI.buildRequestBody([{ role: "user", content: "测试" }], true);
-  assert.equal(body.model, DEFAULT_MODEL);
+  assert.equal(body.model, DEFAULT_REQUEST_MODEL);
 });
 
 test("a saved Provider model survives refresh and matches the switcher and chat body", () => {
@@ -159,15 +161,16 @@ test("a saved Provider model survives refresh and matches the switcher and chat 
   firstPage.window.AppConfig.saveProviderConfig({
     mode: "real",
     baseUrl: "https://example.test",
-    model: DEFAULT_MODEL,
-    defaultModel: DEFAULT_MODEL,
+    model: DEFAULT_REQUEST_MODEL,
+    displayName: "Claude Opus 4.6",
+    defaultModel: DEFAULT_REQUEST_MODEL,
     auth: { token: "test-only" }
   });
 
   const refreshedPage = createContext();
   vm.runInNewContext(dataSource, refreshedPage);
   const refreshedConfig = refreshedPage.window.AppConfig.getProviderConfig();
-  assert.equal(refreshedConfig.model, DEFAULT_MODEL);
+  assert.equal(refreshedConfig.model, DEFAULT_REQUEST_MODEL);
   const switcher = new ModelSwitcher({
     configStore: refreshedPage.window.AppConfig,
     modelRegistry: require("../frontend-p4b/assets/js/model-registry"),
@@ -182,7 +185,7 @@ test("a saved Provider model survives refresh and matches the switcher and chat 
   refreshedPage.window.AppProvider = { send() {}, stream() {} };
   vm.runInNewContext(apiSource, refreshedPage);
   const body = refreshedPage.window.AppAPI.buildRequestBody([{ role: "user", content: "测试" }], true);
-  assert.equal(body.model, DEFAULT_MODEL);
+  assert.equal(body.model, DEFAULT_REQUEST_MODEL);
 });
 
 test("Provider type and API path migrate through the single Provider config source", () => {
@@ -216,8 +219,45 @@ test("settings keeps API keys masked and edits the same Provider config", () => 
   const script = fs.readFileSync(path.join(__dirname, "..", "frontend-p4b", "assets/js/settings.js"), "utf8");
   assert.match(html, /name="type"/);
   assert.match(html, /name="endpoint"/);
+  assert.match(html, /name="displayName"/);
+  assert.match(html, /实际请求模型名/);
+  assert.match(html, /model_not_found/);
   assert.match(html, /name="token" type="password"/);
   assert.match(html, /data-provider-panel-token/);
   assert.match(script, /configStore\.saveProviderConfig\(readFormConfig\(\)\)/);
   assert.doesNotMatch(script, /console\.(?:log|info|debug)\([^)]*token/);
+});
+
+test("legacy short model migrates to the known request model without conflating displayName", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "frontend-p4b", "assets", "js", "data.js"), "utf8");
+  let stored = JSON.stringify({ model: DEFAULT_MODEL, mode: "real" });
+  const context = {
+    window: {},
+    localStorage: { getItem: () => stored, setItem(_key, value) { stored = value; } },
+    JSON, Object, String, Boolean, Set
+  };
+  vm.runInNewContext(source, context);
+  const migrated = context.window.AppConfig.getProviderConfig();
+  assert.equal(migrated.displayName, "Claude Opus 4.6");
+  assert.equal(migrated.model, DEFAULT_REQUEST_MODEL);
+  context.window.AppConfig.saveProviderConfig({ ...migrated, displayName: "自定义显示", model: DEFAULT_MODEL });
+  assert.equal(context.window.AppConfig.getProviderConfig().model, DEFAULT_MODEL);
+  assert.equal(context.window.AppConfig.getProviderConfig().displayName, "自定义显示");
+});
+
+test("chat request body uses provider model and never displayName", () => {
+  const apiSource = fs.readFileSync(path.join(__dirname, "..", "frontend-p4b", "assets", "js", "api.js"), "utf8");
+  const context = {
+    window: {
+      AppData: { MODEL_CONFIG: { model: "fallback", stream: true } },
+      AppConfig: { getProviderConfig: () => ({ model: "real-upstream-model", displayName: "Friendly Model" }) },
+      MessageProtocol: { toOpenAIMessages: value => value },
+      AppProvider: { send() {}, stream() {} }
+    },
+    Array, AbortController, Set, String, TypeError
+  };
+  vm.runInNewContext(apiSource, context);
+  const body = context.window.AppAPI.buildRequestBody([{ role: "user", content: "test" }]);
+  assert.equal(body.model, "real-upstream-model");
+  assert.equal("displayName" in body, false);
 });

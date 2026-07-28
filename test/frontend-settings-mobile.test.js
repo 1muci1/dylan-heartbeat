@@ -25,13 +25,15 @@ const memoryStorage = () => {
 test("settings exposes both avatar entries and opens the native file input from the click handler", () => {
   const html = read("settings.html");
   const script = read("assets/js/avatar-chat.js");
+  const picker = fs.readFileSync(path.join(__dirname, "..", "ai-companion-frontend", "avatar", "avatar-picker.js"), "utf8");
   const css = read("assets/css/settings.css");
   assert.match(html, /data-avatar-target="user"[^>]*>更改我的头像/);
   assert.match(html, /data-avatar-target="chen"[^>]*>更改沉沉头像/);
-  assert.match(script, /data-avatar-editor-file/);
-  assert.match(script, /fileInput\.click\(\)/);
-  assert.match(script, /reader\.readAsDataURL\(file\)/);
-  assert.match(script, /saveAvatar\([^;]+target\)/s);
+  assert.match(script, /CompanionAvatarPicker\?\.mount/);
+  assert.match(picker, /data-avatar-editor-file/);
+  assert.match(picker, /fileInput\.click\(\)/);
+  assert.match(picker, /reader\.readAsDataURL\(file\)/);
+  assert.match(picker, /store\.saveAvatar\([^;]+target\)/s);
   assert.match(css, /\.avatar-editor-modal/);
   assert.match(css, /\.avatar-editor__pick input/);
 });

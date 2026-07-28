@@ -8,6 +8,7 @@
   const MODELS = Object.freeze([
     Object.freeze({
       id: "claude-opus-4-6",
+      requestModel: "[脆卷-kiro-0.08]claude-opus-4-6",
       name: "Claude Opus 4.6",
       provider: "Anthropic",
       icon: "C",
@@ -18,6 +19,7 @@
     }),
     Object.freeze({
       id: "gpt-5",
+      requestModel: "gpt-5",
       name: "GPT-5",
       provider: "OpenAI",
       icon: "G",
@@ -28,6 +30,7 @@
     }),
     Object.freeze({
       id: "companion-default",
+      requestModel: "companion-default",
       name: "沉 · Companion",
       provider: "Dylan Gateway",
       icon: "沉",
@@ -39,6 +42,7 @@
   ]);
 
   const byId = id => MODELS.find(model => model.id === id) || null;
+  const byRequestModel = requestModel => MODELS.find(model => model.requestModel === requestModel) || null;
   const list = ({ enabledOnly = false } = {}) => MODELS.filter(model => !enabledOnly || model.enabled);
   const isValidId = id => Boolean(byId(id)?.enabled);
   const requireId = id => {
@@ -50,5 +54,5 @@
     return id;
   };
 
-  return { MODELS, byId, list, isValidId, requireId };
+  return { MODELS, byId, byRequestModel, list, isValidId, requireId };
 });

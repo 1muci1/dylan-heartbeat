@@ -21,6 +21,13 @@ test("user and Chen avatars persist independently and reload", () => {
   assert.equal(restored.avatar.userAvatar.imageData.startsWith("blob:"), false);
 });
 
+test("user avatar persistence rejects transient blob URLs", () => {
+  const storage = memoryStorage();
+  const store = new UserPreferenceStore({ storage });
+  store.saveAvatar({ source: "upload", imageData: "blob:https://example.test/transient" }, "user");
+  assert.equal(new UserPreferenceStore({ storage }).loadSync().avatar.userAvatar.imageData, null);
+});
+
 test("chat background persists and can be cleared", () => {
   const storage = memoryStorage();
   const store = new UserPreferenceStore({ storage });
@@ -34,6 +41,7 @@ test("chat exposes Chen avatar editor and background preference hooks", () => {
   const html = fs.readFileSync(path.join(frontend, "chat.html"), "utf8");
   const chat = fs.readFileSync(path.join(frontend, "assets/js/chat.js"), "utf8");
   const script = fs.readFileSync(path.join(frontend, "assets/js/avatar-chat.js"), "utf8");
+  const picker = fs.readFileSync(path.join(__dirname, "..", "ai-companion-frontend/avatar/avatar-picker.js"), "utf8");
   const preferences = fs.readFileSync(path.join(frontend, "assets/js/chat-preferences.js"), "utf8");
   const settings = fs.readFileSync(path.join(frontend, "assets/js/settings.js"), "utf8");
   const home = fs.readFileSync(path.join(__dirname, "..", "ai-companion-frontend/home/home.js"), "utf8");
@@ -45,7 +53,11 @@ test("chat exposes Chen avatar editor and background preference hooks", () => {
   assert.match(preferences, /store\.load\(\)\.then\(apply\)\.catch/);
   assert.match(preferences, /getChatBackground/);
   assert.match(preferences, /--chat-bg-image/);
-  assert.match(script, /saveAvatar/);
+  assert.match(script, /CompanionAvatarPicker\?\.mount/);
+  assert.match(picker, /saveAvatar/);
+  assert.match(picker, /readAsDataURL/);
+  assert.match(picker, /data:image\//);
+  assert.match(picker, /pending\.startsWith\("blob:"\)/);
   assert.match(script, /message-avatar--assistant/);
   assert.match(script, /message-avatar--user/);
   assert.match(script, /getUserAvatarImage/);

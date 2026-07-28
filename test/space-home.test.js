@@ -79,6 +79,7 @@ test("Space Home page loads the upgraded hero and navigation structure", () => {
   const html = fs.readFileSync(path.join(homeRoot, "index.html"), "utf8");
   const css = fs.readFileSync(path.join(homeRoot, "home.css"), "utf8");
   const js = fs.readFileSync(path.join(homeRoot, "home.js"), "utf8");
+  const picker = fs.readFileSync(path.join(appRoot, "avatar", "avatar-picker.js"), "utf8");
   for (const token of [
     "data-home-shell",
     "data-home-hero",
@@ -105,6 +106,14 @@ test("Space Home page loads the upgraded hero and navigation structure", () => {
   }
   assert.match(css + js, /is-home-hero-animated/);
   assert.match(css + js, /is-home-entering/);
+  assert.match(html, /data-home-user-avatar data-avatar-target="user"/);
+  assert.match(html, /avatar\/avatar-picker\.js/);
+  assert.match(js, /CompanionAvatarPicker\?\.mount/);
+  assert.match(js, /selector:\s*"\[data-home-user-avatar\]"/);
+  assert.match(picker, /trigger\.addEventListener\("click"/);
+  assert.match(picker, /fileInput\.click\(\)/);
+  assert.match(picker, /readAsDataURL\(file\)/);
+  assert.match(picker, /store\.saveAvatar\([\s\S]*target/);
 });
 
 test("Root entry redirects into Home while preserving AppConfig bootstrap", () => {

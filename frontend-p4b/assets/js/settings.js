@@ -128,6 +128,7 @@ document.addEventListener("DOMContentLoaded", () => {
     mode: fields.enabled.checked ? "real" : "mock",
     baseUrl: fields.baseUrl.value.trim(),
     endpoint: fields.endpoint.value.trim(),
+    displayName: fields.displayName.value.trim(),
     model: fields.model.value.trim(),
     auth: {
       type: "bearer",
@@ -143,8 +144,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (modeLabel) modeLabel.textContent = fields.enabled.checked ? "REAL" : "MOCK";
   };
   const updateCurrentSummary = (config) => {
-    const registeredModel = window.CompanionModelRegistry?.byId?.(config.model);
-    if (currentModel) currentModel.textContent = registeredModel?.name || config.model || "Claude Opus 4.6";
+    const registeredModel = window.CompanionModelRegistry?.byRequestModel?.(config.model)
+      || window.CompanionModelRegistry?.byId?.(config.model);
+    if (currentModel) currentModel.textContent = config.displayName || registeredModel?.name || config.model || "Claude Opus 4.6";
     if (currentProvider) currentProvider.textContent = providerNames[config.type] || config.type || "Provider 未配置";
   };
   updateModeLabel();

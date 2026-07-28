@@ -1,11 +1,12 @@
-const CACHE_NAME = "xinban-shell-v27-p4b";
+const CACHE_NAME = "xinban-shell-v28-p4b";
 const STALE_CACHE_NAMES = new Set([
   "xinban-shell-v21-p4b",
   "xinban-shell-v22-p4b",
   "xinban-shell-v23-p4b",
   "xinban-shell-v24-p4b",
   "xinban-shell-v25-p4b",
-  "xinban-shell-v26-p4b"
+  "xinban-shell-v26-p4b",
+  "xinban-shell-v27-p4b"
 ]);
 const APP_SHELL = [
   "./",
@@ -23,6 +24,7 @@ const APP_SHELL = [
   "./assets/css/chat.css",
   "./assets/css/dashboard.css",
   "./assets/css/settings.css",
+  "/shared/provider-config-panel.css",
   "./assets/css/memory.css",
   "./assets/css/stickers.css",
   "./assets/css/ai-memory-review.css",
@@ -42,6 +44,8 @@ const APP_SHELL = [
   "./assets/js/chat-preferences.js",
   "./assets/js/avatar-chat.js",
   "./assets/js/settings-return.js",
+  "./assets/js/settings-section.js",
+  "/shared/provider-config-panel.js",
   "./assets/js/chat.js",
   "./assets/js/dashboard.js",
   "./assets/js/settings.js",

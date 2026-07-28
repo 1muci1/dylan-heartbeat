@@ -115,6 +115,17 @@
 .appearance-result { min-height:14px; margin-top:8px; color:var(--primary); font-size:9px; text-align:center; }
 .settings-zone { scroll-margin-top:16px; }
 .settings-zone--model { padding-top:2px; }
+.settings-page[data-settings-section="model"] .settings-zone--appearance,
+.settings-page[data-settings-section="model"] .preference-data-settings,
+.settings-page[data-settings-section="model"] .memory-import { display:none; }
+.settings-page[data-settings-section="appearance"] .settings-zone--model,
+.settings-page[data-settings-section="appearance"] .preference-data-settings,
+.settings-page[data-settings-section="appearance"] .memory-import { display:none; }
+.settings-page[data-settings-section="model"] .settings-zone--model,
+.settings-page[data-settings-section="appearance"] .settings-zone--appearance { min-height:calc(100dvh - 190px); }
+.provider-config-dialog .provider-form { margin:0; border:0; border-radius:0; background:transparent; box-shadow:none; }
+.provider-config-dialog .provider-field { margin-bottom:0; }
+.provider-config-dialog .provider-config-actions { grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:4px; }
 .provider-field select { width:100%; min-height:44px; padding:0 13px; border:1px solid rgba(109,84,124,.16); border-radius:13px; outline:none; color:#5d5362; background:#fcfbfd; font-size:11px; }
 .provider-secret { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:7px; }
 .provider-secret button { min-width:54px; border:1px solid rgba(109,84,124,.16); border-radius:12px; color:var(--primary); background:var(--surface-soft); font-size:10px; }

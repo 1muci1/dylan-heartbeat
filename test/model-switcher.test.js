@@ -74,8 +74,9 @@ test("settings and chat consume the registry without changing runtime code", () 
   const settings = fs.readFileSync(path.join(__dirname, "..", "frontend-p4b", "settings.html"), "utf8");
   const chat = fs.readFileSync(path.join(__dirname, "..", "frontend-p4b", "chat.html"), "utf8");
   const switcher = fs.readFileSync(switcherSource, "utf8");
-  assert.match(settings, /data-model-list/);
-  assert.match(settings, /data-auto-model/);
+  assert.match(settings, /data-open-global-provider/);
+  assert.match(settings, /data-global-provider-dialog/);
+  assert.doesNotMatch(settings, /data-model-list/);
   assert.match(settings, /src="\/storage\/user-preference-store\.js"/);
   assert.doesNotMatch(settings, /ai-companion-frontend\/storage\/user-preference-store\.js/);
   assert.match(chat, /data-model-badge/);
@@ -86,7 +87,7 @@ test("settings and chat consume the registry without changing runtime code", () 
 test("model UI remains theme-token based", () => {
   const css = fs.readFileSync(path.join(__dirname, "..", "frontend-p4b", "assets", "css", "settings.css"), "utf8");
   assert.match(css, /--primary|var\(--primary\)/);
-  assert.match(css, /model-option\.is-selected/);
+  assert.match(css, /model-current/);
   assert.match(css, /:root\[data-app-style/);
 });
 
@@ -216,7 +217,7 @@ test("settings keeps API keys masked and edits the same Provider config", () => 
   assert.match(html, /name="type"/);
   assert.match(html, /name="endpoint"/);
   assert.match(html, /name="token" type="password"/);
-  assert.match(html, /data-toggle-provider-token/);
+  assert.match(html, /data-provider-panel-token/);
   assert.match(script, /configStore\.saveProviderConfig\(readFormConfig\(\)\)/);
   assert.doesNotMatch(script, /console\.(?:log|info|debug)\([^)]*token/);
 });

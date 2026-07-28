@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { test } = require("node:test");
 const { resolveReturnTarget } = require("../frontend-p4b/assets/js/settings-return");
+const settingsSection = require("../frontend-p4b/assets/js/settings-section");
 
 const frontend = path.join(__dirname, "..", "frontend-p4b");
 const read = relative => fs.readFileSync(path.join(frontend, relative), "utf8");
@@ -58,4 +59,52 @@ test("settings exposes native model and appearance anchors without changing defa
     }),
     "/home/"
   );
+});
+
+test("settings hashes select one visual section while no hash keeps the complete page", () => {
+  const css = read("assets/css/settings.css");
+  const createDocument = () => {
+    const title = { textContent: "" };
+    return { body: { dataset: {} }, querySelector: () => title, title };
+  };
+  const modelDocument = createDocument();
+  assert.equal(settingsSection.apply(modelDocument, "#model"), "model");
+  assert.equal(modelDocument.body.dataset.settingsSection, "model");
+  assert.equal(modelDocument.title.textContent, "模型设置");
+  const appearanceDocument = createDocument();
+  assert.equal(settingsSection.apply(appearanceDocument, "#appearance"), "appearance");
+  assert.equal(appearanceDocument.body.dataset.settingsSection, "appearance");
+  assert.equal(appearanceDocument.title.textContent, "小世界美化");
+  const allDocument = createDocument();
+  assert.equal(settingsSection.apply(allDocument, ""), "all");
+  assert.equal(allDocument.body.dataset.settingsSection, "all");
+  assert.match(css, /data-settings-section="model"[\s\S]*settings-zone--appearance/);
+  assert.match(css, /data-settings-section="appearance"[\s\S]*settings-zone--model/);
+});
+
+test("global model settings use the shared Provider configuration dialog", () => {
+  const html = read("settings.html");
+  const js = read("assets/js/settings.js");
+  assert.match(html, /data-open-global-provider>配置模型/);
+  assert.match(html, /data-global-provider-dialog/);
+  for (const field of ["type", "baseUrl", "endpoint", "token", "model", "enabled"]) {
+    assert.match(html, new RegExp(`name="${field}"`));
+  }
+  assert.match(html, /data-provider-panel-token/);
+  assert.match(html, />取消</);
+  assert.match(html, />保存</);
+  assert.match(js, /data-open-global-provider[\s\S]*providerPanel\.open/);
+  assert.match(js, /saveProviderConfig\(readFormConfig\(\)\)/);
+  assert.doesNotMatch(js, /console\.(?:log|debug|info)\s*\(/);
+});
+
+test("settings and council load the same Provider panel controller and stylesheet", () => {
+  const settings = read("settings.html");
+  const council = fs.readFileSync(path.join(__dirname, "..", "ai-companion-frontend", "collaboration", "index.html"), "utf8");
+  for (const asset of ["/shared/provider-config-panel.css", "/shared/provider-config-panel.js"]) {
+    assert.match(settings, new RegExp(asset.replace(/[./]/g, "\\$&")));
+    assert.match(council, new RegExp(asset.replace(/[./]/g, "\\$&")));
+  }
+  assert.match(settings, /class="provider-config-dialog"/);
+  assert.match(council, /class="provider-config-dialog"/);
 });

@@ -1,4 +1,8 @@
 document.addEventListener("DOMContentLoaded", () => {
+  const applySettingsSection = () => window.CompanionSettingsSection?.apply(document, window.location.hash);
+  applySettingsSection();
+  window.addEventListener("hashchange", applySettingsSection);
+
   const backLink = document.querySelector("[data-settings-back]");
   const returnResolver = window.CompanionSettingsReturn;
   if (backLink && returnResolver) {
@@ -94,35 +98,34 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   const configStore = window.AppConfig;
   const provider = window.AppProvider;
-  const form = document.querySelector(".provider-form");
+  const dialog = document.querySelector("[data-global-provider-dialog]");
+  const providerPanel = window.CompanionProviderConfigPanel?.bind(dialog);
+  const form = dialog?.querySelector("[data-provider-config-form]");
   const result = document.querySelector(".provider-result");
   const testButton = document.querySelector("[data-test-connection]");
-  const debugButton = document.querySelector("[data-debug-request]");
-  const debugPanel = document.querySelector(".provider-debug");
-  if (!configStore || !provider || !form || !result || !testButton
-    || !debugButton || !debugPanel) return;
+  if (!configStore || !provider || !providerPanel || !form || !result || !testButton) return;
 
-  const fields = {
-    type: form.elements.type,
-    baseUrl: form.elements.baseUrl,
-    endpoint: form.elements.endpoint,
-    model: form.elements.model,
-    token: form.elements.token,
-    realMode: form.elements.realMode
-  };
+  const fields = providerPanel.fields;
   const storedConfig = configStore.getProviderConfig();
   preferenceStore?.saveModel(storedConfig.model);
-  fields.type.value = storedConfig.type;
-  fields.baseUrl.value = storedConfig.baseUrl;
-  fields.endpoint.value = storedConfig.endpoint;
-  fields.model.value = storedConfig.model;
-  fields.token.value = storedConfig.auth.token;
-  fields.realMode.checked = storedConfig.mode === "real";
+  providerPanel.fill({
+    ...storedConfig,
+    token: storedConfig.auth.token,
+    enabled: storedConfig.mode === "real"
+  });
   const modeLabel = document.querySelector("[data-provider-mode]");
+  const currentModel = document.querySelector("[data-current-model]");
+  const currentProvider = document.querySelector("[data-current-model-provider]");
+  const providerNames = {
+    dylan: "Dylan Gateway",
+    gateway: "OpenAI-compatible Gateway",
+    openai: "OpenAI",
+    anthropic: "Anthropic-compatible"
+  };
 
   const readFormConfig = () => ({
     type: fields.type.value,
-    mode: fields.realMode.checked ? "real" : "mock",
+    mode: fields.enabled.checked ? "real" : "mock",
     baseUrl: fields.baseUrl.value.trim(),
     endpoint: fields.endpoint.value.trim(),
     model: fields.model.value.trim(),
@@ -137,27 +140,41 @@ document.addEventListener("DOMContentLoaded", () => {
     result.className = `provider-result ${type ? `is-${type}` : ""}`.trim();
   };
   const updateModeLabel = () => {
-    if (modeLabel) modeLabel.textContent = fields.realMode.checked ? "REAL" : "MOCK";
+    if (modeLabel) modeLabel.textContent = fields.enabled.checked ? "REAL" : "MOCK";
+  };
+  const updateCurrentSummary = (config) => {
+    const registeredModel = window.CompanionModelRegistry?.byId?.(config.model);
+    if (currentModel) currentModel.textContent = registeredModel?.name || config.model || "Claude Opus 4.6";
+    if (currentProvider) currentProvider.textContent = providerNames[config.type] || config.type || "Provider 未配置";
   };
   updateModeLabel();
+  updateCurrentSummary(storedConfig);
   if (!storedConfig.baseUrl) showResult("未配置", "error");
 
-  fields.realMode.addEventListener("change", updateModeLabel);
-  document.querySelector("[data-toggle-provider-token]")?.addEventListener("click", (event) => {
-    const showing = fields.token.type === "text";
-    fields.token.type = showing ? "password" : "text";
-    event.currentTarget.textContent = showing ? "显示" : "隐藏";
-    event.currentTarget.setAttribute("aria-label", showing ? "显示 API Key" : "隐藏 API Key");
+  fields.enabled.addEventListener("change", updateModeLabel);
+  document.querySelector("[data-open-global-provider]")?.addEventListener("click", () => {
+    const config = configStore.getProviderConfig();
+    providerPanel.open({
+      title: "配置聊天模型",
+      values: {
+        ...config,
+        token: config.auth.token,
+        enabled: config.mode === "real"
+      }
+    });
   });
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     const config = configStore.saveProviderConfig(readFormConfig());
     preferenceStore?.saveModel(config.model);
+    updateCurrentSummary(config);
+    updateModeLabel();
     showResult(
       config.mode === "real" ? "配置已保存，真实模式已开启。" : "配置已保存，当前为 mock 模式。",
       "success"
     );
+    window.setTimeout(() => providerPanel.close(), 350);
   });
 
   testButton.addEventListener("click", async () => {
@@ -176,31 +193,6 @@ document.addEventListener("DOMContentLoaded", () => {
     } finally {
       testButton.disabled = false;
       testButton.textContent = originalLabel;
-    }
-  });
-
-  debugButton.addEventListener("click", async () => {
-    const config = configStore.saveProviderConfig(readFormConfig());
-    preferenceStore?.saveModel(config.model);
-    debugButton.disabled = true;
-    const originalLabel = debugButton.textContent;
-    debugButton.textContent = "请求中…";
-    debugPanel.hidden = false;
-
-    try {
-      const debugResult = await provider.debugRequest();
-      debugPanel.querySelector("[data-debug-url]").textContent = debugResult.url || "—";
-      debugPanel.querySelector("[data-debug-status]").textContent = debugResult.status || "未发送";
-      debugPanel.querySelector("[data-debug-structure]").textContent = JSON.stringify(
-        debugResult.structure,
-        null,
-        2
-      );
-      debugPanel.querySelector("[data-debug-sse]").textContent = debugResult.sse ? "正常" : "否";
-      showResult(debugResult.status ? "真实请求调试完成" : "真实请求未发送", debugResult.status ? "success" : "error");
-    } finally {
-      debugButton.disabled = false;
-      debugButton.textContent = originalLabel;
     }
   });
 

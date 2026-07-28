@@ -9,11 +9,14 @@
   <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="assets/css/common.css">
   <link rel="stylesheet" href="assets/css/settings.css">
+  <link rel="stylesheet" href="/shared/provider-config-panel.css">
   <script src="assets/js/appearance.js"></script>
+  <script src="assets/js/settings-section.js"></script>
   <script src="/storage/user-preference-store.js"></script>
   <title>心伴 · Provider 设置</title>
 </head>
 <body class="settings-page" data-page="settings">
+  <script>window.CompanionSettingsSection?.apply(document, window.location.hash);</script>
   <main class="app-shell settings-shell">
     <header class="settings-header">
       <a class="settings-header__back" href="/home/" aria-label="返回上一页" data-settings-back>
@@ -21,7 +24,7 @@
       </a>
       <div>
         <p>PROVIDER SETTINGS</p>
-        <h1>Dylan Gateway</h1>
+        <h1 data-settings-page-title>Dylan Gateway</h1>
       </div>
       <span class="settings-header__mode" data-provider-mode>MOCK</span>
     </header>
@@ -77,32 +80,24 @@
       <div class="model-settings__heading">
         <span>AI MODEL</span>
         <h2 id="model-settings-title">模型设置</h2>
-        <p>选择当前聊天使用的模型。模型列表由前端 Registry 管理。</p>
+        <p>查看当前聊天模型，或打开统一 Provider 配置。</p>
       </div>
       <div class="model-current">
         <span class="model-current__icon">CC</span>
-        <div><small>当前模型</small><strong data-current-model>未配置模型</strong><span data-current-model-provider>Provider 未配置</span></div><button class="model-current__switch" type="button" data-model-toggle>切换模型</button>
-      </div>
-      <label class="model-auto"><span><strong>自动选择模型</strong><small>v1 只保存选择偏好，不会自动调用模型</small></span><input type="checkbox" data-auto-model><i aria-hidden="true"></i></label>
-      <div class="model-list" data-model-list aria-label="可用模型" hidden></div>
-      <p class="model-switcher-status" role="status" data-model-switcher-status></p>
-    </section>
-
-    <section class="settings-intro" aria-labelledby="settings-title">
-      <span class="settings-intro__icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24"><path d="M8 12h8M12 8v8"></path><circle cx="12" cy="12" r="8"></circle></svg>
-      </span>
-      <div>
-        <h2 id="settings-title">Provider 配置</h2>
-        <p>当前聊天保持 mock 模式。连接测试只探测 endpoint，不发送聊天内容。</p>
+        <div><small>当前模型</small><strong data-current-model>未配置模型</strong><span data-current-model-provider>Provider 未配置</span></div><button class="model-current__switch" type="button" data-open-global-provider>配置模型</button>
       </div>
     </section>
 
-    <form class="provider-form" novalidate>
+    <dialog class="provider-config-dialog" data-global-provider-dialog>
+    <form class="provider-form" data-provider-config-form novalidate>
+      <header>
+        <div><p>GLOBAL CHAT PROVIDER</p><h2 data-provider-panel-title>配置聊天模型</h2></div>
+        <button type="button" data-provider-panel-close aria-label="关闭">×</button>
+      </header>
       <label class="provider-field" for="provider-type">
         <span>Provider 类型</span>
         <small>选择当前 API 的兼容协议</small>
-        <select id="provider-type" name="type">
+        <select id="provider-type" name="type" data-provider-custom>
           <option value="dylan">Dylan Gateway</option>
           <option value="gateway">OpenAI-compatible Gateway</option>
           <option value="openai">OpenAI</option>
@@ -113,33 +108,33 @@
       <label class="provider-field" for="gateway-url">
         <span>API Base URL</span>
         <small>不包含 API Path</small>
-        <input id="gateway-url" name="baseUrl" type="url" inputmode="url" placeholder="https://gateway.example.com" autocomplete="url">
+        <input id="gateway-url" name="baseUrl" type="url" inputmode="url" placeholder="https://gateway.example.com" autocomplete="url" data-provider-custom>
       </label>
 
       <label class="provider-field" for="provider-endpoint">
         <span>API Path</span>
         <small>以 / 开头，例如 /v1/chat/completions</small>
-        <input id="provider-endpoint" name="endpoint" type="text" value="/v1/chat/completions" autocomplete="off">
+        <input id="provider-endpoint" name="endpoint" type="text" value="/v1/chat/completions" autocomplete="off" data-provider-custom>
       </label>
 
       <label class="provider-field" for="model-id">
         <span>模型 ID</span>
         <small>填写 Gateway 实际接受的 model 值</small>
-        <input id="model-id" name="model" type="text" placeholder="your-model-id" autocomplete="off">
+        <input id="model-id" name="model" type="text" placeholder="your-model-id" autocomplete="off" data-provider-custom>
       </label>
 
       <label class="provider-field" for="bearer-token">
         <span>API Key / Bearer Token</span>
         <small>仅填写短期令牌，不要使用长期上游 API Key</small>
-        <span class="provider-secret"><input id="bearer-token" name="token" type="password" placeholder="短期访问令牌" autocomplete="new-password"><button type="button" data-toggle-provider-token aria-label="显示 API Key">显示</button></span>
+        <span class="provider-config-secret"><input id="bearer-token" name="token" type="password" placeholder="短期访问令牌" autocomplete="new-password" data-provider-custom><button type="button" data-provider-panel-token aria-label="显示 API Key">显示</button></span>
       </label>
 
-      <label class="provider-mode" for="real-mode">
+      <label class="provider-mode provider-config-enabled" for="real-mode">
         <span class="provider-mode__copy">
           <strong>真实模式</strong>
           <small>开启后，正常聊天将连接已配置的 Dylan Gateway</small>
         </span>
-        <input id="real-mode" name="realMode" type="checkbox">
+        <input id="real-mode" name="enabled" type="checkbox" data-provider-custom>
         <span class="provider-mode__switch" aria-hidden="true"></span>
       </label>
 
@@ -148,30 +143,15 @@
         <p>Token 将保存在当前浏览器的 localStorage。请仅使用可撤销、短期且权限受限的令牌。</p>
       </div>
 
-      <div class="provider-actions">
+      <p class="provider-result" data-provider-panel-status role="status" aria-live="polite"></p>
+
+      <div class="provider-config-actions">
+        <button class="provider-button provider-button--secondary" type="button" data-provider-panel-close>取消</button>
         <button class="provider-button provider-button--secondary" type="button" data-test-connection>测试连接</button>
-        <button class="provider-button provider-button--primary" type="submit">保存配置</button>
-        <button class="provider-button provider-button--debug" type="button" data-debug-request>保存配置后测试真实请求</button>
+        <button class="provider-button provider-button--primary" type="submit">保存</button>
       </div>
-
-      <p class="provider-result" role="status" aria-live="polite"></p>
-
-      <section class="provider-debug" aria-labelledby="debug-title" hidden>
-        <div class="provider-debug__heading">
-          <div>
-            <span>REAL REQUEST DEBUG</span>
-            <h2 id="debug-title">联调结果</h2>
-          </div>
-          <small>仅发送 ping，不写入聊天</small>
-        </div>
-        <dl>
-          <div><dt>请求 URL</dt><dd><code data-debug-url>—</code></dd></div>
-          <div><dt>HTTP 状态</dt><dd data-debug-status>—</dd></div>
-          <div><dt>返回结构</dt><dd><pre data-debug-structure>—</pre></dd></div>
-          <div><dt>SSE</dt><dd data-debug-sse>—</dd></div>
-        </dl>
-      </section>
     </form>
+    </dialog>
     </div>
 
     <section class="preference-data-settings" aria-labelledby="preference-data-title">
@@ -239,6 +219,7 @@
   <script src="assets/js/common.js"></script>
   <script src="assets/js/avatar-chat.js"></script>
   <script src="assets/js/settings-return.js"></script>
+  <script src="/shared/provider-config-panel.js"></script>
   <script src="assets/js/settings.js"></script>
 </body>
 </html>

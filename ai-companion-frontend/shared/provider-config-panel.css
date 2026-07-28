@@ -1,0 +1,18 @@
+.provider-config-dialog { width:min(calc(100% - 28px),430px); max-height:min(88vh,720px); padding:0; overflow:auto; border:1px solid rgba(255,255,255,.9); border-radius:24px; color:var(--provider-panel-ink,#51475a); background:var(--provider-panel-bg,#fbf9fc); box-shadow:0 24px 70px rgba(50,35,61,.24); }
+.provider-config-dialog::backdrop { background:rgba(35,26,42,.48); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); }
+.provider-config-dialog form { display:grid; gap:12px; padding:20px; }
+.provider-config-dialog header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.provider-config-dialog header p { margin:0 0 4px; color:var(--provider-panel-muted,#918697); font-size:9px; letter-spacing:.14em; }
+.provider-config-dialog header h2 { margin:0; font-size:20px; }
+.provider-config-dialog header > button { width:32px; height:32px; border:0; border-radius:50%; color:var(--provider-panel-primary,#76618a); background:var(--provider-panel-soft,#eee6f4); font-size:20px; }
+.provider-config-dialog label { display:grid; gap:6px; color:var(--provider-panel-label,#766a7c); font-size:10px; font-weight:600; }
+.provider-config-dialog input,.provider-config-dialog select { width:100%; min-height:42px; padding:0 11px; border:1px solid rgba(109,84,124,.16); border-radius:12px; color:var(--provider-panel-ink,#51475a); background:#fff; }
+.provider-config-dialog input:disabled,.provider-config-dialog select:disabled { opacity:.55; }
+.provider-config-secret { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:7px; }
+.provider-config-secret button { min-width:52px; border:1px solid rgba(103,78,119,.12); border-radius:11px; color:var(--provider-panel-primary,#76618a); background:var(--provider-panel-soft,#eee6f4); }
+.provider-config-enabled { display:flex!important; align-items:center; justify-content:space-between; }
+.provider-config-enabled input { width:20px; min-height:20px; }
+.provider-config-dialog [data-provider-panel-status] { min-height:15px; margin:0; color:var(--provider-panel-muted,#918697); font-size:10px; text-align:center; }
+.provider-config-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+.provider-config-actions button { min-height:42px; border:1px solid rgba(103,78,119,.12); border-radius:12px; color:var(--provider-panel-primary,#76618a); background:#f3edf6; }
+.provider-config-actions button[type="submit"] { border:0; color:#fff; background:linear-gradient(145deg,#89709e,#604c70); }

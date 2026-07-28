@@ -111,6 +111,12 @@
 .session-drawer__header strong { display: block; color: #51465a; font-size: 18px; }
 .session-status { display: block; margin-top: 4px; color: #9b909f; font-size: 9px; }
 .session-close { width: 34px; height: 34px; border: 0; border-radius: 50%; color: #75647f; background: #eee8f2; font-size: 22px; }
+.session-appearance-link { display:grid; grid-template-columns:34px minmax(0,1fr) auto; align-items:center; gap:10px; margin-bottom:10px; padding:11px; border:1px solid rgba(112,86,132,.13); border-radius:14px; color:#5b4d64; background:linear-gradient(145deg,#f4eef8,#ece3f2); }
+.session-appearance-link > span:first-child { display:grid; width:34px; height:34px; place-items:center; border-radius:11px; color:#fff; background:linear-gradient(145deg,#8d70a7,#665074); }
+.session-appearance-link > span:nth-child(2) { display:grid; gap:3px; min-width:0; }
+.session-appearance-link strong { font-size:12px; }
+.session-appearance-link small { color:#8f8195; font-size:9px; }
+.session-appearance-link > span:last-child { color:#806c8c; font-size:20px; }
 .session-new { width: 100%; padding: 11px; border: 0; border-radius: 12px; color: white; background: linear-gradient(145deg, #846c9b, #5d496d); }
 .session-list { display: flex; overflow-y: auto; gap: 7px; max-height: calc(100% - 110px); margin-top: 14px; flex-direction: column; }
 .session-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; padding: 10px; border: 1px solid rgba(105,83,121,.07); border-radius: 12px; background: rgba(255,255,255,.72); }

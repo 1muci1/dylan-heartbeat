@@ -1,9 +1,10 @@
-const CACHE_NAME = "xinban-shell-v25-p4b";
+const CACHE_NAME = "xinban-shell-v26-p4b";
 const STALE_CACHE_NAMES = new Set([
   "xinban-shell-v21-p4b",
   "xinban-shell-v22-p4b",
   "xinban-shell-v23-p4b",
-  "xinban-shell-v24-p4b"
+  "xinban-shell-v24-p4b",
+  "xinban-shell-v25-p4b"
 ]);
 const APP_SHELL = [
   "./",

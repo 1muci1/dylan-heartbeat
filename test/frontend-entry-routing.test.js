@@ -11,8 +11,7 @@ const canonicalRoutes = [
   'href="/home/"',
   'href="/game/"',
   'href="/frontend-p4b/chat.html"',
-  'href="/collaboration/"',
-  'href="/space/"'
+  'href="/collaboration/"'
 ];
 
 test("root entry and legacy chat entry route into the canonical companion shell", () => {
@@ -33,6 +32,8 @@ test("new Home and Chat navigation use canonical absolute routes", () => {
     assert.match(home, new RegExp(route.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.match(chat, new RegExp(route.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
+  assert.match(home, /href="\/space\/"/);
+  assert.match(chat, /href="\/frontend-p4b\/settings\.html\?returnTo=%2Ffrontend-p4b%2Fchat\.html"/);
   assert.doesNotMatch(home, /href="\/chat\.html"/);
   assert.doesNotMatch(chat, /<title>心伴/);
 });

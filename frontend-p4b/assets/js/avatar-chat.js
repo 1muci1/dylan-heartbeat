@@ -64,7 +64,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const saveButton = modal.querySelector("[data-avatar-editor-save]");
   const status = modal.querySelector("[data-avatar-editor-status]");
   const close = () => { modal.hidden = true; pending = null; if (fileInput) fileInput.value = ""; };
-  const open = nextTarget => { target = nextTarget === "user" ? "user" : "chen"; modal.hidden = false; status.textContent = `正在编辑${target === "user" ? "我的头像" : "沉沉头像"}`; };
+  const open = nextTarget => {
+    target = nextTarget === "user" ? "user" : "chen";
+    modal.hidden = false;
+    status.textContent = `正在编辑${target === "user" ? "我的头像" : "沉沉头像"}`;
+    if (fileInput) {
+      fileInput.value = "";
+      fileInput.click();
+    }
+  };
   document.querySelectorAll("[data-avatar-target]").forEach(button => button.addEventListener("click", () => open(button.dataset.avatarTarget)));
   modal.querySelector(".avatar-editor__close")?.addEventListener("click", close);
   modal.querySelector("[data-avatar-editor-cancel]")?.addEventListener("click", close);

@@ -136,7 +136,9 @@
     });
     documentRef.querySelectorAll("[data-model-badge]").forEach(node => {
       node.addEventListener("click", () => {
-        if (windowRef?.location) windowRef.location.href = "settings.html#model-settings-title";
+        if (!windowRef?.location) return;
+        const currentRoute = `${windowRef.location.pathname || "/frontend-p4b/chat.html"}${windowRef.location.search || ""}${windowRef.location.hash || ""}`;
+        windowRef.location.href = `settings.html?returnTo=${encodeURIComponent(currentRoute)}#model-settings-title`;
       });
     });
     render();

@@ -128,3 +128,15 @@
 :root[data-app-style="mist"] { color-scheme:light; --bg:#faf7fa; --surface:#fff; --surface-soft:#f2ecf4; --text:#39333e; --muted:#827986; --line:rgba(91,67,104,.12); }
 :root[data-app-font="serif"] body { font-family:"Songti SC","STSong","Noto Serif SC",serif; }
 :root[data-app-font="rounded"] body { font-family:"Arial Rounded MT Bold","PingFang SC",sans-serif; }
+.avatar-editor-modal { position:fixed; z-index:60; inset:0; display:grid; place-items:center; padding:20px; background:rgba(4,4,8,.62); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+.avatar-editor-modal[hidden] { display:none; }
+.avatar-editor { width:min(100%,340px); padding:22px; border:1px solid var(--line); border-radius:24px; color:var(--text); background:var(--surface); box-shadow:var(--shadow); }
+.avatar-editor h2 { margin:0; font-size:20px; }
+.avatar-editor p { color:var(--muted); font-size:11px; line-height:1.6; }
+.avatar-editor__close { float:right; width:30px; height:30px; border:0; border-radius:50%; color:var(--muted); background:var(--surface-soft); font-size:20px; }
+.avatar-editor__preview { display:grid; width:132px; height:132px; margin:16px auto; place-items:center; border:1px solid var(--line); border-radius:50%; color:var(--muted); background-position:center; background-size:cover; }
+.avatar-editor__pick { display:block; padding:11px; border:1px solid var(--line); border-radius:12px; color:var(--primary-dark); background:var(--primary-light); text-align:center; font-size:11px; cursor:pointer; }
+.avatar-editor__pick input { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+.avatar-editor__actions { display:flex; gap:8px; margin-top:12px; }
+.avatar-editor__actions button { flex:1; padding:10px; border:1px solid var(--line); border-radius:11px; color:var(--text); background:var(--surface-soft); }
+.avatar-editor__actions button:last-child { color:#fff; background:linear-gradient(145deg,var(--primary),#8b5cf6); }

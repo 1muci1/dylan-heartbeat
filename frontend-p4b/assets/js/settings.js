@@ -1,4 +1,15 @@
 document.addEventListener("DOMContentLoaded", () => {
+  const backLink = document.querySelector("[data-settings-back]");
+  const returnResolver = window.CompanionSettingsReturn;
+  if (backLink && returnResolver) {
+    backLink.href = returnResolver.resolveReturnTarget({
+      returnTo: new URLSearchParams(window.location.search).get("returnTo"),
+      referrer: document.referrer,
+      origin: window.location.origin,
+      settingsPath: window.location.pathname,
+      fallback: "/home/"
+    });
+  }
   const appearance = window.CompanionAppearance;
   if (appearance) {
     const current = appearance.read();

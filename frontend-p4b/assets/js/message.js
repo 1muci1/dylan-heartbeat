@@ -49,17 +49,15 @@
 
   const getConversationHistory = () => normalizeHistory(store.getState().messages);
 
+  const OMITTED_IMAGE_TEXT = "[图片已省略：当前模型未启用多模态]";
   const toOpenAIMessages = (history = getConversationHistory()) => normalizeHistory(history)
     .map(({ role, content, attachments, sticker }) => {
       if (role !== "user") return { role, content };
-      if (sticker?.id) return { role, content: [{ type: "sticker", sticker_id: sticker.id }] };
-      if (Array.isArray(attachments) && attachments.length) return {
-        role,
-        content: [
-          ...(content ? [{ type: "text", text: content }] : []),
-          ...attachments.map(item => ({ type: "image_url", image_url: { url: item.url } }))
-        ]
-      };
+      if (Array.isArray(attachments) && attachments.length) {
+        const text = content && content !== "[图片]" ? `${content}\n${OMITTED_IMAGE_TEXT}` : OMITTED_IMAGE_TEXT;
+        return { role, content: text };
+      }
+      if (sticker?.id) return { role, content: content || `[Sticker: ${sticker.label || "Sticker"}]` };
       return { role, content };
     });
 

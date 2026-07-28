@@ -107,9 +107,17 @@ test("Space Home page loads the upgraded hero and navigation structure", () => {
   assert.match(css + js, /is-home-hero-animated/);
   assert.match(css + js, /is-home-entering/);
   assert.match(html, /data-home-user-avatar data-avatar-target="user"/);
-  assert.match(html, /avatar\/avatar-picker\.js/);
+  assert.match(html, /storage\/user-preference-store\.js\?v=30/);
+  assert.match(html, /avatar\/avatar-picker\.js\?v=30/);
+  assert.match(html, /home\/home\.js\?v=30/);
+  assert.match(html, /type="button" data-home-user-avatar/);
   assert.match(js, /CompanionAvatarPicker\?\.mount/);
   assert.match(js, /selector:\s*"\[data-home-user-avatar\]"/);
+  assert.match(js, /DOMContentLoaded/);
+  assert.match(js, /mountFallbackUserAvatarPicker/);
+  assert.match(js, /data-home-user-avatar-file/);
+  assert.match(js, /readAsDataURL\(file\)/);
+  assert.match(js, /saveAvatar\([\s\S]*"user"/);
   assert.match(picker, /trigger\.addEventListener\("click"/);
   assert.match(picker, /fileInput\.click\(\)/);
   assert.match(picker, /readAsDataURL\(file\)/);

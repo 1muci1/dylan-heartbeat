@@ -575,6 +575,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }).catch(() => {});
       }
     } catch (error) {
+      clearPendingFiles();
       pendingRow.remove();
       const errorMessage = messageProtocol.createAssistantMessage(
         error?.code === "CONFIG_ERROR"
@@ -600,6 +601,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const stickerSearch = document.querySelector(".sticker-panel input");
   let pendingFiles = [];
 
+  const clearPendingFiles = () => {
+    pendingFiles = [];
+    renderPendingFiles();
+    if (picker) picker.value = "";
+  };
   const renderPendingFiles = () => {
     previews?.replaceChildren(); tray.hidden = !pendingFiles.length;
     pendingFiles.forEach((file, index) => { const item = document.createElement("div"); item.className = "attachment-preview"; const img = document.createElement("img"); img.src = URL.createObjectURL(file); const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "×"; remove.setAttribute("aria-label", "移除图片"); remove.onclick = () => { pendingFiles.splice(index, 1); renderPendingFiles(); }; item.append(img, remove); previews.append(item); });
@@ -622,6 +628,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const content = input.value.trim();
     if (!content && !pendingFiles.length) return;
 
+    if (pendingFiles.length) {
+      if (uploadStatus) uploadStatus.textContent = "当前模型未启用图片理解，请切换支持多模态的模型或移除图片。";
+      showToast("当前模型未启用图片理解");
+      clearPendingFiles();
+      input.focus();
+      return;
+    }
+
     let attachments = [];
     if (pendingFiles.length) {
       try { attachments = await media.uploadImages(pendingFiles, sessionApiAvailable ? activeSessionId : "", text => { if (uploadStatus) uploadStatus.textContent = text; }); }
@@ -636,7 +650,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     input.value = "";
-    pendingFiles = []; renderPendingFiles();
+    clearPendingFiles();
     input.style.height = "";
     input.focus();
     requestAssistantReply(message);

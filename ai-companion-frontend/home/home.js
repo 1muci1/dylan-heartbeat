@@ -4,7 +4,11 @@
   const api = factory();
   if (typeof module === "object" && module.exports) module.exports = api;
   if (root) root.CompanionSpaceHome = Object.freeze(api);
-  if (typeof document !== "undefined") api.mount(document, root);
+  if (typeof document !== "undefined") {
+    const start = () => api.boot(document, root);
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });
+    else start();
+  }
 })(typeof window !== "undefined" ? window : null, () => {
   const THEME_NAMES = Object.freeze({
     purple: "紫月",
@@ -189,6 +193,43 @@
     return avatar;
   };
 
+  const mountFallbackUserAvatarPicker = ({ documentRef, windowRef, store } = {}) => {
+    const trigger = documentRef?.querySelector?.("[data-home-user-avatar]");
+    if (!trigger || !documentRef?.createElement || !documentRef?.body || !store?.saveAvatar) return null;
+    if (trigger.dataset.avatarPickerFallback === "bound") return null;
+    const fileInput = documentRef.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = "image/png,image/jpeg,image/webp";
+    fileInput.hidden = true;
+    fileInput.setAttribute("data-home-user-avatar-file", "");
+    documentRef.body.append(fileInput);
+    trigger.dataset.avatarPickerFallback = "bound";
+    trigger.addEventListener("click", () => {
+      fileInput.value = "";
+      fileInput.click();
+    });
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files?.[0];
+      if (!file || !/^image\/(?:png|jpeg|webp)$/iu.test(file.type) || file.size > 2 * 1024 * 1024) return;
+      const Reader = windowRef?.FileReader;
+      if (!Reader) return;
+      const reader = new Reader();
+      reader.onload = () => {
+        const imageData = String(reader.result || "");
+        if (!imageData.startsWith("data:image/") || imageData.startsWith("blob:")) return;
+        store.saveAvatar({
+          source: "upload",
+          imageData,
+          crop: { x: 50, y: 50 },
+          scale: 1,
+          border: "moon"
+        }, "user");
+      };
+      reader.readAsDataURL(file);
+    });
+    return Object.freeze({ fileInput, trigger });
+  };
+
   const mount = (documentRef, windowRef) => {
     const ThemeEngine = windowRef?.CompanionTheme?.ThemeEngine;
     const AvatarStudio = windowRef?.AvatarStudio?.AvatarStudio;
@@ -263,12 +304,18 @@
     preferences?.load?.().then(renderPreferenceAvatars).catch(() => {
       // 保留同步读取后已呈现的头像，恢复失败时不回退默认。
     });
-    windowRef?.CompanionAvatarPicker?.mount({
-      documentRef,
-      windowRef,
-      store: preferences,
-      selector: "[data-home-user-avatar]"
-    });
+    let avatarPicker = null;
+    try {
+      avatarPicker = windowRef?.CompanionAvatarPicker?.mount({
+        documentRef,
+        windowRef,
+        store: preferences,
+        selector: "[data-home-user-avatar]"
+      });
+    } catch {
+      avatarPicker = null;
+    }
+    if (!avatarPicker) mountFallbackUserAvatarPicker({ documentRef, windowRef, store: preferences });
     const hero = documentRef.querySelector("[data-home-hero]");
     if (hero) {
       hero.classList.add("is-home-hero-animated");
@@ -304,7 +351,20 @@
     return controller;
   };
 
+  const boot = (documentRef, windowRef) => {
+    try {
+      const controller = mount(documentRef, windowRef);
+      if (controller) return controller;
+    } catch {
+      // 主页其他模块初始化失败时，仍保留用户头像的直接选择入口。
+    }
+    const PreferenceStore = windowRef?.CompanionUserPreferences?.UserPreferenceStore;
+    const preferences = PreferenceStore ? new PreferenceStore() : null;
+    return mountFallbackUserAvatarPicker({ documentRef, windowRef, store: preferences });
+  };
+
   return {
+    boot,
     SpaceHomeController,
     THEME_NAMES,
     buildHeroTitle,
@@ -313,6 +373,7 @@
     formatClock,
     formatDate,
     mount,
+    mountFallbackUserAvatarPicker,
     overlayFor,
     resolveMoment,
     relationshipDays,

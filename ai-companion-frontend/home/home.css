@@ -23,7 +23,7 @@ body { margin: 0; }
 .home-person > strong { font-size:14px; }.home-person > small { color:var(--theme-color-text-muted); font-size:10px; }
 .home-person > small i { display:inline-block; width:6px; height:6px; margin-right:5px; border-radius:50%; background:#74c69d; box-shadow:0 0 10px #74c69d; }
 .home-avatar-chip { display:grid; width:94px; height:94px; padding:0; place-items:center; border:1px solid var(--theme-color-border); border-radius:50%; color:inherit; background:var(--theme-color-surface-soft); box-shadow:0 13px 35px rgba(0,0,0,.25); }
-.home-avatar-chip--user { cursor:pointer; touch-action:manipulation; }
+.home-avatar-chip--user { cursor:pointer; pointer-events:auto; touch-action:manipulation; }
 .home-avatar-chip--user:focus-visible { outline:3px solid color-mix(in srgb,var(--theme-color-primary) 55%,transparent); outline-offset:4px; }
 .home-avatar-chip--chen { width:108px; height:108px; }
 .home-bond { display:grid; place-items:center; color:var(--theme-color-primary); }

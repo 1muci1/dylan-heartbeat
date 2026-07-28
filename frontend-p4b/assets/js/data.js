@@ -237,15 +237,18 @@
   });
   const normalizeProviderConfig = (config) => {
     const defaults = createDefaultProviderConfig();
+    const supportedTypes = new Set(["dylan", "gateway", "openai", "anthropic"]);
+    const configuredType = String(config?.type || "").trim().toLowerCase();
+    const configuredEndpoint = String(config?.endpoint || "").trim();
     const configuredModel = String(config?.model || "").trim();
     const configuredDefaultModel = String(config?.defaultModel || "").trim();
     const usesLegacyDefault = configuredModel === LEGACY_DEFAULT_PROVIDER_MODEL
       && (!configuredDefaultModel || configuredDefaultModel === LEGACY_DEFAULT_PROVIDER_MODEL);
     return {
-      type: "dylan",
+      type: supportedTypes.has(configuredType) ? configuredType : defaults.type,
       mode: config?.mode === "real" ? "real" : (defaults.mode || "mock"),
       baseUrl: String(config?.baseUrl || defaults.baseUrl).trim(),
-      endpoint: defaults.endpoint,
+      endpoint: configuredEndpoint.startsWith("/") ? configuredEndpoint : defaults.endpoint,
       model: usesLegacyDefault ? defaults.model : (configuredModel || defaults.model),
       defaultModel: usesLegacyDefault
         ? defaults.defaultModel

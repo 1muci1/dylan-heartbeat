@@ -103,24 +103,28 @@ document.addEventListener("DOMContentLoaded", () => {
     || !debugButton || !debugPanel) return;
 
   const fields = {
+    type: form.elements.type,
     baseUrl: form.elements.baseUrl,
+    endpoint: form.elements.endpoint,
     model: form.elements.model,
     token: form.elements.token,
     realMode: form.elements.realMode
   };
   const storedConfig = configStore.getProviderConfig();
   preferenceStore?.saveModel(storedConfig.model);
+  fields.type.value = storedConfig.type;
   fields.baseUrl.value = storedConfig.baseUrl;
+  fields.endpoint.value = storedConfig.endpoint;
   fields.model.value = storedConfig.model;
   fields.token.value = storedConfig.auth.token;
   fields.realMode.checked = storedConfig.mode === "real";
   const modeLabel = document.querySelector("[data-provider-mode]");
 
   const readFormConfig = () => ({
-    type: "dylan",
+    type: fields.type.value,
     mode: fields.realMode.checked ? "real" : "mock",
     baseUrl: fields.baseUrl.value.trim(),
-    endpoint: "/v1/chat/completions",
+    endpoint: fields.endpoint.value.trim(),
     model: fields.model.value.trim(),
     auth: {
       type: "bearer",
@@ -139,6 +143,12 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!storedConfig.baseUrl) showResult("未配置", "error");
 
   fields.realMode.addEventListener("change", updateModeLabel);
+  document.querySelector("[data-toggle-provider-token]")?.addEventListener("click", (event) => {
+    const showing = fields.token.type === "text";
+    fields.token.type = showing ? "password" : "text";
+    event.currentTarget.textContent = showing ? "显示" : "隐藏";
+    event.currentTarget.setAttribute("aria-label", showing ? "显示 API Key" : "隐藏 API Key");
+  });
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();

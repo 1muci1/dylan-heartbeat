@@ -157,6 +157,8 @@
       fetchImpl: windowRef?.fetch?.bind(windowRef)
     });
     const state = { room: null, busy: false };
+    const ProviderStore = windowRef?.CollaborationProviderConfig?.CollaborationProviderStore;
+    const providerStore = ProviderStore ? new ProviderStore() : null;
     const select = selector => documentRef.querySelector(selector);
     const setText = (selector, value) => {
       const target = select(selector);
@@ -175,6 +177,81 @@
       if (createButton) createButton.disabled = busy;
       if (runButton) runButton.disabled = busy;
     };
+
+    const providerDialog = select("[data-agent-provider-dialog]");
+    const providerForm = select("[data-agent-provider-form]");
+    const providerStatus = select("[data-agent-provider-status]");
+    let providerAgentId = "";
+    const providerFields = providerForm ? {
+      source: providerForm.elements.source,
+      type: providerForm.elements.type,
+      baseUrl: providerForm.elements.baseUrl,
+      endpoint: providerForm.elements.endpoint,
+      token: providerForm.elements.token,
+      model: providerForm.elements.model,
+      enabled: providerForm.elements.enabled
+    } : null;
+    const setProviderFieldsDisabled = () => {
+      if (!providerFields) return;
+      const useGlobal = providerFields.source.value === "global";
+      ["type", "baseUrl", "endpoint", "token", "model", "enabled"].forEach(key => {
+        providerFields[key].disabled = useGlobal;
+      });
+    };
+    const openProviderDialog = agentId => {
+      if (!providerStore || !providerDialog || !providerFields || !AGENTS[agentId]) return;
+      providerAgentId = agentId;
+      const saved = providerStore.get(agentId);
+      const global = windowRef?.AppConfig?.getProviderConfig?.() || {};
+      const visible = saved.source === "custom" ? saved : {
+        ...saved,
+        type: global.type || saved.type,
+        baseUrl: global.baseUrl || "",
+        endpoint: global.endpoint || saved.endpoint,
+        model: global.model || saved.model,
+        enabled: global.mode === "real",
+        auth: { type: "bearer", token: "" }
+      };
+      providerFields.source.value = saved.source;
+      providerFields.type.value = visible.type;
+      providerFields.baseUrl.value = visible.baseUrl;
+      providerFields.endpoint.value = visible.endpoint;
+      providerFields.token.value = saved.source === "custom" ? visible.auth.token : "";
+      providerFields.token.type = "password";
+      providerFields.model.value = visible.model;
+      providerFields.enabled.checked = visible.enabled;
+      setText("[data-agent-provider-name]", AGENTS[agentId].label);
+      if (providerStatus) providerStatus.textContent = saved.source === "global" ? "当前跟随全局配置" : "当前使用单独配置";
+      setProviderFieldsDisabled();
+      providerDialog.showModal?.();
+    };
+    documentRef.querySelectorAll("[data-configure-agent]").forEach(button => {
+      button.addEventListener("click", () => openProviderDialog(button.dataset.configureAgent));
+    });
+    providerFields?.source.addEventListener("change", setProviderFieldsDisabled);
+    select("[data-agent-provider-token]")?.addEventListener("click", event => {
+      const showing = providerFields.token.type === "text";
+      providerFields.token.type = showing ? "password" : "text";
+      event.currentTarget.textContent = showing ? "显示" : "隐藏";
+    });
+    const closeProviderDialog = () => providerDialog?.close?.();
+    select("[data-agent-provider-close]")?.addEventListener("click", closeProviderDialog);
+    select("[data-agent-provider-cancel]")?.addEventListener("click", closeProviderDialog);
+    providerForm?.addEventListener("submit", event => {
+      event.preventDefault();
+      if (!providerStore || !providerAgentId || !providerFields) return;
+      providerStore.save(providerAgentId, {
+        source: providerFields.source.value,
+        type: providerFields.type.value,
+        enabled: providerFields.enabled.checked,
+        baseUrl: providerFields.baseUrl.value,
+        endpoint: providerFields.endpoint.value,
+        model: providerFields.model.value,
+        auth: { type: "bearer", token: providerFields.token.value }
+      });
+      if (providerStatus) providerStatus.textContent = "配置已保存到本设备";
+      windowRef?.setTimeout?.(closeProviderDialog, 250);
+    });
 
     const renderRoom = () => {
       const room = state.room;

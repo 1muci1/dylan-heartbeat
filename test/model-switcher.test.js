@@ -183,3 +183,40 @@ test("a saved Provider model survives refresh and matches the switcher and chat 
   const body = refreshedPage.window.AppAPI.buildRequestBody([{ role: "user", content: "测试" }], true);
   assert.equal(body.model, DEFAULT_MODEL);
 });
+
+test("Provider type and API path migrate through the single Provider config source", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "frontend-p4b", "assets", "js", "data.js"), "utf8");
+  const values = new Map();
+  const localStorage = {
+    getItem: key => values.get(key) || null,
+    setItem: (key, value) => values.set(key, String(value))
+  };
+  const context = { window: {}, localStorage, JSON, Object, String, Boolean, Set };
+  vm.runInNewContext(source, context);
+  context.window.AppConfig.saveProviderConfig({
+    type: "anthropic",
+    mode: "real",
+    baseUrl: "https://provider.example",
+    endpoint: "/compatible/messages",
+    model: "custom-claude-model",
+    auth: { type: "bearer", token: "not-printed" }
+  });
+  const refreshed = { window: {}, localStorage, JSON, Object, String, Boolean, Set };
+  vm.runInNewContext(source, refreshed);
+  const config = refreshed.window.AppConfig.getProviderConfig();
+  assert.equal(config.type, "anthropic");
+  assert.equal(config.endpoint, "/compatible/messages");
+  assert.equal(config.model, "custom-claude-model");
+  assert.equal(Boolean(config.auth.token), true);
+});
+
+test("settings keeps API keys masked and edits the same Provider config", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "frontend-p4b", "settings.html"), "utf8");
+  const script = fs.readFileSync(path.join(__dirname, "..", "frontend-p4b", "assets/js/settings.js"), "utf8");
+  assert.match(html, /name="type"/);
+  assert.match(html, /name="endpoint"/);
+  assert.match(html, /name="token" type="password"/);
+  assert.match(html, /data-toggle-provider-token/);
+  assert.match(script, /configStore\.saveProviderConfig\(readFormConfig\(\)\)/);
+  assert.doesNotMatch(script, /console\.(?:log|info|debug)\([^)]*token/);
+});

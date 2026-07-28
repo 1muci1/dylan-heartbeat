@@ -276,7 +276,7 @@
 
   const isRemoteProvider = () => {
     const config = getProviderConfig();
-    return ["dylan", "openai", "gateway"].includes(config.type);
+    return ["dylan", "openai", "anthropic", "gateway"].includes(config.type);
   };
   const isMockMode = () => (getProviderConfig().mode || API_MODE) !== "real";
 
@@ -320,7 +320,7 @@
       return { status: "unconfigured" };
     }
     if (!['https:', 'http:'].includes(parsedUrl.protocol)
-      || config.endpoint !== "/v1/chat/completions") {
+      || !String(config.endpoint || "").startsWith("/")) {
       return { status: "unconfigured" };
     }
 

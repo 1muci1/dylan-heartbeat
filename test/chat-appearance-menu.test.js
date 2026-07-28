@@ -9,21 +9,30 @@ const { resolveReturnTarget } = require("../frontend-p4b/assets/js/settings-retu
 const frontend = path.join(__dirname, "..", "frontend-p4b");
 const read = relative => fs.readFileSync(path.join(frontend, relative), "utf8");
 
-test("the existing session drawer exposes appearance as its first action", () => {
+test("the existing session drawer separates model and appearance shortcuts", () => {
   const html = read("chat.html");
   const drawerStart = html.indexOf('<aside class="session-drawer"');
-  const appearance = html.indexOf('class="session-appearance-link"', drawerStart);
+  const model = html.indexOf('session-settings-link--model', drawerStart);
+  const appearance = html.indexOf('href="/frontend-p4b/settings.html?returnTo=%2Ffrontend-p4b%2Fchat.html#appearance"', drawerStart);
   const newSession = html.indexOf('class="session-new"', drawerStart);
   assert.ok(drawerStart >= 0);
-  assert.ok(appearance > drawerStart && appearance < newSession);
+  assert.ok(model > drawerStart && model < appearance && appearance < newSession);
+  assert.match(
+    html.slice(model, appearance),
+    /模型设置[\s\S]*Provider、API 与模型/
+  );
   assert.match(
     html.slice(appearance, newSession),
     /小世界美化[\s\S]*头像、背景与主题/
   );
 });
 
-test("appearance shortcut keeps chat as return target and uses the appearance hash", () => {
+test("model and appearance shortcuts keep chat as return target and use separate hashes", () => {
   const html = read("chat.html");
+  assert.match(
+    html,
+    /href="\/frontend-p4b\/settings\.html\?returnTo=%2Ffrontend-p4b%2Fchat\.html#model"/
+  );
   assert.match(
     html,
     /href="\/frontend-p4b\/settings\.html\?returnTo=%2Ffrontend-p4b%2Fchat\.html#appearance"/
@@ -38,9 +47,10 @@ test("appearance shortcut keeps chat as return target and uses the appearance ha
   );
 });
 
-test("settings exposes a native appearance anchor without changing default return behavior", () => {
+test("settings exposes native model and appearance anchors without changing default return behavior", () => {
   const html = read("settings.html");
-  assert.match(html, /class="appearance-settings" id="appearance"/);
+  assert.match(html, /class="settings-zone settings-zone--model" id="model"/);
+  assert.match(html, /class="settings-zone settings-zone--appearance" id="appearance"/);
   assert.equal(
     resolveReturnTarget({
       origin: "https://chat.example",

@@ -8,6 +8,11 @@ const { test } = require("node:test");
 const root = path.join(__dirname, "..", "ai-companion-frontend", "collaboration");
 const read = name => fs.readFileSync(path.join(root, name), "utf8");
 const collaboration = require(path.join(root, "collaboration.js"));
+const {
+  CollaborationProviderStore,
+  DEFAULT_MODEL,
+  STORAGE_KEY
+} = require(path.join(root, "collaboration-provider-store.js"));
 
 const roomPayload = {
   room: {
@@ -48,7 +53,46 @@ test("Collaboration page loads AppConfig and remains independent from chat.js", 
   assert.match(html, /\/assets\/js\/data\.js/);
   assert.match(html, /Gateway API/);
   assert.match(html, /data-room-form/);
+  assert.match(html, /collaboration-provider-store\.js/);
   assert.doesNotMatch(html, /react|vue|angular|provider\.js|chat\.js/i);
+});
+
+test("each council AI exposes global or custom masked Provider configuration", () => {
+  const html = read("index.html");
+  for (const agentId of ["chen", "chatgpt"]) {
+    assert.match(html, new RegExp(`data-configure-agent="${agentId}"`));
+  }
+  assert.match(html, /配置此 AI/);
+  assert.match(html, /使用全局模型配置/);
+  assert.match(html, /使用单独 Provider 配置/);
+  for (const field of ["baseUrl", "endpoint", "token", "model", "enabled"]) {
+    assert.match(html, new RegExp(`name="${field}"`));
+  }
+  assert.match(html, /name="token" type="password"/);
+});
+
+test("seat Provider config uses a versioned local schema and restores after refresh", () => {
+  const values = new Map();
+  const storage = {
+    getItem: key => values.get(key) || null,
+    setItem: (key, value) => values.set(key, String(value))
+  };
+  const first = new CollaborationProviderStore({ storage });
+  first.save("chen", {
+    source: "custom",
+    type: "gateway",
+    enabled: true,
+    baseUrl: "https://seat.example",
+    endpoint: "/v1/chat/completions",
+    model: "seat-model",
+    auth: { type: "bearer", token: "not-printed" }
+  });
+  const restored = new CollaborationProviderStore({ storage }).get("chen");
+  assert.equal(STORAGE_KEY, "xinban-collaboration-provider-config-v1");
+  assert.equal(restored.source, "custom");
+  assert.equal(restored.model, "seat-model");
+  assert.equal(Boolean(restored.auth.token), true);
+  assert.equal(new CollaborationProviderStore({ storage }).get("chatgpt").model, DEFAULT_MODEL);
 });
 
 test("API configuration uses AppConfig baseUrl and Bearer token", async () => {
@@ -138,7 +182,7 @@ test("renders chen and chatgpt messages with textContent", () => {
   assert.ok(container.children.some(element => element.className.includes("message--chatgpt")));
   assert.ok(created.some(element => element.tagName === "p" && element.textContent === "沉的观点"));
   assert.equal(collaboration.summarizeRoom(room), "双方形成了一份讨论总结。");
-  assert.doesNotMatch(read("collaboration.js"), /innerHTML|localStorage|sessionStorage/);
+  assert.doesNotMatch(read("collaboration.js"), /innerHTML|console\.(?:log|info|debug)/);
 });
 
 test("API failures use stable errors and never fabricate mock messages", async () => {

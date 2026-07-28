@@ -26,7 +26,8 @@
       <span class="settings-header__mode" data-provider-mode>MOCK</span>
     </header>
 
-    <section class="appearance-settings" id="appearance" aria-labelledby="appearance-title">
+    <div class="settings-zone settings-zone--appearance" id="appearance">
+    <section class="appearance-settings" aria-labelledby="appearance-title">
       <div class="appearance-settings__heading">
         <span>SPACE APPEARANCE</span>
         <h2 id="appearance-title">小世界美化</h2>
@@ -69,7 +70,9 @@
       <div><span>AVATAR STUDIO</span><h2 id="avatar-settings-title">头像</h2><p>用户头像与沉沉头像独立保存，刷新后会自动恢复。</p></div>
       <div class="avatar-settings__actions"><button type="button" data-avatar-target="user">更改我的头像</button><button type="button" data-avatar-target="chen">更改沉沉头像</button></div>
     </section>
+    </div>
 
+    <div class="settings-zone settings-zone--model" id="model">
     <section class="model-settings" aria-labelledby="model-settings-title">
       <div class="model-settings__heading">
         <span>AI MODEL</span>
@@ -85,12 +88,6 @@
       <p class="model-switcher-status" role="status" data-model-switcher-status></p>
     </section>
 
-    <section class="preference-data-settings" aria-labelledby="preference-data-title">
-      <div><span>DATA MANAGEMENT</span><h2 id="preference-data-title">本地设置</h2><p>只管理本设备的主题、头像、空间与模型偏好，不会删除聊天记录、Token 或 Provider 配置。</p></div>
-      <div class="preference-data-actions"><button type="button" data-preference-save>保存设置</button><button type="button" data-preference-reset>重置设置</button><button type="button" data-preference-clear>清除本地数据</button></div>
-      <p class="preference-data-result" role="status" data-preference-result></p>
-    </section>
-
     <section class="settings-intro" aria-labelledby="settings-title">
       <span class="settings-intro__icon" aria-hidden="true">
         <svg viewBox="0 0 24 24"><path d="M8 12h8M12 8v8"></path><circle cx="12" cy="12" r="8"></circle></svg>
@@ -102,10 +99,27 @@
     </section>
 
     <form class="provider-form" novalidate>
+      <label class="provider-field" for="provider-type">
+        <span>Provider 类型</span>
+        <small>选择当前 API 的兼容协议</small>
+        <select id="provider-type" name="type">
+          <option value="dylan">Dylan Gateway</option>
+          <option value="gateway">OpenAI-compatible Gateway</option>
+          <option value="openai">OpenAI</option>
+          <option value="anthropic">Anthropic-compatible</option>
+        </select>
+      </label>
+
       <label class="provider-field" for="gateway-url">
-        <span>Gateway Base URL</span>
-        <small>不包含 /v1/chat/completions</small>
+        <span>API Base URL</span>
+        <small>不包含 API Path</small>
         <input id="gateway-url" name="baseUrl" type="url" inputmode="url" placeholder="https://gateway.example.com" autocomplete="url">
+      </label>
+
+      <label class="provider-field" for="provider-endpoint">
+        <span>API Path</span>
+        <small>以 / 开头，例如 /v1/chat/completions</small>
+        <input id="provider-endpoint" name="endpoint" type="text" value="/v1/chat/completions" autocomplete="off">
       </label>
 
       <label class="provider-field" for="model-id">
@@ -115,15 +129,10 @@
       </label>
 
       <label class="provider-field" for="bearer-token">
-        <span>Bearer Token</span>
+        <span>API Key / Bearer Token</span>
         <small>仅填写短期令牌，不要使用长期上游 API Key</small>
-        <input id="bearer-token" name="token" type="password" placeholder="短期访问令牌" autocomplete="new-password">
+        <span class="provider-secret"><input id="bearer-token" name="token" type="password" placeholder="短期访问令牌" autocomplete="new-password"><button type="button" data-toggle-provider-token aria-label="显示 API Key">显示</button></span>
       </label>
-
-      <div class="provider-endpoint">
-        <span>Endpoint</span>
-        <code>/v1/chat/completions</code>
-      </div>
 
       <label class="provider-mode" for="real-mode">
         <span class="provider-mode__copy">
@@ -163,6 +172,13 @@
         </dl>
       </section>
     </form>
+    </div>
+
+    <section class="preference-data-settings" aria-labelledby="preference-data-title">
+      <div><span>DATA MANAGEMENT</span><h2 id="preference-data-title">本地设置</h2><p>只管理本设备的主题、头像、空间与模型偏好，不会删除聊天记录、Token 或 Provider 配置。</p></div>
+      <div class="preference-data-actions"><button type="button" data-preference-save>保存设置</button><button type="button" data-preference-reset>重置设置</button><button type="button" data-preference-clear>清除本地数据</button></div>
+      <p class="preference-data-result" role="status" data-preference-result></p>
+    </section>
 
     <section class="memory-import" aria-labelledby="memory-import-title">
       <div class="memory-import__heading">

@@ -53,16 +53,22 @@
 
         <fieldset>
           <legend>参与 Agent</legend>
-          <label class="agent-option agent-option--chen">
-            <input type="checkbox" name="agents" value="chen" checked>
-            <span class="agent-avatar">沉</span>
-            <span><strong>chen</strong><small>AI Companion</small></span>
-          </label>
-          <label class="agent-option agent-option--gpt">
-            <input type="checkbox" name="agents" value="chatgpt" checked>
-            <span class="agent-avatar">G</span>
-            <span><strong>chatgpt</strong><small>协作 Agent</small></span>
-          </label>
+          <div class="agent-card">
+            <label class="agent-option agent-option--chen">
+              <input type="checkbox" name="agents" value="chen" checked>
+              <span class="agent-avatar">沉</span>
+              <span><strong>chen</strong><small>AI Companion</small></span>
+            </label>
+            <button type="button" data-configure-agent="chen">配置此 AI</button>
+          </div>
+          <div class="agent-card">
+            <label class="agent-option agent-option--gpt">
+              <input type="checkbox" name="agents" value="chatgpt" checked>
+              <span class="agent-avatar">G</span>
+              <span><strong>chatgpt</strong><small>协作 Agent</small></span>
+            </label>
+            <button type="button" data-configure-agent="chatgpt">配置此 AI</button>
+          </div>
         </fieldset>
 
         <button class="primary-button" type="submit">创建房间</button>
@@ -106,7 +112,27 @@
     </section>
   </main>
 
+  <dialog class="agent-provider-dialog" data-agent-provider-dialog>
+    <form method="dialog" data-agent-provider-form>
+      <header><div><p>AI PROVIDER</p><h2>配置 <span data-agent-provider-name>AI</span></h2></div><button type="button" data-agent-provider-close aria-label="关闭">×</button></header>
+      <label>配置来源
+        <select name="source"><option value="global">使用全局模型配置</option><option value="custom">使用单独 Provider 配置</option></select>
+      </label>
+      <label>Provider 类型
+        <select name="type"><option value="dylan">Dylan Gateway</option><option value="gateway">OpenAI-compatible Gateway</option><option value="openai">OpenAI</option><option value="anthropic">Anthropic-compatible</option></select>
+      </label>
+      <label>API Base URL<input name="baseUrl" type="url" inputmode="url" placeholder="https://gateway.example.com"></label>
+      <label>API Path<input name="endpoint" type="text" placeholder="/v1/chat/completions"></label>
+      <label>API Key<span class="agent-provider-secret"><input name="token" type="password" autocomplete="new-password"><button type="button" data-agent-provider-token>显示</button></span></label>
+      <label>Model<input name="model" type="text" autocomplete="off" placeholder="claude-opus-4-6"></label>
+      <label class="agent-provider-enabled"><span>启用此 AI</span><input name="enabled" type="checkbox"></label>
+      <p data-agent-provider-status role="status"></p>
+      <div class="agent-provider-actions"><button type="button" data-agent-provider-cancel>取消</button><button type="submit">保存</button></div>
+    </form>
+  </dialog>
+
   <script src="/assets/js/data.js"></script>
+  <script src="collaboration-provider-store.js"></script>
   <script src="collaboration.js"></script>
 </body>
 </html>

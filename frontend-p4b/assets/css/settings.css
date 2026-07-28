@@ -113,6 +113,11 @@
 .appearance-links { display:grid; margin-top:16px; border-top:1px solid var(--line); }
 .appearance-links a { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:9px; min-height:48px; border-bottom:1px solid var(--line); font-size:11px; }.appearance-links a > span { color:var(--primary); font-size:20px; }
 .appearance-result { min-height:14px; margin-top:8px; color:var(--primary); font-size:9px; text-align:center; }
+.settings-zone { scroll-margin-top:16px; }
+.settings-zone--model { padding-top:2px; }
+.provider-field select { width:100%; min-height:44px; padding:0 13px; border:1px solid rgba(109,84,124,.16); border-radius:13px; outline:none; color:#5d5362; background:#fcfbfd; font-size:11px; }
+.provider-secret { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:7px; }
+.provider-secret button { min-width:54px; border:1px solid rgba(109,84,124,.16); border-radius:12px; color:var(--primary); background:var(--surface-soft); font-size:10px; }
 
 .model-settings { margin-bottom:18px; padding:20px; border:1px solid var(--line); border-radius:24px; background:var(--surface); box-shadow:var(--shadow); }
 .model-settings__heading span { color:var(--primary); font-size:9px; font-weight:750; letter-spacing:.16em; }

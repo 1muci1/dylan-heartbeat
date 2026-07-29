@@ -170,8 +170,90 @@ test("drawing frontend sends structured strokes and uses public draw status", ()
   assert.match(js, /await response\.text\(\)\.then\(\(\) => null\)/);
   assert.match(js, /沉暂时连接不上游戏服务/);
   assert.match(js, /submitButton\.disabled = true/);
-  assert.match(js, /沉暂时没看清，稍后再试/);
+  assert.match(js, /result\.textContent = "沉正在看你的画……"/);
   assert.doesNotMatch(js, /localStorage|sessionStorage/);
+});
+
+test("user drawing validates the hidden answer and real strokes before any request", () => {
+  const html = read("index.html");
+  const js = read("game.js");
+  assert.match(html, /画作答案（只给系统判定，沉看不到）/);
+  assert.match(html, /placeholder="例如：雨伞"/);
+  assert.match(html, /data-draw-answer[^>]+required/);
+  assert.match(html, /答案只用于系统判定，提交给沉看的只有线条结构/);
+  assert.match(js, /if \(!String\(answer \|\| ""\)\.trim\(\)\)/);
+  assert.match(js, /stroke\.points\.length >= 2/);
+  assert.match(js, /先告诉系统你画的是什么，沉不会看到这个答案/);
+  assert.match(js, /先画几笔再提交给沉猜/);
+  const submitHandler = js.slice(js.indexOf('$("[data-draw-submit]")'), js.indexOf('$("[data-chen-guess]")'));
+  assert.ok(submitHandler.indexOf("validateUserDrawing") < submitHandler.indexOf("gameFetch"));
+  assert.match(submitHandler, /if \(!validation\.ok\)[\s\S]*return;/);
+});
+
+test("draw errors map to fixed safe messages and never expose raw non-JSON text", () => {
+  const js = read("game.js");
+  for (const code of [
+    "DRAW_ANSWER_INVALID",
+    "DRAWING_EMPTY",
+    "DRAW_AUTH_REQUIRED",
+    "FORBIDDEN",
+    "DRAW_ROUND_NOT_FOUND",
+    "DRAW_MODEL_FAILED"
+  ]) assert.match(js, new RegExp(code));
+  assert.match(js, /这一局暂时提交失败，稍后再试/);
+  assert.match(js, /await response\.text\(\)\.then\(\(\) => null\)/);
+  assert.doesNotMatch(js, /Unexpected token/);
+});
+
+test("Chen drawing prompt receives public structure but never the private answer", () => {
+  const js = read("game.js");
+  const askChen = js.slice(js.indexOf("async function askChen"), js.indexOf('$("[data-draw-submit]")'));
+  assert.match(askChen, /status\.drawing_svg/);
+  assert.match(askChen, /status\.ascii_grid/);
+  assert.match(askChen, /你是沉，在和辞辞玩你画我猜/);
+  assert.doesNotMatch(askChen, /\banswer\b/);
+});
+
+test("guess result actions are tappable buttons with visible in-card feedback", () => {
+  const html = read("index.html");
+  const js = read("game.js");
+  const css = read("identity.css");
+  for (const action of ["correct", "wrong", "hint"]) {
+    assert.match(html, new RegExp(`<button type="button" data-chen-feedback="${action}"`));
+  }
+  const actionMarkup = html.slice(html.indexOf("guess-result__actions"), html.indexOf("data-chen-feedback-text"));
+  assert.doesNotMatch(actionMarkup, /disabled/);
+  assert.match(js, /太好了，沉猜对了！/);
+  assert.match(js, /state\.roundOutcome = "guessed_correct"/);
+  assert.match(js, /没关系，可以给沉一点提示，或者再让她猜一次/);
+  assert.match(css, /\.guess-result[\s\S]*z-index:\s*3/);
+  assert.match(css, /\.guess-result[\s\S]*pointer-events:\s*auto/);
+  assert.doesNotMatch(css, /\.guess-result[^}]*pointer-events:\s*none/);
+  assert.match(css, /\.drawing-wrap,[\s\S]*z-index:\s*0/);
+});
+
+test("hint action reveals an input and submits only the user hint for another Chen guess", () => {
+  const html = read("index.html");
+  const js = read("game.js");
+  assert.match(html, /data-chen-hint-form hidden/);
+  assert.match(html, /name="hint"[^>]+maxlength="120"/);
+  assert.match(html, /提交提示后再猜/);
+  assert.match(js, /data-chen-hint-form]"\)\.addEventListener\("submit"/);
+  assert.match(js, /askChen\(state\.drawingStatus, hint\)/);
+  assert.match(js, /用户给了一个提示/);
+  assert.match(js, /沉再猜：/);
+  assert.doesNotMatch(js.slice(js.indexOf("async function askChen"), js.indexOf('$("[data-draw-submit]")')), /\banswer\b/);
+});
+
+test("feedback loading always restores the result buttons after success or failure", () => {
+  const js = read("game.js");
+  const hintHandler = js.slice(
+    js.indexOf('$("[data-chen-hint-form]").addEventListener'),
+    js.indexOf('$$("[data-draw-mode]")')
+  );
+  assert.match(hintHandler, /buttons\.forEach\(button => \{ button\.disabled = true; \}\)/);
+  assert.match(hintHandler, /catch \(error\)[\s\S]*drawErrorMessage\(error\)/);
+  assert.match(hintHandler, /finally[\s\S]*button\.disabled = false/);
 });
 
 test("Gateway lets game requests reach their JSON Bearer route instead of the plain Forbidden fallback", () => {

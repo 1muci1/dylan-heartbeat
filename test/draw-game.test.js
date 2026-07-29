@@ -87,3 +87,15 @@ test("draw route validation errors always use the safe JSON envelope", async t =
   assert.equal(response.json().error.code, "DRAW_ANSWER_INVALID");
   assert.doesNotMatch(response.body, /stack|aliases|provider response|bearer/i);
 });
+
+test("a tap without a drawn line is rejected as an empty drawing", () => {
+  const service = new DrawGameService();
+  assert.throws(
+    () => service.drawStart({
+      artist: "user",
+      answer: "圆",
+      strokes: [{ tool: "polyline", points: [[10, 10]], color: "#51475a", width: 6 }]
+    }),
+    error => error.code === "DRAWING_EMPTY" && error.statusCode === 400
+  );
+});

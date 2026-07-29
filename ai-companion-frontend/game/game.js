@@ -10,10 +10,21 @@
     thinkingTimer: null,
     strokes: [],
     activeStroke: null,
-    roundId: null
+    roundId: null,
+    drawingStatus: null,
+    roundOutcome: null
   };
   const $ = selector => document.querySelector(selector);
   const $$ = selector => document.querySelectorAll(selector);
+  const DRAW_ERROR_MESSAGES = Object.freeze({
+    DRAW_ANSWER_INVALID: "先告诉系统你画的是什么，沉不会看到这个答案。",
+    DRAWING_EMPTY: "先画几笔再提交给沉猜。",
+    DRAW_AUTH_REQUIRED: "游戏连接失效了，刷新后再试。",
+    FORBIDDEN: "游戏连接失效了，刷新后再试。",
+    UNAUTHORIZED: "游戏连接失效了，刷新后再试。",
+    DRAW_ROUND_NOT_FOUND: "这一局画作已经失效，重新开始一局吧。",
+    DRAW_MODEL_FAILED: "沉暂时没看清，稍后再试。"
+  });
   const preferenceStore = window.CompanionUserPreferences?.UserPreferenceStore
     ? new window.CompanionUserPreferences.UserPreferenceStore()
     : null;
@@ -61,6 +72,21 @@
     }
     if (!body || typeof body !== "object") throw new Error("沉暂时连接不上游戏服务，请稍后再试。");
     return body;
+  }
+  function drawErrorMessage(error) {
+    return DRAW_ERROR_MESSAGES[error?.code] || "这一局暂时提交失败，稍后再试。";
+  }
+  function validateUserDrawing(answer, strokes) {
+    if (!String(answer || "").trim()) {
+      return { ok: false, code: "DRAW_ANSWER_INVALID", message: DRAW_ERROR_MESSAGES.DRAW_ANSWER_INVALID };
+    }
+    const hasLine = Array.isArray(strokes) && strokes.some(stroke =>
+      Array.isArray(stroke?.points) && stroke.points.length >= 2
+    );
+    if (!hasLine) {
+      return { ok: false, code: "DRAWING_EMPTY", message: DRAW_ERROR_MESSAGES.DRAWING_EMPTY };
+    }
+    return { ok: true };
   }
 
   function showView(name) {
@@ -174,48 +200,112 @@
   $("[data-draw-undo]").addEventListener("click", () => { state.strokes.pop(); redraw(); });
   $("[data-draw-clear]").addEventListener("click", () => { state.strokes = []; redraw(); });
 
-  async function askChen(status) {
+  async function askChen(status, hint = "") {
     const config = provider();
     if (!config.baseUrl || !config.token || !config.model) return "我看到了画，但还需要先配置聊天模型才能认真猜。";
     const systemPrompt = "你是沉，在和辞辞玩你画我猜。你不是泛泛的 AI，不要说“作为 AI”。你要用沉的口吻猜。你可以根据 SVG 路径和 ASCII 网格判断。猜不出来时，可以温柔地要一点提示。不要泄露答案。不要解释工具实现。";
-    const prompt = `请猜一个最可能的中文名词，只给出自然、简短的猜测。\nSVG:\n${status.drawing_svg}\nASCII (${status.ascii_grid_note}):\n${status.ascii_grid}`;
+    const safeHint = String(hint || "").trim().slice(0, 120);
+    const hintContext = safeHint ? `\n用户给了一个提示：${safeHint}` : "";
+    const prompt = `请猜一个最可能的中文名词，只给出自然、简短的猜测。${hintContext}\nSVG:\n${status.drawing_svg}\nASCII (${status.ascii_grid_note}):\n${status.ascii_grid}`;
     const response = await fetch(`${config.baseUrl}${config.endpoint.startsWith("/") ? config.endpoint : `/${config.endpoint}`}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.token}` },
       body: JSON.stringify({ model: config.model, stream: false, messages: [{ role: "system", content: systemPrompt }, { role: "user", content: prompt }] })
     });
-    if (!response.ok) throw new Error("沉暂时没猜出来，请稍后重试。");
-    const body = await response.json();
+    if (!response.ok) {
+      const error = new Error("沉暂时没看清，稍后再试。");
+      error.code = "DRAW_MODEL_FAILED";
+      error.status = response.status;
+      throw error;
+    }
+    const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+    const body = contentType.includes("application/json")
+      ? await response.json().catch(() => null)
+      : null;
+    if (!body) {
+      const error = new Error("沉暂时没看清，稍后再试。");
+      error.code = "DRAW_MODEL_FAILED";
+      throw error;
+    }
     return String(body?.choices?.[0]?.message?.content || "我还没想好。").trim();
   }
   $("[data-draw-submit]").addEventListener("click", async event => {
     const result = $("[data-draw-status]");
     const submitButton = event.currentTarget;
     if (submitButton.disabled) return;
+    const answer = $("[data-draw-answer]").value.trim();
+    const validation = validateUserDrawing(answer, state.strokes);
+    if (!validation.ok) {
+      result.textContent = validation.message;
+      return;
+    }
     submitButton.disabled = true;
     try {
       result.textContent = "沉正在看你的画……";
       const started = await gameFetch("/api/game/draw/start", {
         method: "POST",
-        body: JSON.stringify({ artist: "user", answer: $("[data-draw-answer]").value, strokes: state.strokes })
+        body: JSON.stringify({ artist: "user", answer, strokes: state.strokes })
       });
       state.roundId = started.round_id;
       const status = await gameFetch(`/api/game/draw/status/${encodeURIComponent(state.roundId)}`);
+      state.drawingStatus = status;
+      state.roundOutcome = "awaiting_feedback";
       const guess = await askChen(status);
       $("[data-chen-guess-text]").textContent = `沉猜：${guess}`;
+      $("[data-chen-feedback-text]").textContent = "告诉沉她有没有猜对吧。";
+      $("[data-chen-hint-form]").hidden = true;
+      $$("[data-chen-feedback]").forEach(button => { button.disabled = false; });
       $("[data-chen-guess]").hidden = false;
       result.textContent = "沉看完啦。她的猜测就在下面。";
-    } catch {
-      result.textContent = "沉暂时没看清，稍后再试。";
+    } catch (error) {
+      result.textContent = drawErrorMessage(error);
     } finally {
       submitButton.disabled = false;
     }
   });
   $("[data-chen-guess]").addEventListener("click", event => {
     const feedback = event.target.closest("[data-chen-feedback]")?.dataset.chenFeedback;
-    if (feedback === "correct") $("[data-draw-status]").textContent = "沉猜对啦，她很开心。";
-    if (feedback === "wrong") $("[data-draw-status]").textContent = "沉没猜中，可以给她一点提示。";
-    if (feedback === "hint") $("[data-draw-status]").textContent = "告诉沉一个小提示，再让她猜一次吧。";
+    if (!feedback) return;
+    const feedbackText = $("[data-chen-feedback-text]");
+    if (feedback === "correct") {
+      state.roundOutcome = "guessed_correct";
+      $("[data-chen-guess]").dataset.outcome = state.roundOutcome;
+      feedbackText.textContent = "太好了，沉猜对了！";
+      $$("[data-chen-feedback]").forEach(button => { button.disabled = true; });
+      $("[data-chen-hint-form]").hidden = true;
+    }
+    if (feedback === "wrong") {
+      state.roundOutcome = "guessed_wrong";
+      $("[data-chen-guess]").dataset.outcome = state.roundOutcome;
+      feedbackText.textContent = "没关系，可以给沉一点提示，或者再让她猜一次。";
+      $("[data-chen-hint-form]").hidden = false;
+    }
+    if (feedback === "hint") {
+      feedbackText.textContent = "写下一点提示，沉会再认真猜一次。";
+      $("[data-chen-hint-form]").hidden = false;
+      $("[data-chen-hint-form] input")?.focus();
+    }
+  });
+  $("[data-chen-hint-form]").addEventListener("submit", async event => {
+    event.preventDefault();
+    const feedbackText = $("[data-chen-feedback-text]");
+    const hint = String(new FormData(event.currentTarget).get("hint") || "").trim();
+    if (!hint || !state.drawingStatus) return;
+    const buttons = $$("[data-chen-feedback], [data-chen-hint-form] button");
+    buttons.forEach(button => { button.disabled = true; });
+    feedbackText.textContent = "沉正在结合提示再看一遍……";
+    try {
+      const guess = await askChen(state.drawingStatus, hint);
+      $("[data-chen-guess-text]").textContent = `沉再猜：${guess}`;
+      feedbackText.textContent = "沉重新猜了一次，告诉她结果吧。";
+      event.currentTarget.hidden = true;
+      event.currentTarget.reset();
+      state.roundOutcome = "awaiting_feedback";
+    } catch (error) {
+      feedbackText.textContent = drawErrorMessage(error);
+    } finally {
+      buttons.forEach(button => { button.disabled = false; });
+    }
   });
 
   $$("[data-draw-mode]").forEach(button => button.addEventListener("click", () => {
@@ -244,7 +334,14 @@
     } catch (error) { $("[data-preset-result]").textContent = error.message; }
   });
 
-  window.GameSpaceConfig = Object.freeze({ drawStart: "/api/game/draw/start", drawStatus: "/api/game/draw/status/:roundId", drawGuess: "/api/game/draw/guess/:roundId", protocol });
+  window.GameSpaceConfig = Object.freeze({
+    drawStart: "/api/game/draw/start",
+    drawStatus: "/api/game/draw/status/:roundId",
+    drawGuess: "/api/game/draw/guess/:roundId",
+    drawErrorMessage,
+    protocol,
+    validateUserDrawing
+  });
   resetGomoku();
   redraw();
   applyGameAvatars();

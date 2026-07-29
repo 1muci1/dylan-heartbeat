@@ -46,7 +46,9 @@ class DrawGameService {
       if (!answer || answer.length > 40) throw Object.assign(new Error("请填写 1–40 字的画作答案"), { statusCode: 400, code: "DRAW_ANSWER_INVALID" });
       aliases = Array.isArray(input.aliases) ? input.aliases.map(String).map(value => value.trim()).filter(Boolean).slice(0, 12) : [];
       strokes = normalizeStrokes(input.strokes, canvas);
-      if (strokes.length === 0) throw Object.assign(new Error("画板还是空的"), { statusCode: 400, code: "DRAWING_EMPTY" });
+      if (!strokes.some(stroke => stroke.points.length >= 2)) {
+        throw Object.assign(new Error("画板还是空的"), { statusCode: 400, code: "DRAWING_EMPTY" });
+      }
     }
     const id = crypto.randomUUID();
     const createdAt = this.now().toISOString();

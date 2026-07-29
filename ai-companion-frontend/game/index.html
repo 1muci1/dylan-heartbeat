@@ -65,8 +65,9 @@
       </div>
 
       <div data-draw-pane="user">
-        <label class="answer-field">画作答案（不会出现在公开状态）
-          <input type="text" maxlength="40" data-draw-answer placeholder="例如：雨伞">
+        <label class="answer-field">画作答案（只给系统判定，沉看不到）
+          <input type="text" maxlength="40" data-draw-answer placeholder="例如：雨伞" required aria-describedby="draw-answer-note">
+          <small id="draw-answer-note">答案只用于系统判定，提交给沉看的只有线条结构。</small>
         </label>
         <div class="drawing-wrap"><canvas width="600" height="420" data-drawing-canvas aria-label="画板"></canvas></div>
         <div class="drawing-tools">
@@ -77,7 +78,19 @@
         <p class="game-status" data-draw-status aria-live="polite">用手指或鼠标画几笔吧。</p>
         <div class="guess-result" data-chen-guess hidden>
           <p data-chen-guess-text></p>
-          <div><button type="button" data-chen-feedback="correct">猜对了</button><button type="button" data-chen-feedback="wrong">没猜对</button><button type="button" data-chen-feedback="hint">给提示</button></div>
+          <div class="guess-result__actions">
+            <button type="button" data-chen-feedback="correct">猜对了</button>
+            <button type="button" data-chen-feedback="wrong">没猜对</button>
+            <button type="button" data-chen-feedback="hint">给提示</button>
+          </div>
+          <p class="guess-result__feedback" data-chen-feedback-text aria-live="polite"></p>
+          <form class="hint-form" data-chen-hint-form hidden>
+            <label for="chen-hint">给沉一点提示</label>
+            <div>
+              <input id="chen-hint" name="hint" type="text" maxlength="120" placeholder="例如：下雨时会用到" required>
+              <button type="submit">提交提示后再猜</button>
+            </div>
+          </form>
         </div>
       </div>
 

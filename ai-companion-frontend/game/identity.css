@@ -28,3 +28,74 @@
 .player-avatar--small { width: 36px; height: 36px; }
 .player-avatar.has-avatar-image { color: transparent; }
 .players-heart { font-size: 18px; opacity: .72; }
+
+.answer-field small {
+  color: #9b8fa1;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.answer-field input:invalid:not(:placeholder-shown) {
+  border-color: rgba(176, 91, 112, .5);
+}
+
+.drawing-wrap,
+.drawing-wrap canvas {
+  position: relative;
+  z-index: 0;
+}
+
+.guess-result {
+  position: relative;
+  z-index: 3;
+  pointer-events: auto;
+}
+
+.guess-result__actions,
+.guess-result__actions button,
+.hint-form,
+.hint-form input,
+.hint-form button {
+  pointer-events: auto;
+}
+
+.guess-result__feedback {
+  min-height: 1.5em;
+  margin: 10px 0 0;
+  color: #75667c;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.hint-form {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.hint-form label {
+  color: #817487;
+  font-size: 10px;
+}
+
+.hint-form div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+}
+
+.hint-form input {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(103, 78, 119, .16);
+  border-radius: 10px;
+}
+
+.hint-form button {
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 10px;
+  color: white;
+  background: #78638b;
+}

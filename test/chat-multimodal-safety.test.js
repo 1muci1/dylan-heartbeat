@@ -100,13 +100,17 @@ test("vision-enabled providers send only the current image and omit historical i
   assert.doesNotMatch(JSON.stringify(messages), /old-image/);
 });
 
-test("chat blocks unsupported pending images and clears attachment state on failures", () => {
+test("chat blocks unsupported image sending while preserving preview and clears state on request failures", () => {
   const chat = fs.readFileSync(path.join(frontend, "assets/js/chat.js"), "utf8");
-  assert.match(chat, /当前模型未启用图片理解，请切换支持多模态的模型或移除图片/);
-  assert.match(chat, /if \(pendingFiles\.length\)[\s\S]*clearPendingFiles\(\)[\s\S]*return;/);
+  const unsupportedStart = chat.indexOf("if (pendingFiles.length && !supportsImages())");
+  const unsupportedEnd = chat.indexOf("let attachments = []", unsupportedStart);
+  const unsupported = chat.slice(unsupportedStart, unsupportedEnd);
+  assert.match(unsupported, /模型设置 → 支持图片理解 开启后再发送图片/);
+  assert.match(unsupported, /showToast\(message\)/);
+  assert.match(unsupported, /return;/);
+  assert.doesNotMatch(unsupported, /clearPendingFiles|uploadImages|requestAssistantReply/);
   assert.match(chat, /catch \(error\) \{\s*clearPendingFiles\(\);/);
   assert.match(chat, /const supportsImages = \(\) => window\.AppConfig/);
-  assert.match(chat, /if \(!supportsImages\(\)\)[\s\S]*showToast\(message\)[\s\S]*return;/);
   assert.match(chat, /imageMessageId: userMessage\.attachments\?\.length \? userMessage\.id : null/);
 });
 
@@ -123,5 +127,12 @@ test("mobile image input opens synchronously without camera capture or display-n
     chat.indexOf('picker?.addEventListener("change"')
   );
   assert.match(clickHandler, /picker\?\.click\(\)/);
-  assert.doesNotMatch(clickHandler, /\bawait\b|setTimeout|Promise/);
+  assert.doesNotMatch(clickHandler, /\bawait\b|setTimeout|Promise|supportsImages|getProviderConfig|showToast/);
+  const changeHandler = chat.slice(
+    chat.indexOf('picker?.addEventListener("change"'),
+    chat.indexOf('stickerButton?.addEventListener("click"')
+  );
+  assert.match(changeHandler, /pendingFiles\.push\(\.\.\.files\)/);
+  assert.match(changeHandler, /renderPendingFiles\(\)/);
+  assert.doesNotMatch(changeHandler, /supportsImages|clearPendingFiles/);
 });

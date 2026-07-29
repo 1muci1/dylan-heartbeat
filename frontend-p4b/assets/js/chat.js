@@ -631,9 +631,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!content && !pendingFiles.length) return;
 
     if (pendingFiles.length && !supportsImages()) {
-      if (uploadStatus) uploadStatus.textContent = "当前模型未启用图片理解，请切换支持多模态的模型或移除图片。";
-      showToast("当前模型未启用图片理解");
-      clearPendingFiles();
+      const message = "当前模型未启用图片理解。请到 模型设置 → 支持图片理解 开启后再发送图片。";
+      if (uploadStatus) uploadStatus.textContent = message;
+      showToast(message);
       input.focus();
       return;
     }
@@ -754,22 +754,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initializeLocalHistory(initialState.messages).finally(initializeSessions);
   api.onLoadingChange(setRequestState);
   sendButton.addEventListener("click", handleSend);
-  imageButton?.addEventListener("click", () => {
-    if (!supportsImages()) {
-      clearPendingFiles();
-      const message = "当前模型未启用图片理解。请到 模型设置 → 支持图片理解 开启，或切换支持看图的模型。";
-      if (uploadStatus) uploadStatus.textContent = message;
-      showToast(message);
-      return;
-    }
-    picker?.click();
-  });
+  imageButton?.addEventListener("click", () => picker?.click());
   picker?.addEventListener("change", () => {
-    if (!supportsImages()) {
-      clearPendingFiles();
-      if (uploadStatus) uploadStatus.textContent = "当前模型未启用图片理解。请到 模型设置 → 支持图片理解 开启，或切换支持看图的模型。";
-      return;
-    }
     const files = [...picker.files];
     if (files.length + pendingFiles.length > 4) {
       if (uploadStatus) uploadStatus.textContent = "每次最多选择 4 张图片";

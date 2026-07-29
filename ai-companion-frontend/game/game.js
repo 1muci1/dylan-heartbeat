@@ -1,7 +1,7 @@
 "use strict";
 
 (() => {
-  const { SIZE, emptyBoard, isWin, scheduleChenMove } = window.CompanionGomoku;
+  const { SIZE, emptyBoard, isWin, pointToCell, scheduleChenMove } = window.CompanionGomoku;
   const protocol = window.CompanionDrawingProtocol;
   const state = {
     board: emptyBoard(),
@@ -73,11 +73,17 @@
   function renderBoard() {
     const root = $("[data-gomoku-board]");
     root.replaceChildren();
+    const lines = document.createElement("div");
+    lines.className = "gomoku-board__lines";
+    lines.setAttribute("aria-hidden", "true");
+    root.append(lines);
     state.board.forEach((row, rowIndex) => row.forEach((cell, columnIndex) => {
       const button = document.createElement("button");
       button.type = "button";
       button.dataset.row = rowIndex;
       button.dataset.column = columnIndex;
+      button.style.top = `${(rowIndex + 1) / (SIZE + 1) * 100}%`;
+      button.style.left = `${(columnIndex + 1) / (SIZE + 1) * 100}%`;
       button.setAttribute("role", "gridcell");
       button.setAttribute("aria-label", `${rowIndex + 1} 行 ${columnIndex + 1} 列${cell === 1 ? "黑子" : cell === 2 ? "白子" : "空位"}`);
       if (cell) button.className = cell === 1 ? "stone stone--black" : "stone stone--white";
@@ -95,10 +101,13 @@
     setGomokuStatus("当前回合：轮到你。");
   }
   $("[data-gomoku-board]").addEventListener("click", event => {
-    const cell = event.target.closest("[data-row]");
-    if (!cell || state.over || state.locked) return;
-    const row = Number(cell.dataset.row);
-    const column = Number(cell.dataset.column);
+    if (state.over || state.locked) return;
+    const root = event.currentTarget;
+    const clickedCell = event.target.closest("[data-row]");
+    const point = clickedCell
+      ? { row: Number(clickedCell.dataset.row), column: Number(clickedCell.dataset.column) }
+      : pointToCell(event.clientX, event.clientY, root.getBoundingClientRect());
+    const { row, column } = point;
     if (state.board[row][column]) return;
     state.board[row][column] = 1;
     if (isWin(state.board, row, column, 1)) {
@@ -123,7 +132,9 @@
         state.over = true;
         setGomokuStatus("沉赢了。沉认真记下这一局。");
       } else {
-        setGomokuStatus("沉落子了。当前回合：轮到你。");
+        setGomokuStatus(move.reason === "block"
+          ? "沉堵住了这一手。当前回合：轮到你。"
+          : "沉落子了。当前回合：轮到你。");
       }
       renderBoard();
     } });

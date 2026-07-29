@@ -1,0 +1,57 @@
+.gomoku-board {
+  --board-edge: 6.25%;
+  position: relative;
+  display: block;
+  overflow: visible;
+  border: 2px solid #8d7155;
+  background: #d9b278;
+  touch-action: manipulation;
+}
+
+.gomoku-board__lines {
+  position: absolute;
+  inset: var(--board-edge);
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(80, 55, 35, .6) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(80, 55, 35, .6) 1px, transparent 1px);
+  background-position: left top;
+  background-size: calc(100% / 14) 100%, 100% calc(100% / 14);
+  box-shadow:
+    inset -1px 0 rgba(80, 55, 35, .6),
+    inset 0 -1px rgba(80, 55, 35, .6);
+}
+
+.gomoku-board button {
+  position: absolute;
+  z-index: 1;
+  width: 7.1%;
+  height: 7.1%;
+  min-width: 0;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 0;
+  background: transparent;
+  touch-action: manipulation;
+}
+
+.gomoku-board button::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 82%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  content: "";
+}
+
+.gomoku-board .stone--black::after {
+  background: #29252a;
+  box-shadow: inset -2px -2px 4px #000, 0 2px 4px rgba(55, 35, 20, .3);
+}
+
+.gomoku-board .stone--white::after {
+  background: #faf8f3;
+  box-shadow: inset -2px -2px 4px #b9b0a6, 0 2px 4px rgba(55, 35, 20, .24);
+}

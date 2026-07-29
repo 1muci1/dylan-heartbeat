@@ -4,7 +4,13 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { test } = require("node:test");
-const { emptyBoard, isWin, chooseAiMove, scheduleChenMove } = require("../ai-companion-frontend/game/gomoku");
+const {
+  emptyBoard,
+  isWin,
+  chooseAiMove,
+  pointToCell,
+  scheduleChenMove
+} = require("../ai-companion-frontend/game/gomoku");
 
 const root = path.join(__dirname, "..", "ai-companion-frontend", "game");
 const read = name => fs.readFileSync(path.join(root, name), "utf8");
@@ -16,7 +22,9 @@ test("game lobby exposes playable and extensible game cards", () => {
   assert.match(html, /和沉下一局/);
   assert.match(html, /你画给沉猜，或者沉画给你猜/);
   assert.match(html, /即将开放/);
-  for (const file of ["game.css", "identity.css", "gomoku.js", "game.js"]) assert.ok(fs.existsSync(path.join(root, file)));
+  for (const file of ["game.css", "identity.css", "gomoku-board.css", "gomoku.js", "game.js"]) {
+    assert.ok(fs.existsSync(path.join(root, file)));
+  }
 });
 
 test("gomoku detects horizontal, vertical and both diagonal wins without false positives", () => {
@@ -32,7 +40,7 @@ test("gomoku detects horizontal, vertical and both diagonal wins without false p
 test("gomoku AI wins first, blocks second, and never selects an occupied point", () => {
   const winning = emptyBoard();
   for (let column = 2; column < 6; column++) winning[4][column] = 2;
-  assert.deepEqual(chooseAiMove(winning, () => 0), { row: 4, column: 1 });
+  assert.deepEqual(chooseAiMove(winning, () => 0), { row: 4, column: 1, reason: "win" });
 
   const blocking = emptyBoard();
   for (let column = 3; column < 7; column++) blocking[8][column] = 1;
@@ -43,6 +51,69 @@ test("gomoku AI wins first, blocks second, and never selects an occupied point",
   board[7][7] = 1;
   const move = chooseAiMove(board, () => 0);
   assert.equal(board[move.row][move.column], 0);
+});
+
+test("Chen blocks immediate four in every direction", () => {
+  for (const [dr, dc] of [[0,1],[1,0],[1,1],[1,-1]]) {
+    const board = emptyBoard();
+    const start = dc < 0 ? [4, 10] : [4, 4];
+    for (let step = 0; step < 4; step++) {
+      board[start[0] + dr * step][start[1] + dc * step] = 1;
+    }
+    const move = chooseAiMove(board, () => 0);
+    assert.equal(move.reason, "block");
+    board[move.row][move.column] = 1;
+    assert.equal(isWin(board, move.row, move.column, 1), true);
+  }
+});
+
+test("Chen blocks every broken-four shape at its winning gap", () => {
+  for (const [columns, gap] of [
+    [[3, 4, 6, 7], 5],
+    [[3, 4, 5, 7], 6],
+    [[3, 5, 6, 7], 4]
+  ]) {
+    const board = emptyBoard();
+    columns.forEach(column => { board[7][column] = 1; });
+    assert.deepEqual(chooseAiMove(board, () => 0), { row: 7, column: gap, reason: "block" });
+  }
+});
+
+test("Chen prioritizes its own win over blocking the user", () => {
+  const board = emptyBoard();
+  for (let column = 2; column < 6; column++) board[3][column] = 2;
+  for (let row = 7; row < 11; row++) board[row][9] = 1;
+  const move = chooseAiMove(board, () => 0);
+  assert.equal(move.reason, "win");
+  assert.deepEqual({ row: move.row, column: move.column }, { row: 3, column: 1 });
+});
+
+test("board coordinates map taps near a visible intersection to the correct cell", () => {
+  const rect = { left: 20, top: 40, width: 320, height: 320 };
+  const edge = 20;
+  const cell = 20;
+  const row = 9;
+  const column = 6;
+  assert.deepEqual(
+    pointToCell(rect.left + edge + column * cell + 4, rect.top + edge + row * cell - 4, rect),
+    { row, column }
+  );
+});
+
+test("board draws fifteen-by-fifteen intersections with half-cell edge padding", () => {
+  const html = read("index.html");
+  const css = read("gomoku-board.css");
+  const js = read("game.js");
+  assert.match(html, /gomoku-board\.css/);
+  assert.match(css, /--board-edge:\s*6\.25%/);
+  assert.match(css, /background-size:\s*calc\(100% \/ 14\) 100%,\s*100% calc\(100% \/ 14\)/);
+  assert.match(css, /inset -1px 0/);
+  assert.match(css, /inset 0 -1px/);
+  assert.match(css, /transform:\s*translate\(-50%, -50%\)/);
+  assert.match(js, /gomoku-board__lines/);
+  assert.match(js, /button\.style\.top/);
+  assert.match(js, /button\.style\.left/);
+  assert.match(js, /pointToCell\(event\.clientX, event\.clientY/);
 });
 
 test("Chen move is delayed and does not appear before the thinking timer fires", () => {
@@ -124,7 +195,7 @@ test("all visible players are Chen and the game reuses both preference avatars",
   assert.match(js, /轮到沉，沉正在想/);
   assert.match(js, /沉落子了/);
   assert.match(js, /state\.locked/);
-  assert.match(js, /if \(!cell \|\| state\.over \|\| state\.locked\) return/);
+  assert.match(js, /if \(state\.over \|\| state\.locked\) return/);
   assert.match(js, /你赢了。沉认真记下这一局。/);
   assert.match(js, /沉赢了。沉认真记下这一局。/);
   assert.match(js, /沉正在看你的画/);

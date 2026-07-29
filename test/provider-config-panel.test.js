@@ -1,6 +1,8 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const { test } = require("node:test");
 const { bind } = require("../ai-companion-frontend/shared/provider-config-panel");
 
@@ -105,4 +107,12 @@ test("global council source disables only custom Provider fields", () => {
   source.value = "custom";
   source.listeners.change();
   assert.equal(custom.disabled, false);
+});
+
+test("Provider panel keeps mobile actions above the safe area", () => {
+  const css = fs.readFileSync(path.join(__dirname, "..", "ai-companion-frontend", "shared", "provider-config-panel.css"), "utf8");
+  assert.match(css, /\.provider-config-dialog form[^}]*overflow-y:auto/);
+  assert.match(css, /\.provider-config-actions[^}]*position:sticky/);
+  assert.match(css, /\.provider-config-actions[^}]*safe-area-inset-bottom/);
+  assert.match(css, /100dvh/);
 });

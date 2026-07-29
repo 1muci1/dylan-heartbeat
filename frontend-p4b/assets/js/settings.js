@@ -116,6 +116,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const modeLabel = document.querySelector("[data-provider-mode]");
   const currentModel = document.querySelector("[data-current-model]");
   const currentProvider = document.querySelector("[data-current-model-provider]");
+  const configStatus = {
+    provider: document.querySelector("[data-provider-configured]"),
+    model: document.querySelector("[data-model-configured]"),
+    token: document.querySelector("[data-token-configured]"),
+    images: document.querySelector("[data-images-configured]")
+  };
   const providerNames = {
     dylan: "Dylan Gateway",
     gateway: "OpenAI-compatible Gateway",
@@ -149,6 +155,10 @@ document.addEventListener("DOMContentLoaded", () => {
       || window.CompanionModelRegistry?.byId?.(config.model);
     if (currentModel) currentModel.textContent = config.displayName || registeredModel?.name || config.model || "Claude Opus 4.6";
     if (currentProvider) currentProvider.textContent = providerNames[config.type] || config.type || "Provider 未配置";
+    if (configStatus.provider) configStatus.provider.textContent = config.type && config.baseUrl ? "已配置" : "未配置";
+    if (configStatus.model) configStatus.model.textContent = config.model ? "已配置" : "未配置";
+    if (configStatus.token) configStatus.token.textContent = config.auth?.token ? "已填写" : "未填写";
+    if (configStatus.images) configStatus.images.textContent = config.supportsImages ? "已开启" : "未开启";
   };
   updateModeLabel();
   updateCurrentSummary(storedConfig);
@@ -173,11 +183,8 @@ document.addEventListener("DOMContentLoaded", () => {
     preferenceStore?.saveModel(config.model);
     updateCurrentSummary(config);
     updateModeLabel();
-    showResult(
-      config.mode === "real" ? "配置已保存，真实模式已开启。" : "配置已保存，当前为 mock 模式。",
-      "success"
-    );
-    window.setTimeout(() => providerPanel.close(), 350);
+    showResult("模型配置已保存", "success");
+    window.setTimeout(() => providerPanel.close(), 700);
   });
 
   testButton.addEventListener("click", async () => {

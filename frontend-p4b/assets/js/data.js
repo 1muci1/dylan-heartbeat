@@ -278,6 +278,23 @@
       }
     };
   };
+  const notifyProviderConfigChange = config => {
+    if (typeof window.dispatchEvent !== "function") return;
+    const detail = {
+      type: config.type,
+      mode: config.mode,
+      baseUrlConfigured: Boolean(config.baseUrl),
+      endpointConfigured: Boolean(config.endpoint),
+      model: config.model,
+      displayName: config.displayName,
+      tokenConfigured: Boolean(config.auth?.token),
+      supportsImages: config.supportsImages === true
+    };
+    window.dispatchEvent(new CustomEvent("provider-config-change", { detail }));
+    window.dispatchEvent(new CustomEvent("user-preferences-change", {
+      detail: { source: PROVIDER_STORAGE_KEY, provider: detail }
+    }));
+  };
 
   window.AppConfig = {
     key: PROVIDER_STORAGE_KEY,
@@ -303,6 +320,7 @@
       } catch {
         // 本地存储不可用时保留当前页面内的填写结果。
       }
+      notifyProviderConfigChange(normalizedConfig);
       return normalizedConfig;
     }
   };

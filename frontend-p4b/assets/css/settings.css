@@ -129,6 +129,10 @@
 .provider-config-dialog .provider-form { margin:0; border:0; border-radius:0; background:transparent; box-shadow:none; }
 .provider-config-dialog .provider-field { margin-bottom:0; }
 .provider-config-dialog .provider-config-actions { grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:4px; }
+.provider-config-diagnostics { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:14px 0 0; }
+.provider-config-diagnostics div { padding:10px 12px; border:1px solid rgba(157,126,190,.12); border-radius:12px; background:rgba(255,255,255,.5); }
+.provider-config-diagnostics dt { color:var(--muted); font-size:9px; }
+.provider-config-diagnostics dd { margin:4px 0 0; color:var(--text); font-size:11px; font-weight:700; }
 .provider-field select { width:100%; min-height:44px; padding:0 13px; border:1px solid rgba(109,84,124,.16); border-radius:13px; outline:none; color:#5d5362; background:#fcfbfd; font-size:11px; }
 .provider-secret { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:7px; }
 .provider-secret button { min-width:54px; border:1px solid rgba(109,84,124,.16); border-radius:12px; color:var(--primary); background:var(--surface-soft); font-size:10px; }

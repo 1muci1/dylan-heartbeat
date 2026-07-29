@@ -57,7 +57,14 @@
     return node;
   };
 
-  const modelLabel = model => model ? `${model.name}` : "未配置模型";
+  const modelLabel = (model, config = null) => config?.displayName || model?.name || config?.model || "未配置模型";
+  const providerNames = Object.freeze({
+    dylan: "Dylan Gateway",
+    gateway: "OpenAI-compatible Gateway",
+    openai: "OpenAI",
+    anthropic: "Anthropic-compatible"
+  });
+  const providerLabel = (model, config = null) => providerNames[config?.type] || model?.provider || config?.type || "Provider 未配置";
 
   const renderCard = (documentRef, model, selected) => {
     const card = documentRef.createElement("button");
@@ -105,9 +112,12 @@
     const autoToggle = documentRef.querySelector("[data-auto-model]");
     const render = () => {
       const current = switcher.current();
-      if (currentNode) currentNode.textContent = modelLabel(current);
-      if (providerNode) providerNode.textContent = current?.provider || "Provider 未配置";
-      if (autoToggle) autoToggle.checked = Boolean(switcher.config().autoSelectModel);
+      const providerConfig = switcher.config();
+      const currentLabel = modelLabel(current, providerConfig);
+      const currentProvider = providerLabel(current, providerConfig);
+      if (currentNode) currentNode.textContent = currentLabel;
+      if (providerNode) providerNode.textContent = currentProvider;
+      if (autoToggle) autoToggle.checked = Boolean(providerConfig.autoSelectModel);
       if (listNode) {
         listNode.replaceChildren(...switcher.list().map(model => {
           const card = renderCard(documentRef, model, current?.id === model.id);
@@ -125,7 +135,9 @@
         }));
       }
       documentRef.querySelectorAll("[data-model-badge]").forEach(node => {
-        node.textContent = current ? `${current.name} · ${current.provider}` : "未配置模型";
+        node.textContent = providerConfig.model
+          ? `${currentLabel} · ${currentProvider}`
+          : "未配置模型";
       });
     };
     autoToggle?.addEventListener("change", () => {
@@ -145,9 +157,13 @@
         windowRef.location.href = `settings.html?returnTo=${encodeURIComponent(currentRoute)}#model`;
       });
     });
+    windowRef?.addEventListener?.("provider-config-change", render);
+    windowRef?.addEventListener?.("storage", event => {
+      if (event.key === config.key) render();
+    });
     render();
     return switcher;
   };
 
-  return { ModelSwitcher, modelLabel, mount, renderCard };
+  return { ModelSwitcher, modelLabel, mount, providerLabel, renderCard };
 });

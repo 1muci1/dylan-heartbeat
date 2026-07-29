@@ -86,6 +86,12 @@
         <span class="model-current__icon">CC</span>
         <div><small>当前模型</small><strong data-current-model>未配置模型</strong><span data-current-model-provider>Provider 未配置</span></div><button class="model-current__switch" type="button" data-open-global-provider>配置模型</button>
       </div>
+      <dl class="provider-config-diagnostics" aria-label="当前配置状态">
+        <div><dt>Provider</dt><dd data-provider-configured>未配置</dd></div>
+        <div><dt>Model</dt><dd data-model-configured>未配置</dd></div>
+        <div><dt>Token</dt><dd data-token-configured>未填写</dd></div>
+        <div><dt>支持图片理解</dt><dd data-images-configured>未开启</dd></div>
+      </dl>
     </section>
 
     <dialog class="provider-config-dialog" data-global-provider-dialog>

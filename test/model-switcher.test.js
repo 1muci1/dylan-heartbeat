@@ -8,7 +8,7 @@ const { test } = require("node:test");
 const registrySource = path.join(__dirname, "..", "frontend-p4b", "assets", "js", "model-registry.js");
 const switcherSource = path.join(__dirname, "..", "frontend-p4b", "assets", "js", "model-switcher.js");
 const { MODELS, byId, isValidId, requireId } = require(registrySource);
-const { ModelSwitcher } = require(switcherSource);
+const { ModelSwitcher, modelLabel, providerLabel } = require(switcherSource);
 const DEFAULT_MODEL = "claude-opus-4-6";
 const DEFAULT_REQUEST_MODEL = "[脆卷-kiro-0.08]claude-opus-4-6";
 const LEGACY_DEFAULT_MODEL = "[脆卷-kiro-0.08]claude-opus-4-6-thinking";
@@ -55,6 +55,17 @@ test("Provider config is the only source used to display the current model", () 
     preferenceStore: stalePreferences
   });
   assert.equal(switcher.current().id, DEFAULT_MODEL);
+});
+
+test("custom Provider models render from config without a registry match", () => {
+  const custom = {
+    type: "dylan",
+    model: "[福利满血官key]claude-opus-4.6",
+    displayName: "Claude Opus 4.6"
+  };
+  assert.equal(modelLabel(null, custom), "Claude Opus 4.6");
+  assert.equal(providerLabel(null, custom), "Dylan Gateway");
+  assert.equal(modelLabel(null, { ...custom, displayName: "" }), custom.model);
 });
 
 test("illegal model IDs are rejected without changing configuration", () => {
@@ -231,7 +242,46 @@ test("settings keeps API keys masked and edits the same Provider config", () => 
   assert.match(html, /支持图片理解/);
   assert.match(html, /data-provider-panel-token/);
   assert.match(script, /configStore\.saveProviderConfig\(readFormConfig\(\)\)/);
+  assert.match(script, /模型配置已保存/);
+  for (const marker of ["data-provider-configured", "data-model-configured", "data-token-configured", "data-images-configured"]) {
+    assert.match(html, new RegExp(marker));
+  }
   assert.doesNotMatch(script, /console\.(?:log|info|debug)\([^)]*token/);
+});
+
+test("saving Provider config emits a safe refresh event and persists image capability", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "frontend-p4b", "assets", "js", "data.js"), "utf8");
+  const values = new Map();
+  const events = [];
+  class TestCustomEvent {
+    constructor(type, init) { this.type = type; this.detail = init?.detail; }
+  }
+  const context = {
+    window: { dispatchEvent: event => events.push(event) },
+    localStorage: {
+      getItem: key => values.get(key) || null,
+      setItem: (key, value) => values.set(key, String(value))
+    },
+    CustomEvent: TestCustomEvent,
+    JSON, Object, String, Boolean, Set
+  };
+  vm.runInNewContext(source, context);
+  context.window.AppConfig.saveProviderConfig({
+    type: "dylan",
+    mode: "real",
+    baseUrl: "https://gateway.example",
+    endpoint: "/v1/chat/completions",
+    displayName: "视觉模型",
+    model: "vendor-vision-model",
+    supportsImages: true,
+    auth: { token: "test-only-secret" }
+  });
+  const stored = JSON.parse(values.get("xinban-provider-config-v1"));
+  assert.equal(stored.supportsImages, true);
+  assert.equal(events.some(event => event.type === "provider-config-change"), true);
+  const detail = events.find(event => event.type === "provider-config-change").detail;
+  assert.equal(detail.tokenConfigured, true);
+  assert.equal(Object.hasOwn(detail, "token"), false);
 });
 
 test("legacy short model migrates to the known request model without conflating displayName", () => {

@@ -18,7 +18,7 @@ process.env.STICKER_UPLOAD_DIR = path.join(dir, "stickers");
 fs.writeFileSync(process.env.TIMELINE_FILE, "[]\n");
 fs.writeFileSync(process.env.TIMESTAMP_DB_FILE, "{}\n");
 
-const { app, latestUserContentOf } = require("../server");
+const { app, latestUserContentOf, memoryQueryOf } = require("../server");
 const auth = { authorization: "Bearer gateway-test-key" };
 
 test("chat runtime reserves a create-only internal Memory write hook", () => {
@@ -35,6 +35,20 @@ test("latest user content selects the current user message", () => {
     { role: "user", content: "我们什么时候认识的？" }
   ]), "我们什么时候认识的？");
   assert.equal(latestUserContentOf([{ role: "assistant", content: "没有用户消息" }]), "");
+});
+
+test("Memory query combines the latest six conversation messages without system prompts", () => {
+  const query = memoryQueryOf([
+    { role: "system", content: "must-not-enter-query" },
+    { role: "user", content: "我的专业是什么？" },
+    { role: "assistant", content: "我们先聊专业。" },
+    { role: "user", content: "沉沉" }
+  ]);
+  assert.match(query, /我的专业是什么/);
+  assert.match(query, /我们先聊专业/);
+  assert.match(query, /沉沉/);
+  assert.doesNotMatch(query, /must-not-enter-query/);
+  assert.ok(query.length <= 2000);
 });
 
 function jsonUpstream(content = "json reply", status = 200, thinking = null) {
@@ -352,6 +366,48 @@ test("chat passes the latest user message to Memory Retriever and prioritizes re
   const unrelatedIndex = context.content.indexOf(noiseContent);
   assert.ok(matchingIndex >= 0);
   assert.ok(unrelatedIndex < 0 || matchingIndex < unrelatedIndex);
+});
+
+test("recent multi-turn query and long chat history do not displace core Memory context", async () => {
+  const coreContent = "CORE_MAJOR_MEMORY_7db4";
+  const created = await app.inject({
+    method: "POST",
+    url: "/api/v1/memories",
+    headers: auth,
+    payload: {
+      type: "MEMORY",
+      title: "学习专业长期画像",
+      content: coreContent,
+      source: "memory-import:v1:fact:chat-core",
+      importance: 5
+    }
+  });
+  assert.equal(created.statusCode, 201);
+
+  let forwarded = null;
+  global.fetch = async (_url, options) => {
+    forwarded = JSON.parse(options.body);
+    return new Response(JSON.stringify({
+      choices: [{ message: { role: "assistant", content: "core reply" } }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  const messages = Array.from({ length: 24 }, (_, index) => ({
+    role: index % 2 ? "assistant" : "user",
+    content: index === 20 ? "我们刚才说到我的专业" : `历史消息 ${index}`
+  }));
+  messages.push({ role: "user", content: "沉沉，你记得吗？" });
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/chat/completions",
+    payload: { model: "test", stream: false, messages }
+  });
+  assert.equal(response.statusCode, 200);
+  const context = forwarded.messages.find(message =>
+    message.role === "system" && message.content.includes("<memory_reference_data")
+  );
+  assert.ok(context);
+  assert.match(context.content, new RegExp(coreContent));
+  assert.ok(forwarded.messages.indexOf(context) < forwarded.messages.findIndex(message => message.role === "user"));
 });
 
 test("empty latest user content keeps Memory Retriever fallback", async () => {

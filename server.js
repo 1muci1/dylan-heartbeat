@@ -106,10 +106,10 @@ const sessionStore = new SessionStore({ database: databaseConnection.db, filenam
 const structuredMemoryStore = new StructuredMemoryStore({ database: databaseConnection.db, filename: databaseConnection.filename, eventStore, logger: app.log });
 const agentMemoryRetriever = new AgentMemoryRetriever({
   store: structuredMemoryStore,
-  defaultLimit: 8,
-  defaultCharacterBudget: 3000
+  defaultLimit: 12,
+  defaultCharacterBudget: 5000
 });
-const agentMemoryContextBuilder = new AgentMemoryContextBuilder({ maxItems: 8, maxCharacters: 3000 });
+const agentMemoryContextBuilder = new AgentMemoryContextBuilder({ maxItems: 12, maxCharacters: 5000 });
 const agentMemoryWriter = new AgentMemoryWriter({ store: structuredMemoryStore });
 const agentMemoryWriteHook = Object.freeze({
   create: proposal => agentMemoryWriter.create(proposal)
@@ -167,7 +167,11 @@ const wakeDecisionSnapshotClient = new WakeDecisionSnapshotClient({
   token: process.env.WAKE_DECISION_INTERNAL_TOKEN
 });
 registerSessionRoutes(app, { store: sessionStore });
-registerMemoryRoutes(app, { store: structuredMemoryStore });
+registerMemoryRoutes(app, {
+  store: structuredMemoryStore,
+  retriever: agentMemoryRetriever,
+  contextBuilder: agentMemoryContextBuilder
+});
 registerMediaRoutes(app, { store: mediaStore, sessionStore });
 registerAiRoutes(app, { store: aiMemoryStore, runner: aiTaskRunner, config: aiConfig, adapter: aiAdapter });
 registerEventRoutes(app, { store: eventStore });
@@ -330,6 +334,17 @@ function latestUserContentOf(messages) {
     }
   }
   return "";
+}
+
+function memoryQueryOf(messages, maxMessages = 6) {
+  if (!Array.isArray(messages)) return "";
+  return messages
+    .filter(message => message?.role === "user" || message?.role === "assistant")
+    .slice(-Math.max(1, Math.min(6, Number(maxMessages) || 6)))
+    .map(message => normalizeContentToText(message.content).trim().slice(0, 500))
+    .filter(Boolean)
+    .join("\n")
+    .slice(-2000);
 }
 
 function normalizeMessageForTimeline(msg) {
@@ -871,10 +886,6 @@ app.post("/v1/chat/completions", async (req, reply) => {
 
 
 
-    // 调试打印
-    console.log("\n===== 转发给 LLM 的 Messages（前 10 条）=====\n");
-    console.log(JSON.stringify(sanitizeForLog(llmMessages.slice(0, 10)), null, 2));
-
     // ---- 自动修复不完整的 tool 调用（双向清理） ----
     // 第一遍：标记需要移除的索引
     const removeSet = new Set();
@@ -944,11 +955,12 @@ app.post("/v1/chat/completions", async (req, reply) => {
     const identityBoundaryContext = agentIdentityBoundaryBuilder.build();
     const identityContext = agentIdentityContextBuilder.build();
     const latestUserContent = latestUserContentOf(kelivoMessages);
+    const memoryQuery = memoryQueryOf(kelivoMessages) || latestUserContent;
     const memoryContext = agentMemoryContextBuilder.build(
       agentMemoryRetriever.retrieve({
-        query: latestUserContent,
-        limit: 8,
-        characterBudget: 3000
+        query: memoryQuery,
+        limit: 12,
+        characterBudget: 5000
       })
     );
     const runtimeContexts = [identityBoundaryContext, identityContext, memoryContext].filter(Boolean);
@@ -1930,4 +1942,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, aiTaskRunner, latestUserContentOf };
+module.exports = { app, aiTaskRunner, latestUserContentOf, memoryQueryOf };

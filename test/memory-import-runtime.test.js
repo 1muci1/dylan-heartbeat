@@ -216,7 +216,7 @@ test("Agent Memory Retriever returns only active categorized whitelist fields wi
   assert.deepEqual(new Set(all.items.map(value => value.category)), new Set(["fact", "preference", "event", "relationship"]));
   assert.ok(all.items.some(value => value.id === fact.id && value.categorySource === "explicit"));
   assert.ok(!all.items.some(value => value.id === archived.id || value.id === deleted.id));
-  const allowed = ["id", "category", "categorySource", "type", "title", "content", "importance", "occurredAt", "createdAt", "updatedAt"];
+  const allowed = ["id", "layer", "category", "categorySource", "type", "title", "content", "importance", "occurredAt", "createdAt", "updatedAt"];
   for (const value of all.items) assert.deepEqual(Object.keys(value), allowed);
   assert.ok(all.items.every(value => !Object.hasOwn(value, "sourceSessionId") && !Object.hasOwn(value, "hash") && !Object.hasOwn(value, "deletedAt")));
 

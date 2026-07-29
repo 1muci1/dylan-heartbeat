@@ -92,3 +92,34 @@ test("identity, sensitive Memory, and non-whitelist fields are filtered", () => 
   assert.equal(Object.hasOwn(result.items[0], "sourceSessionId"), false);
   assert.equal(Object.hasOwn(result.items[0], "deletedAt"), false);
 });
+
+test("short queries still inject stable core profile and relationship memories", () => {
+  const result = retrieve([
+    memory("major", "fact", "学习专业", "用户的长期学习专业", 5),
+    memory("school", "fact", "学校阶段", "用户目前所处的学校阶段", 5),
+    memory("relationship", "relationship", "AI Companion的意义", "长期关系设定", 5),
+    memory("project", "relationship", "沉的小世界初衷", "持续陪伴项目背景", 5),
+    memory("noise", "event", "普通事件", "无关事件", 5)
+  ], "沉沉");
+  assert.deepEqual(
+    result.items.filter(item => item.layer === "core").map(item => item.id),
+    ["major", "project", "relationship", "school"]
+  );
+  assert.equal(result.meta.selectedAlwaysOn, 4);
+  assert.ok(result.meta.candidateCount >= 5);
+});
+
+test("query-aware results and recent important memories share the final bounded selection", () => {
+  const memories = [
+    memory("major", "fact", "学习专业", "用户专业信息", 5, "2026-01-01T00:00:00Z"),
+    memory("cats", "preference", "猫咪偏好", "用户喜欢猫咪", 3, "2026-01-02T00:00:00Z"),
+    memory("recent", "event", "近期变化", "最近的重要变化", 5, "2026-07-29T00:00:00Z")
+  ];
+  const result = new AgentMemoryRetriever({ store: fixture(memories) })
+    .retrieve({ query: "猫咪", limit: 12, characterBudget: 1000 });
+  assert.ok(result.items.some(item => item.id === "major" && item.layer === "core"));
+  assert.ok(result.items.some(item => item.id === "cats" && item.layer === "relevant"));
+  assert.ok(result.items.some(item => item.id === "recent"));
+  assert.ok(result.items.length <= 12);
+  assert.ok(result.meta.usedCharacters <= 1000);
+});

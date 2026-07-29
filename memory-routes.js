@@ -28,6 +28,8 @@ function sendError(req, reply, error) {
 
 function registerMemoryRoutes(app, options) {
   const store = options.store;
+  const retriever = options.retriever;
+  const contextBuilder = options.contextBuilder;
   const apiKey = options.apiKey || process.env.GATEWAY_API_KEY;
   if (!store) throw new TypeError("store 必填");
 
@@ -59,6 +61,40 @@ function registerMemoryRoutes(app, options) {
   )));
 
   app.get("/api/v1/memories/stats", { preHandler: bearerAuth }, route(() => envelope(store.stats())));
+
+  app.get("/admin/memory/debug", { preHandler: bearerAuth, logLevel: "silent" }, route(req => {
+    if (!retriever || !contextBuilder) {
+      throw new StructuredMemoryError("Memory 诊断未配置", 503, "MEMORY_DEBUG_UNAVAILABLE");
+    }
+    const query = String(req.query?.query || "").trim().slice(0, 500);
+    const result = retriever.retrieve({ query, limit: 12, characterBudget: 5000 });
+    const context = contextBuilder.build(result);
+    const activeCount = store.list({ page: 1, limit: 1, status: "active" }).meta.total;
+    const archivedCount = store.list({ page: 1, limit: 1, status: "archived" }).meta.total;
+    const deletedCount = store.list({ page: 1, limit: 1, status: "deleted" }).meta.total;
+    return envelope({
+      query,
+      normalizedQuery: result.meta.normalizedQuery,
+      candidates: result.meta.candidateCount,
+      selectedAlwaysOn: result.items
+        .filter(item => item.layer === "core")
+        .map(({ id, title, type, importance }) => ({ id, title, type, importance })),
+      selectedRelevant: result.items
+        .filter(item => item.layer === "relevant")
+        .map(({ id, title, type, importance }) => ({ id, title, type, importance })),
+      selectedRecent: result.items
+        .filter(item => item.layer === "recent")
+        .map(({ id, title, type, importance }) => ({ id, title, type, importance })),
+      rejectedReasons: {
+        ...result.meta.rejectedReasons,
+        archived: archivedCount,
+        deleted: deletedCount,
+        activeNotSelected: Math.max(0, activeCount - result.items.length - result.meta.rejectedCount)
+      },
+      finalInjectedCount: result.items.length,
+      finalInjectedTokenEstimate: Math.ceil((context?.content?.length || 0) / 4)
+    });
+  }));
 
   app.get("/api/v1/memories/:id", { preHandler: bearerAuth }, route(req => envelope(
     store.get(req.params.id, { includeDeleted: req.query?.includeDeleted === "true" })

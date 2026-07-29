@@ -11,7 +11,10 @@ const MAX_CHARACTER_BUDGET = 20000;
 const MAX_SCAN_ITEMS = 10000;
 const COMPANION_RELATIONSHIP_RESERVE = 2;
 const COMPANION_FACT_RESERVE = 2;
+const DEFAULT_CORE_LIMIT = 8;
+const DEFAULT_RECENT_LIMIT = 2;
 const IDENTITY_TITLES = new Set(["Companion名称", "用户称呼"]);
+const CORE_MEMORY_PATTERN = /(?:用户画像|基本资料|学习专业|专业|学校|学历|年级|学校阶段|生活节奏|作息|关系设定|相遇与关系|AI\s*Companion|沉的小世界|重要偏好|长期偏好|主动联系偏好|毕设方向|当前项目)/iu;
 const SENSITIVE_MEMORY_PATTERN = /(?:\bapi[\s_-]*key\b|\b(?:access|bearer|device)?[\s_-]*token\b|\bpassword\b|\bpasswd\b|\bcookie\b|\bprivate[\s_-]*key\b|\botp\b|\bverification[\s_-]*code\b|API\s*密钥|访问令牌|密码|私钥|验证码|身份证|银行卡|银行账号|精确住址|门禁|医疗诊断|设备\s*token)/iu;
 
 function categorySource(memory) {
@@ -59,6 +62,11 @@ function minimumItemCharacters(memory) {
 function safeCandidate(memory) {
   if (!memory || IDENTITY_TITLES.has(memory.title)) return false;
   return !SENSITIVE_MEMORY_PATTERN.test(`${memory.title || ""}\n${memory.content || ""}`);
+}
+
+function isCoreMemory(memory) {
+  if (!memory || Number(memory.importance) < 4) return false;
+  return CORE_MEMORY_PATTERN.test(memory.title || "");
 }
 
 function normalizedText(value) {
@@ -157,6 +165,27 @@ function searchKeywordCandidates(store, keywords) {
   return candidates;
 }
 
+function selectCoreCandidates(candidates, limit = DEFAULT_CORE_LIMIT) {
+  return candidates
+    .filter(isCoreMemory)
+    .sort((left, right) => (
+      Number(right.importance) - Number(left.importance)
+      || String(right.updatedAt || "").localeCompare(String(left.updatedAt || ""))
+      || String(left.id || "").localeCompare(String(right.id || ""))
+    ))
+    .slice(0, limit);
+}
+
+function selectRecentImportantCandidates(store, excludedIds, limit = DEFAULT_RECENT_LIMIT) {
+  return listCandidates(store)
+    .filter(memory => safeCandidate(memory) && Number(memory.importance) >= 4 && !excludedIds.has(memory.id))
+    .sort((left, right) => (
+      String(right.updatedAt || "").localeCompare(String(left.updatedAt || ""))
+      || Number(right.importance) - Number(left.importance)
+    ))
+    .slice(0, limit);
+}
+
 class AgentMemoryRetriever {
   constructor({ store, defaultLimit = DEFAULT_LIMIT, defaultCharacterBudget = DEFAULT_CHARACTER_BUDGET } = {}) {
     if (!store || typeof store.list !== "function") throw new TypeError("StructuredMemoryStore 必填");
@@ -198,7 +227,7 @@ class AgentMemoryRetriever {
       limit,
       category
     );
-    const filteredCandidates = category
+    const querySelected = category
       ? [
           ...relevantCandidates,
           ...safeCandidates.filter(memory =>
@@ -209,18 +238,35 @@ class AgentMemoryRetriever {
       : relevantCandidates.length
         ? selectWithFallback(safeCandidates, relevantCandidates, limit)
         : selectCompanionCandidates(safeCandidates, limit);
+    const coreCandidates = category ? [] : selectCoreCandidates(safeCandidates);
+    const selectedIds = new Set(coreCandidates.map(memory => memory.id));
+    const relevantLimit = Math.max(0, limit - coreCandidates.length - DEFAULT_RECENT_LIMIT);
+    const relevantLayer = querySelected
+      .filter(memory => !selectedIds.has(memory.id))
+      .slice(0, relevantLimit);
+    relevantLayer.forEach(memory => selectedIds.add(memory.id));
+    const recentCandidates = category
+      ? []
+      : selectRecentImportantCandidates(this.store, selectedIds);
+    const layeredCandidates = category
+      ? querySelected.map(memory => ({ memory, layer: "relevant" }))
+      : [
+          ...coreCandidates.map(memory => ({ memory, layer: "core" })),
+          ...relevantLayer.map(memory => ({ memory, layer: "relevant" })),
+          ...recentCandidates.map(memory => ({ memory, layer: "recent" }))
+        ];
     const items = [];
     let usedCharacters = 0;
-    for (let index = 0; index < filteredCandidates.length; index++) {
-      const memory = filteredCandidates[index];
+    for (let index = 0; index < layeredCandidates.length; index++) {
+      const { memory, layer } = layeredCandidates[index];
       const memoryCategory = categoryOfMemory(memory);
       const remaining = characterBudget - usedCharacters;
       if (remaining <= 0 || items.length >= limit) break;
       const reservedForLater = category
         ? 0
-        : filteredCandidates
+        : layeredCandidates
           .slice(index + 1)
-          .reduce((total, candidate) => total + minimumItemCharacters(candidate), 0);
+          .reduce((total, candidate) => total + minimumItemCharacters(candidate.memory), 0);
       const itemBudget = Math.max(0, remaining - Math.min(remaining, reservedForLater));
       const title = boundedText(memory.title, itemBudget);
       const content = boundedText(memory.content, itemBudget - title.length);
@@ -228,6 +274,7 @@ class AgentMemoryRetriever {
       usedCharacters += title.length + content.length;
       items.push({
         id: memory.id,
+        layer,
         category: memoryCategory,
         categorySource: categorySource(memory),
         type: memory.type,
@@ -248,7 +295,17 @@ class AgentMemoryRetriever {
         truncated: items.length < safeCandidates.length,
         queryApplied: Boolean(extracted.normalized && extracted.keywords.length),
         keywordCount: extracted.keywords.length,
-        relevantCount: relevantCandidates.length
+        relevantCount: relevantCandidates.length,
+        candidateCount: candidates.length,
+        safeCandidateCount: safeCandidates.length,
+        rejectedCount: candidates.length - safeCandidates.length,
+        rejectedReasons: {
+          identityOrSensitive: candidates.length - safeCandidates.length
+        },
+        selectedAlwaysOn: items.filter(item => item.layer === "core").length,
+        selectedRelevant: items.filter(item => item.layer === "relevant").length,
+        selectedRecent: items.filter(item => item.layer === "recent").length,
+        normalizedQuery: extracted.normalized
       }
     };
   }
@@ -257,6 +314,9 @@ class AgentMemoryRetriever {
 module.exports = {
   COMPANION_FACT_RESERVE,
   COMPANION_RELATIONSHIP_RESERVE,
+  CORE_MEMORY_PATTERN,
+  DEFAULT_CORE_LIMIT,
+  DEFAULT_RECENT_LIMIT,
   IDENTITY_TITLES,
   SENSITIVE_MEMORY_PATTERN,
   AgentMemoryRetriever,
@@ -265,9 +325,12 @@ module.exports = {
   MAX_CHARACTER_BUDGET,
   MAX_LIMIT,
   compareRelevant,
+  isCoreMemory,
   listCandidates,
   relevanceOf,
   searchKeywordCandidates,
+  selectCoreCandidates,
+  selectRecentImportantCandidates,
   selectRelevantCandidates,
   selectWithFallback
 };

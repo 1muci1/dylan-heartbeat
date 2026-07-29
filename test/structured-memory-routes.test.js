@@ -9,13 +9,17 @@ const Fastify = require("fastify");
 const { openDatabase } = require("../database");
 const { registerMemoryRoutes } = require("../memory-routes");
 const { StructuredMemoryStore } = require("../structured-memory-store");
+const { AgentMemoryRetriever } = require("../agent-memory-retriever");
+const { AgentMemoryContextBuilder } = require("../agent-memory-context-builder");
 
 async function fixture(t) {
   const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "heartbeat-memory-api-"));
   const connection = openDatabase(path.join(dir, "database.sqlite"));
   const store = new StructuredMemoryStore({ database: connection.db, filename: connection.filename });
+  const retriever = new AgentMemoryRetriever({ store, defaultLimit: 12, defaultCharacterBudget: 5000 });
+  const contextBuilder = new AgentMemoryContextBuilder({ maxItems: 12, maxCharacters: 5000 });
   const app = Fastify({ logger: false });
-  registerMemoryRoutes(app, { store, apiKey: "memory-token" });
+  registerMemoryRoutes(app, { store, retriever, contextBuilder, apiKey: "memory-token" });
   await app.ready();
   t.after(async () => {
     await app.close();
@@ -108,4 +112,30 @@ test("auth and invalid parameters return uniform errors", async t => {
     assert.equal(response.statusCode, 400, url);
     assert.ok(response.json().error);
   }
+});
+
+test("admin Memory debug is authenticated and returns metadata without content or secrets", async t => {
+  const { app } = await fixture(t);
+  await create(app, {
+    type: "MEMORY",
+    title: "学习专业",
+    content: "private memory body",
+    importance: 5,
+    source: "memory-import:v1:fact:debug"
+  });
+  const denied = await app.inject({ method: "GET", url: "/admin/memory/debug?query=专业" });
+  assert.equal(denied.statusCode, 401);
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/admin/memory/debug?query=专业",
+    headers: auth()
+  });
+  assert.equal(response.statusCode, 200);
+  const data = response.json().data;
+  assert.equal(data.query, "专业");
+  assert.ok(data.selectedAlwaysOn.some(item => item.title === "学习专业"));
+  assert.equal(typeof data.finalInjectedTokenEstimate, "number");
+  const serialized = JSON.stringify(data);
+  assert.doesNotMatch(serialized, /private memory body|memory-token|api.?key|bearer/iu);
 });

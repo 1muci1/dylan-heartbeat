@@ -45,6 +45,11 @@ test("draw routes require Bearer auth and expose MCP-ready start/status/guess se
   t.after(() => app.close());
   const unauthorized = await app.inject({ method: "POST", url: "/api/game/draw/start", payload: {} });
   assert.equal(unauthorized.statusCode, 401);
+  assert.match(unauthorized.headers["content-type"], /application\/json/);
+  assert.deepEqual(unauthorized.json(), {
+    ok: false,
+    error: { code: "UNAUTHORIZED", message: "游戏访问凭据无效" }
+  });
   const start = await app.inject({
     method: "POST", url: "/api/game/draw/start",
     headers: { authorization: "Bearer test-only" },
@@ -64,4 +69,21 @@ test("draw routes require Bearer auth and expose MCP-ready start/status/guess se
     payload: { guesser: "chen", content: "山" }
   });
   assert.deepEqual(guess.json(), { result: "猜对了" });
+});
+
+test("draw route validation errors always use the safe JSON envelope", async t => {
+  const app = Fastify({ logger: false });
+  registerDrawGameRoutes(app, { service: new DrawGameService(), apiKey: "test-only" });
+  t.after(() => app.close());
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/game/draw/start",
+    headers: { authorization: "Bearer test-only" },
+    payload: { artist: "user", answer: "", strokes: [] }
+  });
+  assert.equal(response.statusCode, 400);
+  assert.match(response.headers["content-type"], /application\/json/);
+  assert.equal(response.json().ok, false);
+  assert.equal(response.json().error.code, "DRAW_ANSWER_INVALID");
+  assert.doesNotMatch(response.body, /stack|aliases|provider response|bearer/i);
 });

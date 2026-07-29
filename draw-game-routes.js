@@ -10,10 +10,15 @@ function safeEqual(actual, expected) {
 
 function registerDrawGameRoutes(app, { service, apiKey = process.env.GATEWAY_API_KEY } = {}) {
   if (!service) throw new TypeError("DrawGameService 必填");
+  const fail = (reply, statusCode, code, message) => reply.code(statusCode).type("application/json").send({
+    ok: false,
+    error: { code, message }
+  });
   function auth(req, reply, done) {
-    if (!apiKey) return reply.code(503).send({ error: { code: "GATEWAY_KEY_MISSING", message: "游戏服务未配置" } });
+    if (!apiKey) return fail(reply, 503, "GATEWAY_KEY_MISSING", "游戏服务未配置");
     if (!safeEqual(req.headers.authorization || "", `Bearer ${apiKey}`)) {
-      return reply.code(401).header("WWW-Authenticate", "Bearer").send({ error: { code: "UNAUTHORIZED", message: "Unauthorized" } });
+      reply.header("WWW-Authenticate", "Bearer");
+      return fail(reply, 401, "UNAUTHORIZED", "游戏访问凭据无效");
     }
     done();
   }
@@ -22,7 +27,12 @@ function registerDrawGameRoutes(app, { service, apiKey = process.env.GATEWAY_API
       return reply.send(action(req));
     } catch (error) {
       if ((error.statusCode || 500) >= 500) req.log.error({ errorCode: error.code, errorName: error.name }, "draw game API failed");
-      return reply.code(error.statusCode || 500).send({ error: { code: error.code || "DRAW_GAME_FAILED", message: error.statusCode < 500 ? error.message : "游戏服务暂时不可用" } });
+      return fail(
+        reply,
+        error.statusCode || 500,
+        error.code || "DRAW_GAME_FAILED",
+        error.statusCode < 500 ? error.message : "游戏服务暂时不可用"
+      );
     }
   };
   app.post("/api/game/draw/start", { preHandler: auth }, handle(req => service.drawStart(req.body)));

@@ -824,6 +824,8 @@ const auth = req.headers.authorization || "";
   if (req.url.startsWith("/api/v1/memories")) return done();
   if (req.url.startsWith("/api/v1/memory-candidates")) return done();
   if (req.url.startsWith("/api/v1/ai-")) return done();
+  // 游戏 API 使用各自路由的 Bearer 鉴权与 JSON 错误封装。
+  if (req.url.startsWith("/api/game/")) return done();
 
 const ip =
   req.ip ||

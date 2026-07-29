@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { test } = require("node:test");
-const { emptyBoard, isWin, chooseAiMove } = require("../ai-companion-frontend/game/gomoku");
+const { emptyBoard, isWin, chooseAiMove, scheduleChenMove } = require("../ai-companion-frontend/game/gomoku");
 
 const root = path.join(__dirname, "..", "ai-companion-frontend", "game");
 const read = name => fs.readFileSync(path.join(root, name), "utf8");
@@ -45,6 +45,30 @@ test("gomoku AI wins first, blocks second, and never selects an occupied point",
   assert.equal(board[move.row][move.column], 0);
 });
 
+test("Chen move is delayed and does not appear before the thinking timer fires", () => {
+  const board = emptyBoard();
+  board[7][7] = 1;
+  let scheduledCallback;
+  let scheduledDelay;
+  let move = null;
+  const scheduled = scheduleChenMove(board, {
+    random: () => 0,
+    setTimer(callback, delay) {
+      scheduledCallback = callback;
+      scheduledDelay = delay;
+      return 42;
+    },
+    onMove(value) { move = value; }
+  });
+  assert.equal(move, null);
+  assert.equal(scheduled.timer, 42);
+  assert.equal(scheduled.delay, 600);
+  assert.equal(scheduledDelay, 600);
+  scheduledCallback();
+  assert.ok(move);
+  assert.equal(board[move.row][move.column], 0);
+});
+
 test("drawing canvas supports pointer and touch input without bottom navigation overlap", () => {
   const html = read("index.html");
   const js = read("game.js");
@@ -70,7 +94,21 @@ test("drawing frontend sends structured strokes and uses public draw status", ()
   assert.match(js, /\/api\/game\/draw\/guess/);
   assert.match(js, /drawing_svg/);
   assert.match(js, /ascii_grid/);
+  assert.match(js, /headers\.get\("content-type"\)/);
+  assert.match(js, /contentType\.includes\("application\/json"\)/);
+  assert.match(js, /await response\.text\(\)\.then\(\(\) => null\)/);
+  assert.match(js, /沉暂时连接不上游戏服务/);
+  assert.match(js, /submitButton\.disabled = true/);
+  assert.match(js, /沉暂时没看清，稍后再试/);
   assert.doesNotMatch(js, /localStorage|sessionStorage/);
+});
+
+test("Gateway lets game requests reach their JSON Bearer route instead of the plain Forbidden fallback", () => {
+  const server = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
+  const allowIndex = server.indexOf('req.url.startsWith("/api/game/")');
+  const forbiddenIndex = server.indexOf('reply.code(403).send("Forbidden")');
+  assert.ok(allowIndex > -1);
+  assert.ok(forbiddenIndex > allowIndex);
 });
 
 test("all visible players are Chen and the game reuses both preference avatars", () => {
@@ -85,6 +123,10 @@ test("all visible players are Chen and the game reuses both preference avatars",
   assert.match(js, /getUserAvatarImage/);
   assert.match(js, /轮到沉，沉正在想/);
   assert.match(js, /沉落子了/);
+  assert.match(js, /state\.locked/);
+  assert.match(js, /if \(!cell \|\| state\.over \|\| state\.locked\) return/);
+  assert.match(js, /你赢了。沉认真记下这一局。/);
+  assert.match(js, /沉赢了。沉认真记下这一局。/);
   assert.match(js, /沉正在看你的画/);
   assert.match(js, /你是沉，在和辞辞玩你画我猜/);
   assert.doesNotMatch(html, /规则 AI|电脑玩家|AI 落子|bot/i);

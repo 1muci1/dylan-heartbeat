@@ -1,9 +1,17 @@
 "use strict";
 
 (() => {
-  const { SIZE, emptyBoard, isWin, chooseAiMove } = window.CompanionGomoku;
+  const { SIZE, emptyBoard, isWin, scheduleChenMove } = window.CompanionGomoku;
   const protocol = window.CompanionDrawingProtocol;
-  const state = { board: emptyBoard(), over: false, strokes: [], activeStroke: null, roundId: null };
+  const state = {
+    board: emptyBoard(),
+    over: false,
+    locked: false,
+    thinkingTimer: null,
+    strokes: [],
+    activeStroke: null,
+    roundId: null
+  };
   const $ = selector => document.querySelector(selector);
   const $$ = selector => document.querySelectorAll(selector);
   const preferenceStore = window.CompanionUserPreferences?.UserPreferenceStore
@@ -41,8 +49,17 @@
       ...options,
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.token}`, ...(options.headers || {}) }
     });
-    const body = await response.json();
-    if (!response.ok) throw new Error(body?.error?.message || "游戏服务暂时不可用");
+    const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+    const body = contentType.includes("application/json")
+      ? await response.json().catch(() => null)
+      : await response.text().then(() => null).catch(() => null);
+    if (!response.ok) {
+      const error = new Error(body?.error?.message || "沉暂时连接不上游戏服务，请稍后再试。");
+      error.code = body?.error?.code || "GAME_HTTP_ERROR";
+      error.status = response.status;
+      throw error;
+    }
+    if (!body || typeof body !== "object") throw new Error("沉暂时连接不上游戏服务，请稍后再试。");
     return body;
   }
 
@@ -69,26 +86,48 @@
   }
   function setGomokuStatus(text) { $("[data-gomoku-status]").textContent = text; }
   function resetGomoku() {
-    state.board = emptyBoard(); state.over = false; renderBoard(); setGomokuStatus("当前回合：轮到你。");
+    if (state.thinkingTimer) clearTimeout(state.thinkingTimer);
+    state.board = emptyBoard();
+    state.over = false;
+    state.locked = false;
+    state.thinkingTimer = null;
+    renderBoard();
+    setGomokuStatus("当前回合：轮到你。");
   }
   $("[data-gomoku-board]").addEventListener("click", event => {
     const cell = event.target.closest("[data-row]");
-    if (!cell || state.over) return;
+    if (!cell || state.over || state.locked) return;
     const row = Number(cell.dataset.row);
     const column = Number(cell.dataset.column);
     if (state.board[row][column]) return;
     state.board[row][column] = 1;
     if (isWin(state.board, row, column, 1)) {
-      state.over = true; renderBoard(); setGomokuStatus("你赢了。沉认真记下这一局。"); return;
+      state.over = true; state.locked = false; renderBoard(); setGomokuStatus("你赢了。沉认真记下这一局。"); return;
     }
-    setGomokuStatus("当前回合：轮到沉，沉正在想……");
-    const move = chooseAiMove(state.board);
-    if (!move) { state.over = true; renderBoard(); setGomokuStatus("棋盘满了，这局是平局。"); return; }
-    state.board[move.row][move.column] = 2;
-    if (isWin(state.board, move.row, move.column, 2)) {
-      state.over = true; setGomokuStatus("沉连成五子啦。要不要再来一局？");
-    } else setGomokuStatus("沉落子了。当前回合：轮到你。");
+    state.locked = true;
     renderBoard();
+    setGomokuStatus("当前回合：轮到沉，沉正在想……");
+    const scheduled = scheduleChenMove(state.board, { onMove: move => {
+      state.thinkingTimer = null;
+      if (state.over) return;
+      if (!move) {
+        state.over = true;
+        state.locked = false;
+        renderBoard();
+        setGomokuStatus("棋盘满了，这局是平局。");
+        return;
+      }
+      state.board[move.row][move.column] = 2;
+      state.locked = false;
+      if (isWin(state.board, move.row, move.column, 2)) {
+        state.over = true;
+        setGomokuStatus("沉赢了。沉认真记下这一局。");
+      } else {
+        setGomokuStatus("沉落子了。当前回合：轮到你。");
+      }
+      renderBoard();
+    } });
+    state.thinkingTimer = scheduled.timer;
   });
   $("[data-gomoku-reset]").addEventListener("click", resetGomoku);
 
@@ -138,8 +177,11 @@
     const body = await response.json();
     return String(body?.choices?.[0]?.message?.content || "我还没想好。").trim();
   }
-  $("[data-draw-submit]").addEventListener("click", async () => {
+  $("[data-draw-submit]").addEventListener("click", async event => {
     const result = $("[data-draw-status]");
+    const submitButton = event.currentTarget;
+    if (submitButton.disabled) return;
+    submitButton.disabled = true;
     try {
       result.textContent = "沉正在看你的画……";
       const started = await gameFetch("/api/game/draw/start", {
@@ -152,7 +194,11 @@
       $("[data-chen-guess-text]").textContent = `沉猜：${guess}`;
       $("[data-chen-guess]").hidden = false;
       result.textContent = "沉看完啦。她的猜测就在下面。";
-    } catch (error) { result.textContent = error.message; }
+    } catch {
+      result.textContent = "沉暂时没看清，稍后再试。";
+    } finally {
+      submitButton.disabled = false;
+    }
   });
   $("[data-chen-guess]").addEventListener("click", event => {
     const feedback = event.target.closest("[data-chen-feedback]")?.dataset.chenFeedback;

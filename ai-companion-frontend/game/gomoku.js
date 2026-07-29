@@ -51,5 +51,19 @@
     return choices.length ? choices[Math.floor(random() * choices.length) % choices.length] : null;
   }
 
-  return Object.freeze({ SIZE, emptyBoard, isWin, chooseAiMove });
+  function scheduleChenMove(board, {
+    random = Math.random,
+    setTimer = setTimeout,
+    onMove,
+    minimumDelay = 600,
+    maximumDelay = 1200
+  } = {}) {
+    if (typeof onMove !== "function") throw new TypeError("onMove 必填");
+    const span = Math.max(0, maximumDelay - minimumDelay);
+    const delay = minimumDelay + Math.floor(random() * (span + 1));
+    const timer = setTimer(() => onMove(chooseAiMove(board, random)), delay);
+    return { timer, delay };
+  }
+
+  return Object.freeze({ SIZE, emptyBoard, isWin, chooseAiMove, scheduleChenMove });
 });

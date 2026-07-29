@@ -13,9 +13,13 @@ const {
   callGameTool,
   createDrawMcpRuntime
 } = require("../mcp-draw-server");
+const { createMemoryDrawRoundStore } = require("./support/draw-round-store");
 
 async function connectedRuntime(t) {
-  const service = new DrawGameService({ random: () => 0 });
+  const service = new DrawGameService({
+    random: () => 0,
+    store: createMemoryDrawRoundStore()
+  });
   const runtime = createDrawMcpRuntime({
     gameTools: new GameTools({ service }),
     signalSource: new EventEmitter()
@@ -68,7 +72,7 @@ test("MCP draw_start delegates through GameTools and returns the game URL", asyn
     ok: true,
     roundId: "round-1",
     message: "沉画好了，可以开始猜了。",
-    gameUrl: "/game/#draw"
+    gameUrl: "/game/#draw?roundId=round-1"
   });
 });
 

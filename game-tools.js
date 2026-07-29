@@ -159,9 +159,11 @@ function buildDrawGameChatContext(intent, toolResult = null) {
     };
   }
   if (intent.type === "chen_draw" && toolResult?.ok) {
+    const gameUrl = toolResult.gameUrl ||
+      `/game/#draw?roundId=${encodeURIComponent(String(toolResult.roundId || ""))}`;
     return {
       role: "system",
-      content: `沉已通过 draw_start 画好一局（roundId: ${toolResult.roundId}）。请直接说“我画好啦，去游戏页猜猜看。”并提供 /game/#draw 链接，不要解释工具实现。`
+      content: `沉已通过 draw_start 画好一局。请直接说“我画好啦，去游戏页猜猜看。”并提供 ${gameUrl} 链接，不要解释工具实现。`
     };
   }
   return {

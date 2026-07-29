@@ -37,7 +37,7 @@ function fakeBridge(options = {}) {
             ok: true,
             roundId: "round-1",
             message: "沉画好了，可以开始猜了。",
-            gameUrl: "/game/#draw"
+            gameUrl: "/game/#draw?roundId=round-1"
           }
         };
       }
@@ -96,6 +96,7 @@ test("Draw MCP client calls draw_start and keeps hidden fields out", async t => 
   });
   assert.equal(result.ok, true);
   assert.equal(result.roundId, "round-1");
+  assert.equal(result.gameUrl, "/game/#draw?roundId=round-1");
   assert.equal(Object.hasOwn(result, "answer"), false);
   assert.equal(Object.hasOwn(result, "aliases"), false);
   assert.deepEqual(calls.at(-1).request, {

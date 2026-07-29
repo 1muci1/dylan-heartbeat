@@ -7,6 +7,8 @@ const { DrawGameService } = require("./draw-game-service");
 const { GAME_TOOL_NAMES, GameTools } = require("./game-tools");
 
 const GAME_URL = "/game/#draw";
+const gameUrlForRound = roundId =>
+  `${GAME_URL}?roundId=${encodeURIComponent(String(roundId || ""))}`;
 const artistSchema = z.enum(["chen", "user"]).default("chen");
 const guesserSchema = z.enum(["chen", "user"]).default("chen");
 const pointSchema = z.tuple([
@@ -50,7 +52,7 @@ function callGameTool(gameTools, name, input) {
       ok: true,
       roundId: result.roundId,
       message: result.message,
-      gameUrl: GAME_URL
+      gameUrl: gameUrlForRound(result.roundId)
     });
   }
   if (name === "draw_status") {
@@ -185,6 +187,7 @@ module.exports = {
   GAME_URL,
   callGameTool,
   createDrawMcpRuntime,
+  gameUrlForRound,
   main,
   registerDrawMcpTools
 };

@@ -13,6 +13,7 @@ wake_prompt.txt
 uploads/
 memory-backups/
 audit-backups/
+runtime-data/draw-rounds.json*
 
 # Database
 *.sqlite

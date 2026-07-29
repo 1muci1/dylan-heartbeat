@@ -249,7 +249,7 @@ test("feedback loading always restores the result buttons after success or failu
   const js = read("game.js");
   const hintHandler = js.slice(
     js.indexOf('$("[data-chen-hint-form]").addEventListener'),
-    js.indexOf('$$("[data-draw-mode]")')
+    js.indexOf('$$("[data-draw-mode]")', js.indexOf('$("[data-chen-hint-form]").addEventListener'))
   );
   assert.match(hintHandler, /buttons\.forEach\(button => \{ button\.disabled = true; \}\)/);
   assert.match(hintHandler, /catch \(error\)[\s\S]*drawErrorMessage\(error\)/);
@@ -291,4 +291,14 @@ test("MCP plan keeps Chen as the player identity", () => {
   assert.match(plan, /draw_status.*沉查看/);
   assert.match(plan, /draw_guess.*沉提交猜测/);
   assert.match(plan, /玩家身份始终是沉/);
+});
+
+test("shared MCP round links restore Chen drawing mode without exposing answers", () => {
+  const js = read("game.js");
+  assert.match(js, /roundIdFromLocation/);
+  assert.match(js, /new URLSearchParams\(query\)\.get\("roundId"\)/);
+  assert.match(js, /showView\("drawing"\)/);
+  assert.match(js, /selectDrawMode\("chen"\)/);
+  assert.match(js, /api\/game\/draw\/status\/\$\{encodeURIComponent\(roundId\)\}/);
+  assert.match(js, /这一局画作已经失效，重新开始一局吧。/);
 });

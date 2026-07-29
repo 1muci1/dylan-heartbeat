@@ -12,9 +12,15 @@ const {
   detectDrawGameIntent,
   resolveDrawGameIntentTool
 } = require("../game-tools");
+const { createMemoryDrawRoundStore } = require("./support/draw-round-store");
+
+const service = options => new DrawGameService({
+  ...options,
+  store: createMemoryDrawRoundStore()
+});
 
 test("game tools expose only draw_start, draw_status and draw_guess", () => {
-  const tools = new GameTools({ service: new DrawGameService() });
+  const tools = new GameTools({ service: service() });
   assert.deepEqual(GAME_TOOL_NAMES, ["draw_start", "draw_status", "draw_guess"]);
   assert.deepEqual(tools.list().map(tool => tool.name), GAME_TOOL_NAMES);
 });
@@ -32,8 +38,8 @@ test("draw_start delegates to the existing DrawGameService method", () => {
 });
 
 test("draw_status returns only public drawing fields and never answer or aliases", () => {
-  const service = new DrawGameService({ random: () => 0 });
-  const tools = new GameTools({ service });
+  const game = service({ random: () => 0 });
+  const tools = new GameTools({ service: game });
   const started = tools.execute("draw_start", { artist: "chen" });
   const status = tools.execute("draw_status", { roundId: started.roundId });
   assert.equal(status.ok, true);
@@ -46,8 +52,8 @@ test("draw_status returns only public drawing fields and never answer or aliases
 });
 
 test("draw_guess accepts aliases but a wrong guess never leaks the answer", () => {
-  const service = new DrawGameService({ random: () => 0 });
-  const tools = new GameTools({ service });
+  const game = service({ random: () => 0 });
+  const tools = new GameTools({ service: game });
   const started = tools.execute("draw_start", { artist: "chen" });
   assert.deepEqual(tools.execute("draw_guess", {
     roundId: started.roundId, content: "猫咪", guesser: "chen"
@@ -60,7 +66,7 @@ test("draw_guess accepts aliases but a wrong guess never leaks the answer", () =
 });
 
 test("game tool names are whitelisted and invalid inputs return safe errors", () => {
-  const tools = new GameTools({ service: new DrawGameService() });
+  const tools = new GameTools({ service: service() });
   assert.deepEqual(tools.execute("memory_read", {}), {
     ok: false,
     error: { code: "GAME_TOOL_NOT_ALLOWED", message: "游戏工具不在白名单中" }

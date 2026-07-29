@@ -96,6 +96,41 @@
   $$("[data-open-game]").forEach(button => button.addEventListener("click", () => showView(button.dataset.openGame)));
   $$("[data-back]").forEach(button => button.addEventListener("click", () => showView("lobby")));
 
+  function roundIdFromLocation(locationLike = window.location) {
+    const hash = String(locationLike?.hash || "");
+    const query = hash.includes("?") ? hash.slice(hash.indexOf("?") + 1) : "";
+    const roundId = new URLSearchParams(query).get("roundId");
+    return String(roundId || "").trim();
+  }
+
+  function selectDrawMode(mode) {
+    $$("[data-draw-mode]").forEach(item =>
+      item.classList.toggle("is-active", item.dataset.drawMode === mode)
+    );
+    $$("[data-draw-pane]").forEach(pane => {
+      pane.hidden = pane.dataset.drawPane !== mode;
+    });
+  }
+
+  async function restoreSharedDrawRound() {
+    const roundId = roundIdFromLocation();
+    if (!roundId) return;
+    showView("drawing");
+    selectDrawMode("chen");
+    state.roundId = roundId;
+    try {
+      const status = await gameFetch(`/api/game/draw/status/${encodeURIComponent(roundId)}`);
+      $("[data-preset-drawing]").innerHTML = status.drawing_svg;
+      $("[data-preset-result]").textContent = "沉画了一张图，你来猜。";
+    } catch (error) {
+      state.roundId = null;
+      $("[data-preset-drawing]").replaceChildren();
+      $("[data-preset-result]").textContent = error?.code === "DRAW_ROUND_NOT_FOUND"
+        ? "这一局画作已经失效，重新开始一局吧。"
+        : "这一局暂时读取失败，稍后再试。";
+    }
+  }
+
   function renderBoard() {
     const root = $("[data-gomoku-board]");
     root.replaceChildren();
@@ -309,8 +344,7 @@
   });
 
   $$("[data-draw-mode]").forEach(button => button.addEventListener("click", () => {
-    $$("[data-draw-mode]").forEach(item => item.classList.toggle("is-active", item === button));
-    $$("[data-draw-pane]").forEach(pane => { pane.hidden = pane.dataset.drawPane !== button.dataset.drawMode; });
+    selectDrawMode(button.dataset.drawMode);
   }));
   $("[data-chen-start]").addEventListener("click", async () => {
     try {
@@ -340,12 +374,15 @@
     drawGuess: "/api/game/draw/guess/:roundId",
     drawErrorMessage,
     protocol,
+    restoreSharedDrawRound,
+    roundIdFromLocation,
     validateUserDrawing
   });
   resetGomoku();
   redraw();
   applyGameAvatars();
   preferenceStore?.subscribe?.(applyGameAvatars);
+  restoreSharedDrawRound();
   window.addEventListener("pageshow", () => applyGameAvatars());
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") applyGameAvatars();

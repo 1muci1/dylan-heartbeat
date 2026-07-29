@@ -6,6 +6,7 @@ const {
   strokesToSvg,
   makeAsciiGrid
 } = require("./ai-companion-frontend/shared/drawing-protocol");
+const { DrawRoundStore } = require("./draw-round-store");
 
 const ASCII_NOTE = "60×42 字符网格；█ 表示画笔经过的位置，空格表示留白。";
 const PRESETS = Object.freeze([
@@ -23,11 +24,11 @@ function normalizeGuess(value) {
 }
 
 class DrawGameService {
-  constructor({ maxRounds = 100, now = () => new Date(), random = Math.random } = {}) {
+  constructor({ maxRounds = 100, now = () => new Date(), random = Math.random, store = null } = {}) {
     this.maxRounds = maxRounds;
     this.now = now;
     this.random = random;
-    this.rounds = new Map();
+    this.store = store || new DrawRoundStore({ maxRounds });
   }
 
   drawStart(input = {}) {
@@ -52,13 +53,12 @@ class DrawGameService {
     }
     const id = crypto.randomUUID();
     const createdAt = this.now().toISOString();
-    this.rounds.set(id, { id, answer, aliases, artist, canvas, strokes, createdAt });
-    while (this.rounds.size > this.maxRounds) this.rounds.delete(this.rounds.keys().next().value);
+    this.store.createRound({ id, answer, aliases, artist, canvas, strokes, createdAt });
     return { round_id: id, result: "画画提交成功，可以开始猜了。" };
   }
 
   drawStatus(roundId) {
-    const round = this.rounds.get(String(roundId));
+    const round = this.store.getRound(String(roundId));
     if (!round) throw Object.assign(new Error("画作回合不存在或已过期"), { statusCode: 404, code: "DRAW_ROUND_NOT_FOUND" });
     return {
       canvas: { ...round.canvas },
@@ -71,7 +71,7 @@ class DrawGameService {
   }
 
   drawGuess(roundId, input = {}) {
-    const round = this.rounds.get(String(roundId));
+    const round = this.store.getRound(String(roundId));
     if (!round) throw Object.assign(new Error("画作回合不存在或已过期"), { statusCode: 404, code: "DRAW_ROUND_NOT_FOUND" });
     const guess = normalizeGuess(input.content);
     if (!guess) throw Object.assign(new Error("请先输入猜测"), { statusCode: 400, code: "DRAW_GUESS_EMPTY" });

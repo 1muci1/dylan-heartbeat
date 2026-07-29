@@ -2,10 +2,10 @@
 
 const { MEMORY_IMPORT_CATEGORIES, MemoryImportError } = require("./memory-import-contract");
 const { categoryOfMemory } = require("./memory-import-preview");
-const { extractMemoryKeywords, normalizeMemoryQuery } = require("./agent-memory-query");
+const { detectMemoryIntent, extractMemoryKeywords, normalizeMemoryQuery } = require("./agent-memory-query");
 
 const DEFAULT_LIMIT = 10;
-const MAX_LIMIT = 20;
+const MAX_LIMIT = 30;
 const DEFAULT_CHARACTER_BUDGET = 8000;
 const MAX_CHARACTER_BUDGET = 20000;
 const MAX_SCAN_ITEMS = 10000;
@@ -13,6 +13,41 @@ const COMPANION_RELATIONSHIP_RESERVE = 2;
 const COMPANION_FACT_RESERVE = 2;
 const DEFAULT_CORE_LIMIT = 8;
 const DEFAULT_RECENT_LIMIT = 2;
+const DEFAULT_OVERVIEW_PER_GROUP_LIMIT = 4;
+const OVERVIEW_GROUP_ORDER = Object.freeze([
+  "identityRelationship",
+  "academicLife",
+  "projectTechnology",
+  "emotionPreferences",
+  "peopleDailyLife",
+  "recentChanges"
+]);
+const OVERVIEW_GROUPS = Object.freeze({
+  identityRelationship: {
+    label: "核心身份与关系",
+    pattern: /(?:昵称|称呼|身份|关系|相遇|认识|AI\s*Companion|陪伴|沉的小世界|项目意义)/iu
+  },
+  academicLife: {
+    label: "学业与现实生活",
+    pattern: /(?:专业|数字媒体|年级|大四|毕设|毕业|学校|宿舍|作息|生活节奏|培训|模特|课程|实习|AIGC|游戏行业)/iu
+  },
+  projectTechnology: {
+    label: "项目与技术上下文",
+    pattern: /(?:dylan-heartbeat|小窝|聊天页|记忆库|议事厅|VPS|Gateway|前端|后端|部署|Service Worker|Session|Chat Sync|项目|修复|测试)/iu
+  },
+  emotionPreferences: {
+    label: "情绪与互动偏好",
+    pattern: /(?:情绪|焦虑|沮丧|害怕|担心|难过|压力|语气|说法|互动|偏好|喜欢|不喜欢|讨厌|情感边界|关系边界|情感|主动联系)/iu
+  },
+  peopleDailyLife: {
+    label: "人际与生活细节",
+    pattern: /(?:闺蜜|朋友|家人|家庭|社交|日常|习惯|饮食|爱好|生活|室友|同学|宠物|猫|游戏|穿搭)/iu
+  },
+  recentChanges: {
+    label: "近期变化",
+    pattern: /(?:最近|近期|当前|这几天|刚刚|进展|变化|完成|修复|部署|强调|更新)/iu
+  }
+});
 const IDENTITY_TITLES = new Set(["Companion名称", "用户称呼"]);
 const CORE_MEMORY_PATTERN = /(?:用户画像|基本资料|学习专业|专业|学校|学历|年级|学校阶段|生活节奏|作息|关系设定|相遇与关系|AI\s*Companion|沉的小世界|重要偏好|长期偏好|主动联系偏好|毕设方向|当前项目)/iu;
 const SENSITIVE_MEMORY_PATTERN = /(?:\bapi[\s_-]*key\b|\b(?:access|bearer|device)?[\s_-]*token\b|\bpassword\b|\bpasswd\b|\bcookie\b|\bprivate[\s_-]*key\b|\botp\b|\bverification[\s_-]*code\b|API\s*密钥|访问令牌|密码|私钥|验证码|身份证|银行卡|银行账号|精确住址|门禁|医疗诊断|设备\s*token)/iu;
@@ -59,8 +94,8 @@ function minimumItemCharacters(memory) {
   return title.length + (content.length ? 1 : 0);
 }
 
-function safeCandidate(memory) {
-  if (!memory || IDENTITY_TITLES.has(memory.title)) return false;
+function safeCandidate(memory, options = {}) {
+  if (!memory || (!options.includeIdentity && IDENTITY_TITLES.has(memory.title))) return false;
   return !SENSITIVE_MEMORY_PATTERN.test(`${memory.title || ""}\n${memory.content || ""}`);
 }
 
@@ -186,6 +221,87 @@ function selectRecentImportantCandidates(store, excludedIds, limit = DEFAULT_REC
     .slice(0, limit);
 }
 
+function overviewScore(memory, pattern) {
+  const title = String(memory.title || "");
+  const content = String(memory.content || "");
+  const titleMatch = pattern.test(title) ? 4 : 0;
+  const contentMatch = pattern.test(content) ? 2 : 0;
+  return titleMatch + contentMatch + Number(memory.importance || 0);
+}
+
+function selectOverviewCandidates(candidates, perGroupLimit = DEFAULT_OVERVIEW_PER_GROUP_LIMIT) {
+  const groups = Object.fromEntries(OVERVIEW_GROUP_ORDER.map(group => [group, []]));
+  const selectedIds = new Set();
+
+  for (const group of OVERVIEW_GROUP_ORDER) {
+    const definition = OVERVIEW_GROUPS[group];
+    let matches = candidates
+      .filter(memory => !selectedIds.has(memory.id) && definition.pattern.test(
+        `${memory.title || ""}\n${memory.content || ""}\n${memory.source || ""}`
+      ));
+    if (group === "recentChanges") {
+      matches = candidates.filter(memory => !selectedIds.has(memory.id));
+    }
+    matches.sort((left, right) => (
+      (group === "recentChanges"
+        ? String(right.updatedAt || right.createdAt || "").localeCompare(String(left.updatedAt || left.createdAt || ""))
+        : overviewScore(right, definition.pattern) - overviewScore(left, definition.pattern))
+      || Number(right.importance) - Number(left.importance)
+      || String(right.updatedAt || "").localeCompare(String(left.updatedAt || ""))
+    ));
+    for (const memory of matches.slice(0, perGroupLimit)) {
+      groups[group].push(memory);
+      selectedIds.add(memory.id);
+    }
+  }
+
+  return groups;
+}
+
+function overviewItems(groups, limit, characterBudget) {
+  const selected = [];
+  for (const group of OVERVIEW_GROUP_ORDER) {
+    for (const memory of groups[group]) {
+      if (selected.length >= limit) break;
+      selected.push({ memory, group });
+    }
+  }
+
+  const items = [];
+  let usedCharacters = 0;
+  for (const { memory, group } of selected) {
+    const title = boundedText(memory.title, 160) || null;
+    let content = boundedText(memory.content, 420);
+    const base = {
+      id: memory.id,
+      layer: "overview",
+      category: categoryOfMemory(memory),
+      categorySource: categorySource(memory),
+      type: memory.type,
+      title,
+      content,
+      importance: memory.importance,
+      occurredAt: memory.occurredAt,
+      createdAt: memory.createdAt,
+      updatedAt: memory.updatedAt,
+      sourceGroup: group,
+      whySelected: `代表“${OVERVIEW_GROUPS[group].label}”的记忆`
+    };
+    let cost = JSON.stringify(base).length;
+    const remaining = characterBudget - usedCharacters;
+    if (remaining <= 0) break;
+    if (cost > remaining) {
+      content = content.slice(0, Math.max(0, content.length - (cost - remaining)));
+      base.content = content;
+      cost = JSON.stringify(base).length;
+    }
+    if (!content || cost > remaining) break;
+    items.push(base);
+    usedCharacters += cost;
+  }
+  return { items, usedCharacters };
+}
+
 class AgentMemoryRetriever {
   constructor({ store, defaultLimit = DEFAULT_LIMIT, defaultCharacterBudget = DEFAULT_CHARACTER_BUDGET } = {}) {
     if (!store || typeof store.list !== "function") throw new TypeError("StructuredMemoryStore 必填");
@@ -212,10 +328,52 @@ class AgentMemoryRetriever {
       throw new MemoryImportError("keyword 无效", "MEMORY_RUNTIME_QUERY_INVALID");
     }
     const normalizedQuery = normalizeMemoryQuery(query.query);
+    const memoryIntent = query.memoryIntent === "overview" || query.memoryIntent === "normal"
+      ? query.memoryIntent
+      : detectMemoryIntent(normalizedQuery);
     const extracted = extractMemoryKeywords(normalizedQuery);
 
     const candidates = listCandidates(this.store, keyword);
     const safeCandidates = candidates.filter(safeCandidate);
+    if (memoryIntent === "overview") {
+      const overviewSafeCandidates = candidates.filter(memory => safeCandidate(memory, { includeIdentity: true }));
+      const requestedPerGroup = Number(query.perGroupLimit ?? DEFAULT_OVERVIEW_PER_GROUP_LIMIT);
+      const perGroupLimit = Number.isInteger(requestedPerGroup)
+        ? Math.max(1, Math.min(6, requestedPerGroup))
+        : DEFAULT_OVERVIEW_PER_GROUP_LIMIT;
+      const groups = selectOverviewCandidates(overviewSafeCandidates, perGroupLimit);
+      const bounded = overviewItems(groups, limit, characterBudget);
+      const perGroupCount = Object.fromEntries(OVERVIEW_GROUP_ORDER.map(group => [
+        group,
+        bounded.items.filter(item => item.sourceGroup === group).length
+      ]));
+      return {
+        items: bounded.items,
+        meta: {
+          limit,
+          characterBudget,
+          usedCharacters: bounded.usedCharacters,
+          truncated: bounded.items.length < overviewSafeCandidates.length,
+          memoryIntent,
+          queryApplied: false,
+          keywordCount: extracted.keywords.length,
+          relevantCount: 0,
+          candidateCount: candidates.length,
+          safeCandidateCount: overviewSafeCandidates.length,
+          rejectedCount: candidates.length - overviewSafeCandidates.length,
+          rejectedReasons: {
+            sensitive: candidates.length - overviewSafeCandidates.length,
+            notSelectedByOverviewGroup: Math.max(0, overviewSafeCandidates.length - bounded.items.length)
+          },
+          selectedAlwaysOn: 0,
+          selectedRelevant: 0,
+          selectedRecent: 0,
+          selectedGroups: OVERVIEW_GROUP_ORDER.filter(group => perGroupCount[group] > 0),
+          perGroupCount,
+          normalizedQuery: extracted.normalized
+        }
+      };
+    }
     const searchedCandidates = extracted.keywords.length
       ? searchKeywordCandidates(this.store, extracted.keywords).filter(safeCandidate)
       : [];
@@ -302,6 +460,9 @@ class AgentMemoryRetriever {
         rejectedReasons: {
           identityOrSensitive: candidates.length - safeCandidates.length
         },
+        memoryIntent,
+        selectedGroups: [],
+        perGroupCount: {},
         selectedAlwaysOn: items.filter(item => item.layer === "core").length,
         selectedRelevant: items.filter(item => item.layer === "relevant").length,
         selectedRecent: items.filter(item => item.layer === "recent").length,
@@ -316,6 +477,7 @@ module.exports = {
   COMPANION_RELATIONSHIP_RESERVE,
   CORE_MEMORY_PATTERN,
   DEFAULT_CORE_LIMIT,
+  DEFAULT_OVERVIEW_PER_GROUP_LIMIT,
   DEFAULT_RECENT_LIMIT,
   IDENTITY_TITLES,
   SENSITIVE_MEMORY_PATTERN,
@@ -324,12 +486,15 @@ module.exports = {
   DEFAULT_LIMIT,
   MAX_CHARACTER_BUDGET,
   MAX_LIMIT,
+  OVERVIEW_GROUP_ORDER,
+  OVERVIEW_GROUPS,
   compareRelevant,
   isCoreMemory,
   listCandidates,
   relevanceOf,
   searchKeywordCandidates,
   selectCoreCandidates,
+  selectOverviewCandidates,
   selectRecentImportantCandidates,
   selectRelevantCandidates,
   selectWithFallback

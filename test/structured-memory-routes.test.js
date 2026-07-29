@@ -139,3 +139,38 @@ test("admin Memory debug is authenticated and returns metadata without content o
   const serialized = JSON.stringify(data);
   assert.doesNotMatch(serialized, /private memory body|memory-token|api.?key|bearer/iu);
 });
+
+test("admin Memory debug reports overview groups without credentials or long content", async t => {
+  const { app } = await fixture(t);
+  for (const payload of [
+    { title: "AI Companion 关系", content: "长期陪伴关系的简短说明", source: "memory-import:v1:relationship:overview", importance: 5 },
+    { title: "学习专业和毕设", content: "数字媒体艺术专业的大四毕设阶段", source: "memory-import:v1:fact:overview", importance: 5 },
+    { title: "dylan-heartbeat 项目", content: "VPS Gateway 与聊天页项目进展", source: "memory-import:v1:fact:overview-project", importance: 5 },
+    { title: "互动语气偏好", content: "焦虑时喜欢具体而温和的回应", source: "memory-import:v1:preference:overview", importance: 4 },
+    { title: "闺蜜与社交习惯", content: "会和闺蜜分享日常生活", source: "memory-import:v1:fact:overview-people", importance: 4 },
+    { title: "近期状态变化", content: "这几天完成了重要调整", source: "memory-import:v1:event:overview", importance: 5, type: "EVENT" }
+  ]) {
+    await create(app, { type: payload.type || "MEMORY", ...payload });
+  }
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/admin/memory/debug?query=你现在记忆方面怎么样",
+    headers: auth()
+  });
+  assert.equal(response.statusCode, 200);
+  const data = response.json().data;
+  assert.equal(data.memoryIntent, "overview");
+  assert.ok(data.selectedGroups.length >= 5);
+  assert.equal(typeof data.perGroupCount.academicLife, "number");
+  assert.equal(typeof data.finalInjectedCount, "number");
+  assert.equal(typeof data.finalInjectedTokenEstimate, "number");
+  assert.equal(typeof data.rejectedCount, "number");
+  const serialized = JSON.stringify(data);
+  assert.doesNotMatch(serialized, /memory-token|api.?key|bearer/iu);
+  for (const group of data.selectedGroups) {
+    for (const item of data.topTitlesByGroup[group]) {
+      assert.ok(item.summary.length <= 100);
+    }
+  }
+});

@@ -20,6 +20,18 @@ const QUERY_EXPANSIONS = Object.freeze([
   }
 ]);
 
+const MEMORY_OVERVIEW_PATTERNS = Object.freeze([
+  /你(?:还)?记得我(?:吗|么|嘛|？|\?|$)/u,
+  /你(?:现在)?(?:能)?看到(?:多少|哪些|什么)?记忆/u,
+  /你(?:现在)?记忆(?:方面|情况)?(?:怎么样|如何|有细节了吗|有多少)/u,
+  /记忆(?:方面|情况)(?:怎么样|如何|有细节了吗|有多少)/u,
+  /你(?:还)?记得(?:哪些|什么)(?:关于我|我的)?(?:细节|事情|内容|记忆)?/u,
+  /你(?:对我)?了解我?多少/u,
+  /你对我的记忆(?:有|是|包括)?(?:哪些|什么)/u,
+  /你现在能看到记忆了吗/u,
+  /(?:记忆[\s\S]{0,500}现在能看到了吗)|(?:现在能看到了吗[\s\S]{0,500}记忆)/u
+]);
+
 function normalizeMemoryQuery(value) {
   if (value == null) return "";
   return String(value)
@@ -28,6 +40,13 @@ function normalizeMemoryQuery(value) {
     .slice(0, MAX_QUERY_CHARACTERS)
     .toLocaleLowerCase()
     .replace(/\s+/gu, " ");
+}
+
+function detectMemoryIntent(value) {
+  const normalized = normalizeMemoryQuery(value);
+  return MEMORY_OVERVIEW_PATTERNS.some(pattern => pattern.test(normalized))
+    ? "overview"
+    : "normal";
 }
 
 function extractMemoryKeywords(value, options = {}) {
@@ -76,8 +95,10 @@ function extractMemoryKeywords(value, options = {}) {
 module.exports = {
   DEFAULT_MAX_KEYWORDS,
   MAX_QUERY_CHARACTERS,
+  MEMORY_OVERVIEW_PATTERNS,
   QUERY_EXPANSIONS,
   STOP_WORDS,
+  detectMemoryIntent,
   extractMemoryKeywords,
   normalizeMemoryQuery
 };

@@ -2,6 +2,7 @@
 
 const crypto = require("node:crypto");
 const { StructuredMemoryError } = require("./structured-memory-store");
+const { detectMemoryIntent } = require("./agent-memory-query");
 
 function safeEqual(actual, expected) {
   const left = Buffer.from(String(actual));
@@ -67,14 +68,18 @@ function registerMemoryRoutes(app, options) {
       throw new StructuredMemoryError("Memory 诊断未配置", 503, "MEMORY_DEBUG_UNAVAILABLE");
     }
     const query = String(req.query?.query || "").trim().slice(0, 500);
-    const result = retriever.retrieve({ query, limit: 12, characterBudget: 5000 });
-    const context = contextBuilder.build(result);
+    const memoryIntent = detectMemoryIntent(query);
+    const limit = memoryIntent === "overview" ? 24 : 12;
+    const characterBudget = memoryIntent === "overview" ? 12000 : 5000;
+    const result = retriever.retrieve({ query, memoryIntent, limit, characterBudget });
+    const context = contextBuilder.build(result, { maxItems: limit, maxCharacters: characterBudget });
     const activeCount = store.list({ page: 1, limit: 1, status: "active" }).meta.total;
     const archivedCount = store.list({ page: 1, limit: 1, status: "archived" }).meta.total;
     const deletedCount = store.list({ page: 1, limit: 1, status: "deleted" }).meta.total;
     return envelope({
       query,
       normalizedQuery: result.meta.normalizedQuery,
+      memoryIntent,
       candidates: result.meta.candidateCount,
       selectedAlwaysOn: result.items
         .filter(item => item.layer === "core")
@@ -85,12 +90,28 @@ function registerMemoryRoutes(app, options) {
       selectedRecent: result.items
         .filter(item => item.layer === "recent")
         .map(({ id, title, type, importance }) => ({ id, title, type, importance })),
+      selectedGroups: result.meta.selectedGroups,
+      perGroupCount: result.meta.perGroupCount,
+      topTitlesByGroup: Object.fromEntries((result.meta.selectedGroups || []).map(group => [
+        group,
+        result.items
+          .filter(item => item.sourceGroup === group)
+          .slice(0, 6)
+          .map(({ id, title, type, importance, content }) => ({
+            id,
+            title,
+            type,
+            importance,
+            summary: String(content || "").replace(/\s+/g, " ").slice(0, 100)
+          }))
+      ])),
       rejectedReasons: {
         ...result.meta.rejectedReasons,
         archived: archivedCount,
         deleted: deletedCount,
         activeNotSelected: Math.max(0, activeCount - result.items.length - result.meta.rejectedCount)
       },
+      rejectedCount: result.meta.rejectedCount,
       finalInjectedCount: result.items.length,
       finalInjectedTokenEstimate: Math.ceil((context?.content?.length || 0) / 4)
     });

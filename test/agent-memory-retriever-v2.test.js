@@ -2,7 +2,7 @@
 
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
-const { extractMemoryKeywords, normalizeMemoryQuery } = require("../agent-memory-query");
+const { detectMemoryIntent, extractMemoryKeywords, normalizeMemoryQuery } = require("../agent-memory-query");
 const { AgentMemoryRetriever } = require("../agent-memory-retriever");
 
 const memory = (id, category, title, content, importance = 3, updatedAt = "2026-07-01T00:00:00Z", extra = {}) => ({
@@ -36,6 +36,20 @@ test("normalizes user messages and extracts bounded meaningful Chinese keywords"
   assert.ok(meeting.keywords.length <= 6);
   assert.ok(!meeting.keywords.includes("什么"));
   assert.deepEqual(extractMemoryKeywords("").keywords, []);
+});
+
+test("detects memory overview intent without changing ordinary topic queries", () => {
+  for (const query of [
+    "你记得我吗",
+    "沉沉现在记忆方面怎么样有细节了吗",
+    "你现在能看到记忆了吗",
+    "你还记得什么",
+    "上一轮在讨论记忆是否可见\n现在能看到了吗"
+  ]) {
+    assert.equal(detectMemoryIntent(query), "overview", query);
+  }
+  assert.equal(detectMemoryIntent("你记得我的专业是什么吗"), "normal");
+  assert.equal(detectMemoryIntent("今天继续修聊天页"), "normal");
 });
 
 test("什么时候认识 prioritizes the meeting Memory", () => {
@@ -122,4 +136,56 @@ test("query-aware results and recent important memories share the final bounded 
   assert.ok(result.items.some(item => item.id === "recent"));
   assert.ok(result.items.length <= 12);
   assert.ok(result.meta.usedCharacters <= 1000);
+});
+
+test("overview mode selects representative memories across six groups within budget", () => {
+  const memories = [
+    memory("nickname", "relationship", "用户称呼", "用户希望被称为辞辞", 5),
+    memory("relationship", "relationship", "AI Companion 的意义", "用户和沉的长期陪伴关系", 5),
+    memory("academic", "fact", "学习专业与毕设", "数字媒体艺术专业，大四阶段正在准备毕设", 5),
+    memory("project", "fact", "dylan-heartbeat 项目", "VPS Gateway、小窝、聊天页和议事厅的开发上下文", 5),
+    memory("emotion", "preference", "互动语气偏好", "用户不喜欢冷淡说法，焦虑时希望得到具体回应", 5),
+    memory("people", "fact", "闺蜜与社交习惯", "用户会和闺蜜分享日常，也重视家人边界", 4),
+    memory("recent", "event", "近期状态变化", "这几天完成了一项重要调整", 5, "2026-07-29T12:00:00Z")
+  ];
+  const result = new AgentMemoryRetriever({ store: fixture(memories) }).retrieve({
+    query: "你现在记忆方面怎么样",
+    limit: 24,
+    characterBudget: 5000
+  });
+  assert.equal(result.meta.memoryIntent, "overview");
+  assert.deepEqual(result.meta.selectedGroups, [
+    "identityRelationship",
+    "academicLife",
+    "projectTechnology",
+    "emotionPreferences",
+    "peopleDailyLife",
+    "recentChanges"
+  ]);
+  for (const group of result.meta.selectedGroups) {
+    assert.ok(result.meta.perGroupCount[group] >= 1, group);
+    assert.ok(result.items.some(item => item.sourceGroup === group && item.content), group);
+  }
+  assert.ok(result.items.some(item => item.sourceGroup !== "identityRelationship"));
+  assert.ok(result.items.some(item => item.id === "nickname"));
+  assert.ok(result.meta.usedCharacters <= 5000);
+  assert.ok(result.items.length <= 24);
+});
+
+test("overview mode truncates details instead of exceeding its character budget", () => {
+  const memories = Array.from({ length: 30 }, (_, index) => memory(
+    `memory-${index}`,
+    index % 2 ? "preference" : "fact",
+    index % 2 ? `偏好与情绪 ${index}` : `项目进展 ${index}`,
+    "具体细节".repeat(600),
+    5
+  ));
+  const result = new AgentMemoryRetriever({ store: fixture(memories) }).retrieve({
+    query: "你记得哪些细节",
+    limit: 24,
+    characterBudget: 3000
+  });
+  assert.equal(result.meta.memoryIntent, "overview");
+  assert.ok(result.meta.usedCharacters <= 3000);
+  assert.ok(result.items.length <= 24);
 });

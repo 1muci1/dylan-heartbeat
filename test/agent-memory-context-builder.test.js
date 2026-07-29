@@ -102,6 +102,37 @@ test("keeps core, relevant, and recent memories in explicit prompt layers", () =
   assert.match(message.content, /绝不能编造未提供的信息/);
 });
 
+test("overview context preserves grouped details and instructs honest cross-category answers", () => {
+  const message = new AgentMemoryContextBuilder({ maxCharacters: 5000, maxItems: 12 }).build({
+    meta: { memoryIntent: "overview" },
+    items: [
+      memory("relationship", {
+        layer: "overview",
+        sourceGroup: "identityRelationship",
+        title: "相遇与关系",
+        content: "用户与沉的长期陪伴关系",
+        whySelected: "代表核心身份与关系"
+      }),
+      memory("fact", {
+        layer: "overview",
+        sourceGroup: "academicLife",
+        title: "学习专业",
+        content: "用户是数字媒体艺术专业",
+        whySelected: "代表学业与现实生活"
+      })
+    ]
+  }, { maxItems: 24, maxCharacters: 12000 });
+  const data = dataOf(message).overview;
+  assert.equal(data.identityRelationship[0].title, "相遇与关系");
+  assert.equal(data.academicLife[0].content, "用户是数字媒体艺术专业");
+  assert.equal(data.academicLife[0].sourceGroup, "academicLife");
+  assert.equal(data.academicLife[0].whySelected, "代表学业与现实生活");
+  assert.match(message.content, /给出跨类别的具体例子/);
+  assert.match(message.content, /这类细节当前上下文里不多/);
+  assert.match(message.content, /不得编造/);
+  assert.ok(message.content.length <= 12000);
+});
+
 test("returns no context for an empty Retriever result", () => {
   const builder = new AgentMemoryContextBuilder();
   assert.equal(builder.build({ items: [] }), null);

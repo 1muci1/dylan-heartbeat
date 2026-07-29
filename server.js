@@ -11,6 +11,7 @@ const { SessionStore } = require("./session-store");
 const { StructuredMemoryStore } = require("./structured-memory-store");
 const { AgentMemoryRetriever } = require("./agent-memory-retriever");
 const { AgentMemoryContextBuilder } = require("./agent-memory-context-builder");
+const { detectMemoryIntent } = require("./agent-memory-query");
 const { AgentMemoryWriter } = require("./agent-memory-writer");
 const { AgentIdentityContextBuilder } = require("./agent-identity-context-builder");
 const { AgentIdentityBoundaryBuilder } = require("./agent-identity-boundary-builder");
@@ -978,12 +979,19 @@ app.post("/v1/chat/completions", async (req, reply) => {
     const identityContext = agentIdentityContextBuilder.build();
     const latestUserContent = latestUserContentOf(kelivoMessages);
     const memoryQuery = memoryQueryOf(kelivoMessages) || latestUserContent;
+    const memoryIntent = detectMemoryIntent(memoryQuery);
+    const memoryLimit = memoryIntent === "overview" ? 24 : 12;
+    const memoryCharacterBudget = memoryIntent === "overview" ? 12000 : 5000;
     const memoryRetrieval = agentMemoryRetriever.retrieve({
       query: memoryQuery,
-      limit: 12,
-      characterBudget: 5000
+      memoryIntent,
+      limit: memoryLimit,
+      characterBudget: memoryCharacterBudget
     });
-    const memoryContext = agentMemoryContextBuilder.build(memoryRetrieval);
+    const memoryContext = agentMemoryContextBuilder.build(memoryRetrieval, {
+      maxItems: memoryLimit,
+      maxCharacters: memoryCharacterBudget
+    });
     const timelineContext = buildTimelineEventContext(oldTimeline, tsDB);
     const runtimeContexts = [
       identityBoundaryContext,

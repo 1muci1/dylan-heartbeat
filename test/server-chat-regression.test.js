@@ -427,6 +427,57 @@ test("chat passes the latest user message to Memory Retriever and prioritizes re
   assert.ok(unrelatedIndex < 0 || matchingIndex < unrelatedIndex);
 });
 
+test("memory overview questions inject grouped details without replacing the latest user turn", async () => {
+  for (const payload of [
+    { title: "概览关系设定", content: "OVERVIEW_RELATIONSHIP_DETAIL", source: "memory-import:v1:relationship:chat-overview", importance: 5 },
+    { title: "概览学习专业", content: "OVERVIEW_ACADEMIC_DETAIL 数字媒体艺术毕设", source: "memory-import:v1:fact:chat-overview-academic", importance: 5 },
+    { title: "概览 dylan-heartbeat 项目", content: "OVERVIEW_PROJECT_DETAIL Gateway 小窝聊天页", source: "memory-import:v1:fact:chat-overview-project", importance: 5 },
+    { title: "概览互动语气偏好", content: "OVERVIEW_PREFERENCE_DETAIL 焦虑时需要具体回应", source: "memory-import:v1:preference:chat-overview", importance: 5 },
+    { title: "概览闺蜜日常", content: "OVERVIEW_PEOPLE_DETAIL 闺蜜与社交习惯", source: "memory-import:v1:fact:chat-overview-people", importance: 4 },
+    { type: "EVENT", title: "概览近期状态变化", content: "OVERVIEW_RECENT_DETAIL 这几天的重要调整", source: "memory-import:v1:event:chat-overview", importance: 5 }
+  ]) {
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/v1/memories",
+      headers: auth,
+      payload: { type: "MEMORY", ...payload }
+    });
+    assert.equal(created.statusCode, 201);
+  }
+
+  let forwarded = null;
+  global.fetch = async (_url, options) => {
+    forwarded = JSON.parse(options.body);
+    return new Response(JSON.stringify({
+      choices: [{ message: { role: "assistant", content: "overview reply" } }]
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  const currentQuestion = "沉沉现在记忆方面怎么样有细节了吗";
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/chat/completions",
+    payload: { model: "test", stream: false, messages: [{ role: "user", content: currentQuestion }] }
+  });
+  assert.equal(response.statusCode, 200);
+  const context = forwarded.messages.find(message =>
+    message.role === "system" && message.content.includes('"overview"')
+  );
+  assert.ok(context);
+  for (const detail of [
+    "OVERVIEW_RELATIONSHIP_DETAIL",
+    "OVERVIEW_ACADEMIC_DETAIL",
+    "OVERVIEW_PROJECT_DETAIL",
+    "OVERVIEW_PREFERENCE_DETAIL",
+    "OVERVIEW_PEOPLE_DETAIL",
+    "OVERVIEW_RECENT_DETAIL"
+  ]) {
+    assert.match(context.content, new RegExp(detail));
+  }
+  assert.match(context.content, /给出跨类别的具体例子/);
+  assert.equal(forwarded.messages.at(-1).role, "user");
+  assert.equal(forwarded.messages.at(-1).content, currentQuestion);
+});
+
 test("chat summarizes old timeline events before preserving the full current user as final turn", async () => {
   const previousTimeline = fs.readFileSync(process.env.TIMELINE_FILE, "utf8");
   const events = Array.from({ length: 49 }, (_, index) => ({

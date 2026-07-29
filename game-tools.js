@@ -170,11 +170,36 @@ function buildDrawGameChatContext(intent, toolResult = null) {
   };
 }
 
+async function resolveDrawGameIntentTool({
+  intent,
+  callMcpTool,
+  internalTools,
+  logger
+} = {}) {
+  if (intent?.toolName !== "draw_start") return null;
+  let result = null;
+  try {
+    result = await callMcpTool("draw_start", {
+      answer: "沉的随机题目",
+      artist: "chen"
+    });
+  } catch {
+    result = null;
+  }
+  if (result?.ok) return result;
+  logger?.warn?.({
+    code: "DRAW_MCP_FALLBACK_INTERNAL",
+    tool: "draw_start"
+  }, "draw MCP fallback");
+  return internalTools.execute("draw_start", { artist: "chen" });
+}
+
 module.exports = {
   GAME_TOOL_DEFINITIONS,
   GAME_TOOL_NAMES,
   GameToolError,
   GameTools,
   buildDrawGameChatContext,
-  detectDrawGameIntent
+  detectDrawGameIntent,
+  resolveDrawGameIntentTool
 };

@@ -36,8 +36,13 @@ const { registerDrawGameRoutes } = require("./draw-game-routes");
 const {
   GameTools,
   buildDrawGameChatContext,
-  detectDrawGameIntent
+  detectDrawGameIntent,
+  resolveDrawGameIntentTool
 } = require("./game-tools");
+const {
+  callDrawMcpTool,
+  closeDrawMcpClient
+} = require("./draw-mcp-client");
 const { StateStore } = require("./state-store");
 const { StateProjector } = require("./state-projector");
 const { registerStateRoutes } = require("./state-routes");
@@ -207,7 +212,11 @@ registerMemoryAdmin(app, {
   database: databaseConnection.db,
   databaseFile: databaseConnection.filename
 });
-app.addHook("onClose", () => { aiTaskRunner.stop(); databaseConnection.db.close(); });
+app.addHook("onClose", async () => {
+  await closeDrawMcpClient();
+  aiTaskRunner.stop();
+  databaseConnection.db.close();
+});
 
 const PORT = Number(process.env.PORT) || 3000;
 const TARGET_API_URL = process.env.TARGET_API_URL;
@@ -994,9 +1003,12 @@ app.post("/v1/chat/completions", async (req, reply) => {
     const identityContext = agentIdentityContextBuilder.build();
     const latestUserContent = latestUserContentOf(kelivoMessages);
     const drawGameIntent = detectDrawGameIntent(latestUserContent);
-    const drawGameToolResult = drawGameIntent?.toolName === "draw_start"
-      ? gameTools.execute("draw_start", { artist: "chen" })
-      : null;
+    const drawGameToolResult = await resolveDrawGameIntentTool({
+      intent: drawGameIntent,
+      callMcpTool: callDrawMcpTool,
+      internalTools: gameTools,
+      logger: app.log
+    });
     const drawGameContext = buildDrawGameChatContext(drawGameIntent, drawGameToolResult);
     const memoryQuery = memoryQueryOf(kelivoMessages) || latestUserContent;
     const memoryIntent = detectMemoryIntent(memoryQuery);

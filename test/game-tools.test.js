@@ -9,7 +9,8 @@ const {
   GAME_TOOL_NAMES,
   GameTools,
   buildDrawGameChatContext,
-  detectDrawGameIntent
+  detectDrawGameIntent,
+  resolveDrawGameIntentTool
 } = require("../game-tools");
 
 test("game tools expose only draw_start, draw_status and draw_guess", () => {
@@ -94,10 +95,69 @@ test("chat guidance keeps Chen identity and the game link without exposing imple
   assert.match(chenContext.content, /\/game\/#draw/);
 });
 
+test("only Chen-draw intent calls MCP while user-draw and ordinary chat stay local", async () => {
+  const calls = [];
+  const callMcpTool = async (name, input) => {
+    calls.push({ name, input });
+    return { ok: true, roundId: "round-mcp", message: "沉画好了。" };
+  };
+  const internalTools = { execute() { throw new Error("fallback must not run"); } };
+  for (const content of ["我画你猜", "你来猜我画的", "今天好累", "你还记得我什么"]) {
+    const result = await resolveDrawGameIntentTool({
+      intent: detectDrawGameIntent(content),
+      callMcpTool,
+      internalTools
+    });
+    assert.equal(result, null);
+  }
+  assert.equal(calls.length, 0);
+  const result = await resolveDrawGameIntentTool({
+    intent: detectDrawGameIntent("沉你画我猜"),
+    callMcpTool,
+    internalTools
+  });
+  assert.equal(result.roundId, "round-mcp");
+  assert.deepEqual(calls, [{
+    name: "draw_start",
+    input: { answer: "沉的随机题目", artist: "chen" }
+  }]);
+});
+
+test("MCP failure safely falls back to existing internal GameTools", async () => {
+  const logs = [];
+  const fallback = { ok: true, roundId: "round-local", message: "沉画好了。" };
+  const result = await resolveDrawGameIntentTool({
+    intent: detectDrawGameIntent("你画我猜"),
+    callMcpTool: async () => {
+      throw new Error("private stack and path");
+    },
+    internalTools: {
+      execute(name, input) {
+        assert.equal(name, "draw_start");
+        assert.deepEqual(input, { artist: "chen" });
+        return fallback;
+      }
+    },
+    logger: {
+      warn(summary, message) {
+        logs.push({ summary, message });
+      }
+    }
+  });
+  assert.equal(result, fallback);
+  assert.deepEqual(logs, [{
+    summary: { code: "DRAW_MCP_FALLBACK_INTERNAL", tool: "draw_start" },
+    message: "draw MCP fallback"
+  }]);
+  assert.doesNotMatch(JSON.stringify(logs), /private stack|path|token|authorization/i);
+});
+
 test("Gateway registers only the game intent context on the explicit path", () => {
   const server = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
   assert.match(server, /detectDrawGameIntent\(latestUserContent\)/);
-  assert.match(server, /gameTools\.execute\("draw_start", \{ artist: "chen" \}\)/);
+  assert.match(server, /await resolveDrawGameIntentTool\(/);
+  assert.match(server, /callMcpTool: callDrawMcpTool/);
+  assert.match(server, /internalTools: gameTools/);
   assert.match(server, /buildDrawGameChatContext\(drawGameIntent, drawGameToolResult\)/);
 });
 

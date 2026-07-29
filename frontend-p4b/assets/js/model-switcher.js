@@ -8,6 +8,7 @@
 })(typeof window !== "undefined" ? window : null, registry => {
   const fallbackRegistry = { list: () => [], byId: () => null, requireId: id => id };
   const models = registry || fallbackRegistry;
+  const mountedRenders = new WeakMap();
 
   class ModelSwitcher {
     #config;
@@ -161,9 +162,14 @@
     windowRef?.addEventListener?.("storage", event => {
       if (event.key === config.key) render();
     });
+    mountedRenders.set(documentRef, render);
     render();
     return switcher;
   };
+  const refresh = documentRef => {
+    const target = documentRef || (typeof document !== "undefined" ? document : null);
+    return mountedRenders.get(target)?.();
+  };
 
-  return { ModelSwitcher, modelLabel, mount, providerLabel, renderCard };
+  return { ModelSwitcher, modelLabel, mount, providerLabel, refresh, renderCard };
 });

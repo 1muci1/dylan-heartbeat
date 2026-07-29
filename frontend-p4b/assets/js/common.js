@@ -1,11 +1,46 @@
-// 第一阶段仅保留页面级基础行为，不连接任何远程服务。
-document.addEventListener("DOMContentLoaded", () => {
-  const currentPage = document.body.dataset.page;
-  document.querySelector(`[data-nav="${currentPage}"]`)?.classList.add("is-active");
+"use strict";
 
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js").catch(() => {
-      // 本地 file:// 预览时可能无法注册，静默跳过即可。
-    });
-  }
-});
+((windowRef, documentRef, navigatorRef) => {
+  const APP_VERSION = "v36";
+  const SW_CACHE_NAME = "xinban-shell-v36-p4b";
+  const CONTROLLER_REFRESH_GUARD = "p4b-sw-controller-refresh-v36";
+
+  const refreshOnceForController = () => {
+    try {
+      if (windowRef.sessionStorage.getItem(CONTROLLER_REFRESH_GUARD) === "1") return false;
+      windowRef.sessionStorage.setItem(CONTROLLER_REFRESH_GUARD, "1");
+    } catch {
+      if (windowRef.__p4bControllerRefreshDone) return false;
+      windowRef.__p4bControllerRefreshDone = true;
+    }
+    windowRef.location.reload();
+    return true;
+  };
+
+  const registerServiceWorker = () => {
+    if (!navigatorRef?.serviceWorker) return Promise.resolve(null);
+    navigatorRef.serviceWorker.addEventListener("controllerchange", refreshOnceForController);
+    return navigatorRef.serviceWorker.register("./sw.js")
+      .then(registration => {
+        registration.update().catch(() => {});
+        return registration;
+      })
+      .catch(() => null);
+  };
+
+  // 脚本加载后立即检查更新，避免等页面其他模块初始化完成才注册。
+  registerServiceWorker();
+
+  documentRef.addEventListener("DOMContentLoaded", () => {
+    const currentPage = documentRef.body?.dataset.page;
+    documentRef.querySelector(`[data-nav="${currentPage}"]`)?.classList.add("is-active");
+  });
+
+  windowRef.CompanionP4BShell = Object.freeze({
+    APP_VERSION,
+    SW_CACHE_NAME,
+    CONTROLLER_REFRESH_GUARD,
+    refreshOnceForController,
+    registerServiceWorker
+  });
+})(window, document, navigator);

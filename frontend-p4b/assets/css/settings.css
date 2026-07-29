@@ -133,6 +133,8 @@
 .provider-config-diagnostics div { padding:10px 12px; border:1px solid rgba(157,126,190,.12); border-radius:12px; background:rgba(255,255,255,.5); }
 .provider-config-diagnostics dt { color:var(--muted); font-size:9px; }
 .provider-config-diagnostics dd { margin:4px 0 0; color:var(--text); font-size:11px; font-weight:700; }
+.provider-diagnostic-copy { width:100%; min-height:38px; margin-top:9px; border:1px solid var(--line); border-radius:11px; color:var(--primary); background:var(--surface-soft); font-size:10px; }
+.provider-diagnostic-result { min-height:14px; margin:6px 0 0; color:var(--muted); font-size:9px; text-align:center; }
 .provider-field select { width:100%; min-height:44px; padding:0 13px; border:1px solid rgba(109,84,124,.16); border-radius:13px; outline:none; color:#5d5362; background:#fcfbfd; font-size:11px; }
 .provider-secret { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:7px; }
 .provider-secret button { min-width:54px; border:1px solid rgba(109,84,124,.16); border-radius:12px; color:var(--primary); background:var(--surface-soft); font-size:10px; }

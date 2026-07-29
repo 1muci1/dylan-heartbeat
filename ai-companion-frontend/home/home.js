@@ -315,6 +315,12 @@
     };
     renderPreferenceAvatars(preferences?.loadSync?.());
     preferences?.subscribe?.(renderPreferenceAvatars);
+    const reapplyPreferenceAvatars = () => renderPreferenceAvatars(preferences?.loadSync?.());
+    windowRef?.addEventListener?.("pageshow", reapplyPreferenceAvatars);
+    windowRef?.addEventListener?.("focus", reapplyPreferenceAvatars);
+    windowRef?.addEventListener?.("visibilitychange", () => {
+      if (documentRef.visibilityState === "visible") reapplyPreferenceAvatars();
+    });
     preferences?.load?.().then(renderPreferenceAvatars).catch(() => {
       // 保留同步读取后已呈现的头像，恢复失败时不回退默认。
     });

@@ -1,4 +1,6 @@
 .chat-page {
+  --chat-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --chat-bottom-nav-height: calc(var(--nav-height) + var(--chat-safe-bottom));
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
@@ -14,7 +16,7 @@
   overflow: hidden;
   padding: 0;
   flex-direction: column;
-  padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom));
+  padding-bottom: var(--chat-bottom-nav-height);
   background:
     radial-gradient(circle at 18% 16%, rgba(128,88,211,.13), transparent 34%),
     radial-gradient(circle at 88% 52%, rgba(75,87,159,.08), transparent 30%),
@@ -382,7 +384,7 @@
   align-items: flex-end;
   gap: 8px;
   flex: 0 0 auto;
-  padding: 11px 14px max(12px, env(safe-area-inset-bottom));
+  padding: 11px 14px 12px;
   border-top: 1px solid var(--line);
   background: rgba(13,12,18,.82);
   box-shadow: 0 -12px 32px rgba(0,0,0,.16);
@@ -447,7 +449,12 @@
 .composer textarea::placeholder { color: #aaa2ae; }
 .composer .composer__mood { width: 38px; height: 41px; color: #a096a5; background: transparent; }
 .composer__send { color: white; background: linear-gradient(145deg, #846c9b, #5d496d); box-shadow: 0 8px 19px rgba(74,53,89,.19); }
-.bottom-nav--chat { z-index: 12; }
+.bottom-nav--chat {
+  z-index: 12;
+  height: var(--chat-bottom-nav-height);
+  min-height: var(--chat-bottom-nav-height);
+  padding-bottom: calc(8px + var(--chat-safe-bottom));
+}
 :root[data-app-theme="day"] .chat-page { background:var(--bg); }
 :root[data-app-theme="day"] .chat-shell { background:linear-gradient(rgba(248,246,251,.94),rgba(248,246,251,.98)),radial-gradient(circle at 20% 18%,rgba(219,204,235,.48),transparent 30%); }
 :root[data-app-theme="day"] .chat-header { background:rgba(248,246,251,.8); }

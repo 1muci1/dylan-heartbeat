@@ -781,4 +781,17 @@ document.addEventListener("DOMContentLoaded", () => {
     input.style.height = "auto";
     input.style.height = `${Math.min(input.scrollHeight, 96)}px`;
   });
+  const reapplyUiState = () => {
+    window.CompanionModelSwitcher?.refresh?.(document);
+    window.CompanionChatAvatars?.apply?.();
+    window.CompanionChatPreferences?.apply?.();
+  };
+  window.addEventListener("pageshow", reapplyUiState);
+  window.addEventListener("focus", reapplyUiState);
+  window.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") reapplyUiState();
+  });
+  window.addEventListener("storage", reapplyUiState);
+  window.addEventListener("provider-config-change", reapplyUiState);
+  window.addEventListener("user-preferences-change", reapplyUiState);
 });

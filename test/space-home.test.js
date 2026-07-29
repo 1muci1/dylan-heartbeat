@@ -107,9 +107,9 @@ test("Space Home page loads the upgraded hero and navigation structure", () => {
   assert.match(css + js, /is-home-hero-animated/);
   assert.match(css + js, /is-home-entering/);
   assert.match(html, /data-home-user-avatar data-avatar-target="user"/);
-  assert.match(html, /storage\/user-preference-store\.js\?v=31/);
+  assert.match(html, /storage\/user-preference-store\.js\?v=35/);
   assert.match(html, /avatar\/avatar-picker\.js\?v=31/);
-  assert.match(html, /home\/home\.js\?v=31/);
+  assert.match(html, /home\/home\.js\?v=35/);
   assert.match(html, /type="button" data-home-user-avatar/);
   assert.match(html, /type="button" data-home-avatar data-home-chen-avatar data-avatar-target="chen" aria-label="更改沉沉头像"/);
   assert.match(js, /CompanionAvatarPicker\?\.mount/);

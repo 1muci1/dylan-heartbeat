@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="assets/css/common.css">
   <link rel="stylesheet" href="assets/css/settings.css">
   <link rel="stylesheet" href="/shared/provider-config-panel.css">
+  <script src="assets/js/common.js"></script>
   <script src="assets/js/appearance.js"></script>
   <script src="assets/js/settings-section.js"></script>
   <script src="/storage/user-preference-store.js"></script>
@@ -92,6 +93,8 @@
         <div><dt>Token</dt><dd data-token-configured>未填写</dd></div>
         <div><dt>支持图片理解</dt><dd data-images-configured>未开启</dd></div>
       </dl>
+      <button class="provider-diagnostic-copy" type="button" data-copy-provider-diagnostic>复制诊断</button>
+      <p class="provider-diagnostic-result" role="status" data-provider-diagnostic-result></p>
     </section>
 
     <dialog class="provider-config-dialog" data-global-provider-dialog>
@@ -237,7 +240,6 @@
   <script src="assets/js/model-registry.js"></script>
   <script src="assets/js/model-switcher.js"></script>
   <script src="assets/js/provider.js"></script>
-  <script src="assets/js/common.js"></script>
   <script src="/avatar/avatar-picker.js"></script>
   <script src="assets/js/avatar-chat.js"></script>
   <script src="assets/js/settings-return.js"></script>

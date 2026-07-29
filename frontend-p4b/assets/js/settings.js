@@ -122,6 +122,7 @@ document.addEventListener("DOMContentLoaded", () => {
     token: document.querySelector("[data-token-configured]"),
     images: document.querySelector("[data-images-configured]")
   };
+  const diagnosticResult = document.querySelector("[data-provider-diagnostic-result]");
   const providerNames = {
     dylan: "Dylan Gateway",
     gateway: "OpenAI-compatible Gateway",
@@ -165,6 +166,35 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!storedConfig.baseUrl) showResult("未配置", "error");
 
   fields.enabled.addEventListener("change", updateModeLabel);
+  const buildSafeDiagnostic = () => {
+    const config = configStore.getProviderConfig();
+    const preferences = preferenceStore?.loadSync?.();
+    return {
+      appVersion: window.CompanionP4BShell?.APP_VERSION || "v36",
+      swCacheName: window.CompanionP4BShell?.SW_CACHE_NAME || "xinban-shell-v36-p4b",
+      providerConfigured: Boolean(config.type && config.baseUrl),
+      modelConfigured: Boolean(config.model),
+      displayNameConfigured: Boolean(config.displayName),
+      tokenConfigured: Boolean(config.auth?.token),
+      supportsImages: config.supportsImages === true,
+      badgeText: document.querySelector("[data-model-badge]")?.textContent?.trim()
+        || currentModel?.textContent?.trim()
+        || "",
+      userAvatarExists: Boolean(preferenceStore?.getUserAvatarImage?.(preferences)),
+      chenAvatarExists: Boolean(preferenceStore?.getChenAvatarImage?.(preferences)),
+      sourceKey: "xinban-provider-config-v1"
+    };
+  };
+  window.CompanionSettingsDiagnostics = Object.freeze({ build: buildSafeDiagnostic });
+  document.querySelector("[data-copy-provider-diagnostic]")?.addEventListener("click", async () => {
+    const diagnostic = JSON.stringify(buildSafeDiagnostic(), null, 2);
+    try {
+      await navigator.clipboard.writeText(diagnostic);
+      if (diagnosticResult) diagnosticResult.textContent = "诊断信息已复制";
+    } catch {
+      if (diagnosticResult) diagnosticResult.textContent = "无法自动复制，请检查浏览器剪贴板权限";
+    }
+  });
   document.querySelector("[data-open-global-provider]")?.addEventListener("click", () => {
     const config = configStore.getProviderConfig();
     providerPanel.open({

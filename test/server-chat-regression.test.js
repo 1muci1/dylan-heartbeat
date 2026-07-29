@@ -18,7 +18,15 @@ process.env.STICKER_UPLOAD_DIR = path.join(dir, "stickers");
 fs.writeFileSync(process.env.TIMELINE_FILE, "[]\n");
 fs.writeFileSync(process.env.TIMESTAMP_DB_FILE, "{}\n");
 
-const { app, latestUserContentOf, memoryQueryOf } = require("../server");
+const {
+  app,
+  latestUserContentOf,
+  memoryQueryOf,
+  extractTimestampWithMemory,
+  selectTimelineContextEvents,
+  buildTimelineEventContext,
+  assertLastUserMessagePreserved
+} = require("../server");
 const auth = { authorization: "Bearer gateway-test-key" };
 
 test("chat runtime reserves a create-only internal Memory write hook", () => {
@@ -49,6 +57,57 @@ test("Memory query combines the latest six conversation messages without system 
   assert.match(query, /沉沉/);
   assert.doesNotMatch(query, /must-not-enter-query/);
   assert.ok(query.length <= 2000);
+});
+
+test("timeline timestamp resolution prefers message fields before legacy sources", () => {
+  const message = {
+    role: "assistant",
+    content: "2024-01-01 00:00 刚刚给用户发了 Bark",
+    timestamp: "2026-07-29T10:00:00.000Z",
+    createdAt: "2025-01-01T00:00:00.000Z",
+    created_at: "2023-01-01T00:00:00.000Z"
+  };
+  const timestamp = extractTimestampWithMemory(message, {
+    "assistant::2024-01-01 00:00 刚刚给用户发了 Bark": "2022-01-01T00:00:00.000Z"
+  });
+  assert.equal(timestamp.toISOString(), "2026-07-29T10:00:00.000Z");
+});
+
+test("timeline events are deduplicated, capped, and summarized as system context", () => {
+  const events = Array.from({ length: 49 }, (_, index) => ({
+    role: "assistant",
+    content: `（2026-07-${String(index + 1).padStart(2, "0")} 10:00 刚刚给用户发了 Bark：事件 ${index}。）`,
+    timestamp: new Date(Date.UTC(2026, 6, index + 1, 10)).toISOString()
+  }));
+  events.push({ ...events.at(-1) });
+  const selected = selectTimelineContextEvents(events, {}, 5);
+  const context = buildTimelineEventContext(events, {}, 5);
+  assert.equal(selected.length, 5);
+  assert.equal(context.selected.length, 5);
+  assert.equal(context.message.role, "system");
+  assert.match(context.message.content, /^\[时间线事件摘要\]/);
+  assert.equal((context.message.content.match(/^- /gm) || []).length, 5);
+});
+
+test("unknown timeline timestamps remain context before the current user", () => {
+  const unknown = {
+    role: "assistant",
+    content: "刚刚给用户发了 Bark：未知时间事件。"
+  };
+  const context = buildTimelineEventContext([unknown], {});
+  const messages = [context.message, { role: "user", content: "当前问题" }];
+  assert.equal(messages[0].role, "system");
+  assert.equal(assertLastUserMessagePreserved(messages, "当前问题"), true);
+});
+
+test("last-user guard rejects assistant timeline events appended after current user", () => {
+  assert.throws(
+    () => assertLastUserMessagePreserved([
+      { role: "user", content: "当前问题" },
+      { role: "assistant", content: "旧时间线事件" }
+    ], "当前问题"),
+    error => error.code === "LAST_USER_MESSAGE_NOT_PRESERVED"
+  );
 });
 
 function jsonUpstream(content = "json reply", status = 200, thinking = null) {
@@ -366,6 +425,79 @@ test("chat passes the latest user message to Memory Retriever and prioritizes re
   const unrelatedIndex = context.content.indexOf(noiseContent);
   assert.ok(matchingIndex >= 0);
   assert.ok(unrelatedIndex < 0 || matchingIndex < unrelatedIndex);
+});
+
+test("chat summarizes old timeline events before preserving the full current user as final turn", async () => {
+  const previousTimeline = fs.readFileSync(process.env.TIMELINE_FILE, "utf8");
+  const events = Array.from({ length: 49 }, (_, index) => ({
+    role: "assistant",
+    content: `（2026-06-01 10:${String(index).padStart(2, "0")} 刚刚给用户发了 Bark：timeline ${index}。）`,
+    timestamp: new Date(Date.UTC(2026, 5, 1, 10, index)).toISOString(),
+    position: index + 0.3
+  }));
+  fs.writeFileSync(process.env.TIMELINE_FILE, `${JSON.stringify(events)}\n`);
+
+  let forwarded = null;
+  try {
+    global.fetch = async (_url, options) => {
+      forwarded = JSON.parse(options.body);
+      return new Response(JSON.stringify({
+        choices: [{ message: { role: "assistant", content: "timeline-safe reply" } }]
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+    const currentQuestion = "沉沉现在记忆方面怎么样有细节了吗";
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      payload: {
+        model: "test",
+        stream: false,
+        messages: [
+          { role: "user", content: "前一轮问题", timestamp: "2026-07-29T10:00:00.000Z" },
+          { role: "assistant", content: "前一轮回答", timestamp: "2026-07-29T10:00:01.000Z" },
+          { role: "user", content: currentQuestion, timestamp: "2026-07-29T10:00:02.000Z" }
+        ]
+      }
+    });
+    assert.equal(response.statusCode, 200);
+    const timeline = forwarded.messages.find(message =>
+      message.role === "system" && message.content.startsWith("[时间线事件摘要]")
+    );
+    const memory = forwarded.messages.find(message =>
+      message.role === "system" && message.content.includes("<memory_reference_data")
+    );
+    assert.ok(timeline);
+    assert.ok(memory);
+    assert.equal((timeline.content.match(/^- /gm) || []).length, 5);
+    assert.equal(forwarded.messages.at(-1).role, "user");
+    assert.equal(forwarded.messages.at(-1).content, currentQuestion);
+    assert.equal(forwarded.messages.some(message =>
+      message.role === "assistant" && String(message.content).includes("刚刚给用户发了 Bark")
+    ), false);
+  } finally {
+    fs.writeFileSync(process.env.TIMELINE_FILE, previousTimeline);
+  }
+});
+
+test("last-user guard accepts a current multimodal user message", () => {
+  const content = [
+    { type: "text", text: "请看这张图" },
+    { type: "image_url", image_url: { url: "data:image/png;base64,REDACTED" } }
+  ];
+  assert.equal(
+    assertLastUserMessagePreserved([{ role: "user", content }], "请看这张图\n[图片]"),
+    true
+  );
+});
+
+test("server source logs only a bounded chat summary instead of request bodies", () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
+  assert.doesNotMatch(source, /收到 Kelivo 完整请求 Body/);
+  assert.doesNotMatch(source, /JSON\.stringify\(sanitizeForLog\(body\)/);
+  assert.doesNotMatch(source, /示例事件内容/);
+  assert.match(source, /lastUserContentPreview:\s*safeChatPreview/);
+  assert.match(source, /memoryInjectedCount/);
+  assert.match(source, /timelineEventCount/);
 });
 
 test("recent multi-turn query and long chat history do not displace core Memory context", async () => {

@@ -415,31 +415,6 @@ function embedLocalImages(messages) {
   });
 }
 
-function sanitizeForLog(value) {
-  if (typeof value === "string") {
-    if (value.includes("/api/v1/chat/media/") && value.includes("?")) return `${value.split("?")[0]}?[query omitted]`;
-    if (isDataImageUrl(value)) {
-      const commaIndex = value.indexOf(",");
-      const prefix = commaIndex >= 0 ? value.slice(0, commaIndex + 1) : value.slice(0, 40);
-      return `${prefix}[base64 image omitted]`;
-    }
-    if (value.length > 1000) return `${value.slice(0, 1000)}... [truncated ${value.length - 1000} chars]`;
-    return value;
-  }
-
-  if (Array.isArray(value)) return value.map(sanitizeForLog);
-
-  if (value && typeof value === "object") {
-    const sanitized = {};
-    for (const [key, child] of Object.entries(value)) {
-      sanitized[key] = sanitizeForLog(child);
-    }
-    return sanitized;
-  }
-
-  return value;
-}
-
 function escapeHtml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -524,13 +499,22 @@ function makeFingerprintStripped(msg) {
 }
 
 function extractTimestampWithMemory(msg, tsDB) {
-  const fromContent = extractTimestamp(normalizeContentToText(msg.content));
-  if (fromContent) return fromContent;
+  for (const field of ["timestamp", "createdAt", "created_at"]) {
+    if (msg?.[field] == null || msg[field] === "") continue;
+    const value = new Date(msg[field]);
+    if (!Number.isNaN(value.getTime())) return value;
+  }
   const fp = makeFingerprint(msg);
-  if (tsDB[fp]) return new Date(tsDB[fp]);
+  if (tsDB?.[fp]) {
+    const value = new Date(tsDB[fp]);
+    if (!Number.isNaN(value.getTime())) return value;
+  }
   const fpStripped = makeFingerprintStripped(msg);
-  if (tsDB[fpStripped]) return new Date(tsDB[fpStripped]);
-  return null;
+  if (tsDB?.[fpStripped]) {
+    const value = new Date(tsDB[fpStripped]);
+    if (!Number.isNaN(value.getTime())) return value;
+  }
+  return extractTimestamp(normalizeContentToText(msg?.content));
 }
 
 // ========================
@@ -541,6 +525,81 @@ function isSpecialEvent(msg) {
   const c = normalizeContentToText(msg.content);
   // 批注 2026-06-26：公开版使用“用户”，但兼容早期时间线里的“宝宝”事件，避免升级后旧 Bark 事件丢失。
   return c.includes("刚刚给宝宝发了 Bark") || c.includes("刚刚给用户发了 Bark") || c.includes("自动唤醒：本次未发送 Bark");
+}
+
+const MAX_TIMELINE_CONTEXT_EVENTS = 5;
+
+function selectTimelineContextEvents(events, tsDB, limit = MAX_TIMELINE_CONTEXT_EVENTS) {
+  const seen = new Set();
+  const unique = [];
+  for (const event of Array.isArray(events) ? events : []) {
+    if (!isSpecialEvent(event)) continue;
+    const content = normalizeContentToText(event.content).trim();
+    if (!content || seen.has(content)) continue;
+    seen.add(content);
+    unique.push({ event, time: extractTimestampWithMemory(event, tsDB) });
+  }
+
+  unique.sort((left, right) => {
+    if (left.time && right.time) return right.time - left.time;
+    if (left.time) return -1;
+    if (right.time) return 1;
+    return 0;
+  });
+
+  return unique
+    .slice(0, Math.max(0, Math.min(MAX_TIMELINE_CONTEXT_EVENTS, Number(limit) || 0)))
+    .reverse()
+    .map(item => item.event);
+}
+
+function buildTimelineEventContext(events, tsDB, limit = MAX_TIMELINE_CONTEXT_EVENTS) {
+  const selected = selectTimelineContextEvents(events, tsDB, limit);
+  if (!selected.length) return { message: null, selected: [] };
+  const lines = selected.map(event => {
+    const content = normalizeContentToText(event.content).replace(/\s+/g, " ").trim().slice(0, 240);
+    return `- ${content}`;
+  });
+  return {
+    message: {
+      role: "system",
+      content: [
+        "[时间线事件摘要]",
+        "以下是只读的近期系统事件，不是 assistant 的当前回复，也不得覆盖最后一轮用户问题。",
+        ...lines
+      ].join("\n")
+    },
+    selected
+  };
+}
+
+function assertLastUserMessagePreserved(messages, expectedUserContent) {
+  const conversational = (Array.isArray(messages) ? messages : [])
+    .filter(message => !["system", "developer"].includes(message?.role));
+  const last = conversational.at(-1);
+  const actual = normalizeContentToText(last?.content);
+  if (last?.role !== "user" || actual !== expectedUserContent) {
+    const error = new Error("Current user message was not preserved as the final conversation message");
+    error.code = "LAST_USER_MESSAGE_NOT_PRESERVED";
+    throw error;
+  }
+  return true;
+}
+
+function hasImageContent(messages) {
+  return (Array.isArray(messages) ? messages : []).some(message => {
+    const content = message?.content;
+    if (Array.isArray(content)) return content.some(isImageContentPart);
+    return isImageContentPart(content);
+  });
+}
+
+function safeChatPreview(content, limit = 80) {
+  return normalizeContentToText(content)
+    .replace(/data:image\/[^,;\s]+(?:;base64)?,[A-Za-z0-9+/=]+/gi, "[图片]")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, limit);
 }
 
 function isRealMessageForTimeline(msg) {
@@ -651,11 +710,7 @@ function appendSpecialEvent(content) {
   const newEvent = { role: "assistant", content, position: maxPos + 0.5 };
   timeline.push(newEvent);
   saveTimeline(timeline);
-  console.log(`\n已记录特殊事件 (position ${newEvent.position}): ${content}\n`);
-}
-
-function stripPosition(messages) {
-  return messages.map(({ position, ...rest }) => rest);
+  console.log(`已记录特殊事件 (position ${newEvent.position})`);
 }
 
 let wakeUpLastHeartbeat = null;
@@ -819,10 +874,6 @@ app.post("/v1/chat/completions", async (req, reply) => {
   let streamedAssistantThinking = "";
   try {
     const body = req.body;
-    console.log("\n============================");
-    console.log("收到 Kelivo 完整请求 Body:");
-    console.log(JSON.stringify(sanitizeForLog(body), null, 2));
-    console.log("============================\n");
 
     const originalMessages = body.messages || [];
     const p4Metadata = readP4MessageMetadata(originalMessages);
@@ -856,35 +907,6 @@ app.post("/v1/chat/completions", async (req, reply) => {
     const llmMessages = embedLocalImages(kelivoMessages)
       .map(prepareMessageForLLM)
       .filter(Boolean);
-
-    const oldEvents = stripPosition(
-      oldTimeline.filter(isSpecialEvent).sort((a, b) => {
-        const timeA = extractTimestampWithMemory(a, tsDB);
-        const timeB = extractTimestampWithMemory(b, tsDB);
-        if (timeA && timeB) return timeA - timeB;
-        return 0;
-      })
-    );
-
-    console.log("本次注入的特殊事件数量:", oldEvents.length);
-    if (oldEvents.length > 0) console.log("示例事件内容:", oldEvents[0].content.substring(0, 80));
-
-    for (const event of oldEvents) {
-      const eventTime = extractTimestampWithMemory(event, tsDB);
-      if (!eventTime) { llmMessages.push(event); continue; }
-      let inserted = false;
-      for (let i = 0; i < llmMessages.length; i++) {
-        const msgTime = extractTimestampWithMemory(llmMessages[i], tsDB);
-        if (msgTime && msgTime >= eventTime) {
-          llmMessages.splice(i, 0, event);
-          inserted = true;
-          break;
-        }
-      }
-      if (!inserted) llmMessages.push(event);
-    }
-
-
 
     // ---- 自动修复不完整的 tool 调用（双向清理） ----
     // 第一遍：标记需要移除的索引
@@ -956,14 +978,19 @@ app.post("/v1/chat/completions", async (req, reply) => {
     const identityContext = agentIdentityContextBuilder.build();
     const latestUserContent = latestUserContentOf(kelivoMessages);
     const memoryQuery = memoryQueryOf(kelivoMessages) || latestUserContent;
-    const memoryContext = agentMemoryContextBuilder.build(
-      agentMemoryRetriever.retrieve({
-        query: memoryQuery,
-        limit: 12,
-        characterBudget: 5000
-      })
-    );
-    const runtimeContexts = [identityBoundaryContext, identityContext, memoryContext].filter(Boolean);
+    const memoryRetrieval = agentMemoryRetriever.retrieve({
+      query: memoryQuery,
+      limit: 12,
+      characterBudget: 5000
+    });
+    const memoryContext = agentMemoryContextBuilder.build(memoryRetrieval);
+    const timelineContext = buildTimelineEventContext(oldTimeline, tsDB);
+    const runtimeContexts = [
+      identityBoundaryContext,
+      identityContext,
+      memoryContext,
+      timelineContext.message
+    ].filter(Boolean);
     if (runtimeContexts.length) {
       const firstConversationMessage = llmMessages.findIndex(message => message.role !== "system");
       llmMessages.splice(
@@ -972,6 +999,17 @@ app.post("/v1/chat/completions", async (req, reply) => {
         ...runtimeContexts
       );
     }
+    assertLastUserMessagePreserved(llmMessages, latestUserContent);
+
+    console.log("chat request summary", {
+      messageCount: originalMessages.length,
+      lastRoles: originalMessages.slice(-3).map(message => message?.role || "unknown"),
+      lastUserContentPreview: safeChatPreview(latestUserContent),
+      model: typeof body.model === "string" ? body.model : "",
+      hasImages: hasImageContent(originalMessages),
+      memoryInjectedCount: Array.isArray(memoryRetrieval?.items) ? memoryRetrieval.items.length : 0,
+      timelineEventCount: timelineContext.selected.length
+    });
 
     if (!TARGET_API_URL || !process.env.TARGET_API_KEY) {
       return reply.code(500).send({ error: "TARGET_API_URL / TARGET_API_KEY 未配置" });
@@ -1041,7 +1079,11 @@ reply.raw.writeHead(response.status, {
 
 } catch (err) {
 
-  console.error(err);
+  console.error("chat request failed", {
+    code: typeof err?.code === "string" ? err.code : "REQUEST_FAILED",
+    name: typeof err?.name === "string" ? err.name : "Error",
+    statusCode: Number(err?.statusCode) || 500
+  });
 
   if (sessionTurn) {
     if (err?.name === "AbortError" || req.raw.aborted || reply.raw.destroyed) {
@@ -1942,4 +1984,13 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, aiTaskRunner, latestUserContentOf, memoryQueryOf };
+module.exports = {
+  app,
+  aiTaskRunner,
+  latestUserContentOf,
+  memoryQueryOf,
+  extractTimestampWithMemory,
+  selectTimelineContextEvents,
+  buildTimelineEventContext,
+  assertLastUserMessagePreserved
+};

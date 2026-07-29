@@ -4,126 +4,106 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f7f3fb">
-  <meta name="description" content="沉的小世界 · 沉的小屋">
+  <meta name="description" content="沉的小世界 · 小窝游戏厅">
   <link rel="stylesheet" href="game.css">
-  <title>沉的小屋</title>
+  <link rel="stylesheet" href="identity.css">
+  <title>小窝游戏厅</title>
 </head>
 <body>
   <main class="game-shell">
     <header class="game-header">
-      <div>
-        <p>CHEN'S LITTLE WORLD</p>
-        <h1>沉的小屋</h1>
-      </div>
-      <time data-current-date></time>
+      <div><p>CHEN'S PLAYROOM</p><h1>小窝游戏厅</h1></div>
+      <a href="/frontend-p4b/chat.html">找沉聊聊</a>
     </header>
 
-    <section class="room-card" aria-label="沉的小屋场景">
-      <div class="room-sky" aria-hidden="true">
-        <span class="star star--one"></span>
-        <span class="star star--two"></span>
-        <span class="star star--three"></span>
-        <span class="moon"></span>
+    <section class="hero-card">
+      <div class="game-players" aria-label="一起玩的两个人">
+        <span class="player-avatar" data-game-user-avatar>我</span>
+        <span class="players-heart" aria-hidden="true">♡</span>
+        <span class="player-avatar" data-game-chen-avatar>沉</span>
       </div>
-      <div class="room-scene" aria-hidden="true">
-        <div class="window"><span></span></div>
-        <div class="shelf"><i></i><i></i><i></i></div>
-        <div class="lamp"><span></span></div>
-        <div class="sofa"><span></span></div>
-        <div class="rug"></div>
-        <div class="table"><span></span></div>
-      </div>
-      <div class="companion">
-        <div class="companion__portrait" aria-hidden="true">
-          <span class="companion__moon"></span>
-          <strong>沉</strong>
-        </div>
-        <div>
-          <span class="presence"><i></i>正在小屋里</span>
-          <p data-companion-line>今天也一起慢慢待一会儿吧。</p>
-        </div>
-      </div>
+      <span>今晚想和沉玩什么？</span>
+      <h2>和沉一起，认真玩一小会儿。</h2>
+      <p>五子棋与画画都在本地页面完成；画作答案只保存在临时回合里。</p>
     </section>
 
-    <section class="activity-panel" data-panel="games" aria-labelledby="activity-title">
-      <div class="section-heading">
-        <div>
-          <p>一起玩</p>
-          <h2 id="activity-title">小小互动</h2>
-        </div>
-        <span>本地体验</span>
+    <section class="lobby" data-view="lobby">
+      <article class="lobby-card lobby-card--ready">
+        <span class="status">可玩</span><div class="lobby-icon">五</div>
+        <h2>五子棋</h2><p>和沉下一局</p>
+        <button type="button" data-open-game="gomoku">开始对弈</button>
+      </article>
+      <article class="lobby-card lobby-card--ready">
+        <span class="status">第一版可玩</span><div class="lobby-icon">画</div>
+        <h2>你画我猜</h2><p>你画给沉猜，或者沉画给你猜</p>
+        <button type="button" data-open-game="drawing">打开画板</button>
+      </article>
+      <article class="lobby-card lobby-card--soon">
+        <span class="status">即将开放</span><div class="lobby-icon">忆</div>
+        <h2>记忆问答</h2><p>看看沉记得你多少</p>
+        <button type="button" disabled>准备中</button>
+      </article>
+    </section>
+
+    <section class="game-panel" data-view="gomoku" hidden>
+      <div class="panel-heading"><button type="button" data-back>← 游戏厅</button><div><p>你执黑 · 沉执白</p><h2>五子棋</h2></div></div>
+      <div class="turn-players">
+        <span class="player-avatar player-avatar--small" data-game-user-avatar>我</span>
+        <p class="game-status" data-gomoku-status aria-live="polite">当前回合：轮到你。</p>
+        <span class="player-avatar player-avatar--small" data-game-chen-avatar>沉</span>
+      </div>
+      <div class="gomoku-board" data-gomoku-board role="grid" aria-label="十五乘十五五子棋盘"></div>
+      <button class="secondary-button" type="button" data-gomoku-reset>重新开始</button>
+    </section>
+
+    <section class="game-panel" data-view="drawing" hidden>
+      <div class="panel-heading"><button type="button" data-back>← 游戏厅</button><div><p>SVG + ASCII 结构化画作</p><h2>你画我猜</h2></div></div>
+      <div class="mode-tabs">
+        <button type="button" class="is-active" data-draw-mode="user">我画，沉猜</button>
+        <button type="button" data-draw-mode="chen">沉画，我猜</button>
       </div>
 
-      <article class="game-card number-game">
-        <div class="game-card__heading">
-          <span class="game-icon">#</span>
-          <div><h3>猜数字</h3><p>沉想了一个 1–100 的数字</p></div>
+      <div data-draw-pane="user">
+        <label class="answer-field">画作答案（不会出现在公开状态）
+          <input type="text" maxlength="40" data-draw-answer placeholder="例如：雨伞">
+        </label>
+        <div class="drawing-wrap"><canvas width="600" height="420" data-drawing-canvas aria-label="画板"></canvas></div>
+        <div class="drawing-tools">
+          <button type="button" data-draw-undo>撤销</button>
+          <button type="button" data-draw-clear>清空</button>
+          <button type="button" class="primary-button" data-draw-submit>提交给沉猜</button>
         </div>
-        <form data-guess-form>
-          <label for="guess-number">输入你的猜测</label>
-          <div class="guess-row">
-            <input id="guess-number" name="guess" type="number" min="1" max="100" inputmode="numeric" required>
-            <button type="submit">猜一下</button>
-          </div>
+        <p class="game-status" data-draw-status aria-live="polite">用手指或鼠标画几笔吧。</p>
+        <div class="guess-result" data-chen-guess hidden>
+          <p data-chen-guess-text></p>
+          <div><button type="button" data-chen-feedback="correct">猜对了</button><button type="button" data-chen-feedback="wrong">没猜对</button><button type="button" data-chen-feedback="hint">给提示</button></div>
+        </div>
+      </div>
+
+      <div data-draw-pane="chen" hidden>
+        <p class="game-status">沉会从猫、小狗、月亮、伞、房子、花、鱼中悄悄画一题。</p>
+        <button class="primary-button" type="button" data-chen-start>让沉画一幅</button>
+        <div class="preset-drawing" data-preset-drawing aria-label="沉的画作"></div>
+        <form class="guess-form" data-preset-guess>
+          <input type="text" name="guess" maxlength="40" placeholder="输入你的猜测" required>
+          <button type="submit">猜答案</button>
         </form>
-        <p class="result" data-guess-result aria-live="polite">准备好了就开始吧。</p>
-        <button class="text-button" type="button" data-new-number>换一个数字</button>
-      </article>
-
-      <article class="game-card mood-game">
-        <div class="game-card__heading">
-          <span class="game-icon">☁</span>
-          <div><h3>今日心情</h3><p>此刻更接近哪一种感受？</p></div>
-        </div>
-        <div class="mood-options" data-mood-options>
-          <button type="button" data-mood="开心">开心</button>
-          <button type="button" data-mood="平静">平静</button>
-          <button type="button" data-mood="疲惫">疲惫</button>
-          <button type="button" data-mood="低落">低落</button>
-        </div>
-        <p class="result" data-mood-result aria-live="polite">不用急，选最接近的一种就好。</p>
-      </article>
-
-      <article class="game-card event-game">
-        <div class="game-card__heading">
-          <span class="game-icon">✦</span>
-          <div><h3>随机事件</h3><p>看看今天会发生什么小事</p></div>
-        </div>
-        <div class="event-result" data-event-result>轻轻点一下，让今天多一点惊喜。</div>
-        <button class="primary-button" type="button" data-random-event>抽取今日事件</button>
-      </article>
-    </section>
-
-    <section class="activity-panel record-panel" data-panel="record" aria-labelledby="record-title" hidden>
-      <div class="section-heading">
-        <div><p>只保留在当前页面</p><h2 id="record-title">今日记录</h2></div>
-        <span>MOCK</span>
+        <p class="game-status" data-preset-result aria-live="polite"></p>
       </div>
-      <dl>
-        <div><dt>今日心情</dt><dd data-record-mood>还没有选择</dd></div>
-        <div><dt>小屋事件</dt><dd data-record-event>还没有发生</dd></div>
-        <div><dt>猜数字</dt><dd data-record-guess>还没有开始</dd></div>
-      </dl>
-      <p class="privacy-note">第一阶段不会上传或保存这些记录。</p>
     </section>
   </main>
 
-  <nav class="game-nav" aria-label="小屋导航">
-    <a href="/frontend-p4b/chat.html">
-      <span aria-hidden="true">◌</span>
-      聊天
-    </a>
-    <button class="is-active" type="button" data-show-panel="games">
-      <span aria-hidden="true">◇</span>
-      小游戏
-    </button>
-    <button type="button" data-show-panel="record">
-      <span aria-hidden="true">□</span>
-      今日记录
-    </button>
+  <nav class="game-nav" aria-label="小窝导航">
+    <a href="/home/"><span>⌂</span>小窝</a>
+    <a href="/frontend-p4b/chat.html"><span>◌</span>聊天</a>
+    <a class="is-active" href="/game/"><span>◇</span>游戏</a>
+    <a href="/collaboration/"><span>△</span>议事厅</a>
   </nav>
 
   <script src="/assets/js/data.js"></script>
+  <script src="/storage/user-preference-store.js"></script>
+  <script src="/shared/drawing-protocol.js"></script>
+  <script src="gomoku.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

@@ -4,57 +4,96 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { test } = require("node:test");
+const { emptyBoard, isWin, chooseAiMove } = require("../ai-companion-frontend/game/gomoku");
 
 const root = path.join(__dirname, "..", "ai-companion-frontend", "game");
 const read = name => fs.readFileSync(path.join(root, name), "utf8");
 
-test("game space is an independent native frontend module with all local references", () => {
+test("game lobby exposes playable and extensible game cards", () => {
   const html = read("index.html");
-  for (const file of ["game.css", "game.js"]) {
-    assert.ok(fs.existsSync(path.join(root, file)));
-    assert.match(html, new RegExp(file.replace(".", "\\.")));
+  assert.match(html, /小窝游戏厅/);
+  for (const title of ["五子棋", "你画我猜", "记忆问答"]) assert.match(html, new RegExp(title));
+  assert.match(html, /和沉下一局/);
+  assert.match(html, /你画给沉猜，或者沉画给你猜/);
+  assert.match(html, /即将开放/);
+  for (const file of ["game.css", "identity.css", "gomoku.js", "game.js"]) assert.ok(fs.existsSync(path.join(root, file)));
+});
+
+test("gomoku detects horizontal, vertical and both diagonal wins without false positives", () => {
+  for (const [dr, dc] of [[0,1],[1,0],[1,1],[1,-1]]) {
+    const board = emptyBoard();
+    for (let step = 0; step < 4; step++) board[5 + dr * step][7 + dc * step] = 1;
+    assert.equal(isWin(board, 5, 7, 1), false);
+    board[5 + dr * 4][7 + dc * 4] = 1;
+    assert.equal(isWin(board, 5, 7, 1), true);
   }
-  assert.doesNotMatch(html, /chat\.js|provider\.js|react|vue|angular/i);
 });
 
-test("game space includes the room and three required interactions", () => {
+test("gomoku AI wins first, blocks second, and never selects an occupied point", () => {
+  const winning = emptyBoard();
+  for (let column = 2; column < 6; column++) winning[4][column] = 2;
+  assert.deepEqual(chooseAiMove(winning, () => 0), { row: 4, column: 1 });
+
+  const blocking = emptyBoard();
+  for (let column = 3; column < 7; column++) blocking[8][column] = 1;
+  const block = chooseAiMove(blocking, () => 0);
+  assert.ok((block.row === 8 && block.column === 2) || (block.row === 8 && block.column === 7));
+
+  const board = emptyBoard();
+  board[7][7] = 1;
+  const move = chooseAiMove(board, () => 0);
+  assert.equal(board[move.row][move.column], 0);
+});
+
+test("drawing canvas supports pointer and touch input without bottom navigation overlap", () => {
   const html = read("index.html");
   const js = read("game.js");
-  assert.match(html, /沉的小屋/);
-  assert.match(html, /data-guess-form/);
-  for (const mood of ["开心", "平静", "疲惫", "低落"]) assert.match(html, new RegExp(`data-mood="${mood}"`));
-  for (const result of ["大了", "小了", "猜中了"]) assert.match(js, new RegExp(result));
-  for (const event of ["和沉一起看星星", "整理小屋", "喝下午茶", "散步"]) assert.match(js, new RegExp(event));
-});
-
-test("game space uses existing AppConfig and reports successful interactions to the Event API", () => {
-  const html = read("index.html");
-  const js = read("game.js");
-  assert.match(html, /\/assets\/js\/data\.js/);
-  assert.match(js, /\/api\/game\/events/);
-  assert.match(js, /AppConfig\?\.getProviderConfig/);
-  assert.match(js, /config\?\.baseUrl/);
-  assert.match(js, /Authorization:\s*`Bearer/);
-  assert.match(js, /method:\s*"POST"/);
-  for (const eventType of ["mood_selected", "mini_game_completed", "room_interaction"]) {
-    assert.match(js, new RegExp(`eventType: "${eventType}"`));
-  }
-  assert.doesNotMatch(js, /XMLHttpRequest|localStorage|sessionStorage/);
-});
-
-test("game Event reporting is best-effort and never blocks local interaction results", () => {
-  const js = read("game.js");
-  assert.match(js, /if \(!baseUrl \|\| !token\) return false/);
-  assert.match(js, /catch \{\s*return false/);
-  assert.match(js, /void sendGameEvent/);
-  assert.match(js, /return response\.ok/);
-});
-
-test("game space has mobile-first safe-area and narrow viewport rules", () => {
-  const html = read("index.html");
   const css = read("game.css");
-  assert.match(html, /width=device-width/);
-  assert.match(css, /env\(safe-area-inset-bottom\)/);
-  assert.match(css, /@media \(max-width: 359px\)/);
-  assert.match(css, /minmax\(0, 1fr\)/);
+  assert.match(html, /<canvas[^>]+data-drawing-canvas/);
+  assert.match(js, /pointerdown/);
+  assert.match(js, /pointermove/);
+  assert.match(js, /setPointerCapture/);
+  assert.match(css, /touch-action:none/);
+  assert.match(css, /safe-area-inset-bottom/);
+  assert.match(css, /padding:[^}]*var\(--nav-height\)/);
+  assert.match(html, /data-draw-undo/);
+  assert.match(html, /data-draw-clear/);
+  assert.match(html, /data-draw-submit/);
+});
+
+test("drawing frontend sends structured strokes and uses public draw status", () => {
+  const html = read("index.html");
+  const js = read("game.js");
+  assert.match(html, /\/shared\/drawing-protocol\.js/);
+  assert.match(js, /\/api\/game\/draw\/start/);
+  assert.match(js, /\/api\/game\/draw\/status/);
+  assert.match(js, /\/api\/game\/draw\/guess/);
+  assert.match(js, /drawing_svg/);
+  assert.match(js, /ascii_grid/);
+  assert.doesNotMatch(js, /localStorage|sessionStorage/);
+});
+
+test("all visible players are Chen and the game reuses both preference avatars", () => {
+  const html = read("index.html");
+  const js = read("game.js");
+  assert.match(html, /我画，沉猜/);
+  assert.match(html, /沉画，我猜/);
+  assert.match(html, /data-game-chen-avatar/);
+  assert.match(html, /data-game-user-avatar/);
+  assert.match(html, /\/storage\/user-preference-store\.js/);
+  assert.match(js, /getChenAvatarImage/);
+  assert.match(js, /getUserAvatarImage/);
+  assert.match(js, /轮到沉，沉正在想/);
+  assert.match(js, /沉落子了/);
+  assert.match(js, /沉正在看你的画/);
+  assert.match(js, /你是沉，在和辞辞玩你画我猜/);
+  assert.doesNotMatch(html, /规则 AI|电脑玩家|AI 落子|bot/i);
+});
+
+test("MCP plan keeps Chen as the player identity", () => {
+  const plan = read("MCP_PLAN.md");
+  assert.match(plan, /draw_start.*沉开始画/);
+  assert.match(plan, /draw_status.*沉查看/);
+  assert.match(plan, /draw_guess.*沉提交猜测/);
+  assert.match(plan, /玩家身份始终是沉/);
 });

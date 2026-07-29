@@ -10,7 +10,10 @@ const { openDatabase } = require("./database");
 const { SessionStore } = require("./session-store");
 const { StructuredMemoryStore } = require("./structured-memory-store");
 const { AgentMemoryRetriever } = require("./agent-memory-retriever");
-const { AgentMemoryContextBuilder } = require("./agent-memory-context-builder");
+const {
+  AgentMemoryContextBuilder,
+  buildMemoryOverviewResponseInstruction
+} = require("./agent-memory-context-builder");
 const { detectMemoryIntent } = require("./agent-memory-query");
 const { AgentMemoryWriter } = require("./agent-memory-writer");
 const { AgentIdentityContextBuilder } = require("./agent-identity-context-builder");
@@ -993,11 +996,15 @@ app.post("/v1/chat/completions", async (req, reply) => {
       maxCharacters: memoryCharacterBudget
     });
     const timelineContext = buildTimelineEventContext(oldTimeline, tsDB);
+    const memoryOverviewInstruction = memoryIntent === "overview"
+      ? buildMemoryOverviewResponseInstruction()
+      : null;
     const runtimeContexts = [
       identityBoundaryContext,
       identityContext,
       memoryContext,
-      timelineContext.message
+      timelineContext.message,
+      memoryOverviewInstruction
     ].filter(Boolean);
     if (runtimeContexts.length) {
       const firstConversationMessage = llmMessages.findIndex(message => message.role !== "system");

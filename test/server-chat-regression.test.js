@@ -199,6 +199,9 @@ test("empty Memory chat receives the Agent identity boundary without a provider 
   assert.deepEqual(forwarded.messages.map(message =>
     message === boundary ? "identity_boundary" : message.role
   ), ["system", "identity_boundary", "user"]);
+  assert.equal(forwarded.messages.some(message =>
+    message.role === "system" && message.content.includes("不要解释系统实现、检索逻辑、注入策略")
+  ), false);
 });
 
 test("stream:false persists a completed Session turn", async () => {
@@ -460,9 +463,13 @@ test("memory overview questions inject grouped details without replacing the lat
   });
   assert.equal(response.statusCode, 200);
   const context = forwarded.messages.find(message =>
-    message.role === "system" && message.content.includes('"overview"')
+    message.role === "system" && message.content.includes("【记忆概览：")
+  );
+  const instruction = forwarded.messages.find(message =>
+    message.role === "system" && message.content.includes("不要解释系统实现、检索逻辑、注入策略")
   );
   assert.ok(context);
+  assert.ok(instruction);
   for (const detail of [
     "OVERVIEW_RELATIONSHIP_DETAIL",
     "OVERVIEW_ACADEMIC_DETAIL",
@@ -473,7 +480,13 @@ test("memory overview questions inject grouped details without replacing the lat
   ]) {
     assert.match(context.content, new RegExp(detail));
   }
-  assert.match(context.content, /给出跨类别的具体例子/);
+  assert.match(context.content, /具体事实：/);
+  assert.doesNotMatch(context.content, /whySelected|sourceGroup|selectedReason|tokenEstimate|rejectedReasons|检索|注入/);
+  assert.match(instruction.content, /至少覆盖 4 个有资料的类别/);
+  assert.match(instruction.content, /每类给 2～4 个具体例子/);
+  assert.match(instruction.content, /不要.*骨架有了.*代替细节/);
+  assert.ok(forwarded.messages.indexOf(context) < forwarded.messages.indexOf(instruction));
+  assert.ok(forwarded.messages.indexOf(instruction) < forwarded.messages.length - 1);
   assert.equal(forwarded.messages.at(-1).role, "user");
   assert.equal(forwarded.messages.at(-1).content, currentQuestion);
 });
@@ -515,11 +528,22 @@ test("chat summarizes old timeline events before preserving the full current use
       message.role === "system" && message.content.startsWith("[时间线事件摘要]")
     );
     const memory = forwarded.messages.find(message =>
-      message.role === "system" && message.content.includes("<memory_reference_data")
+      message.role === "system" && message.content.includes("【记忆概览：")
+    );
+    const instruction = forwarded.messages.find(message =>
+      message.role === "system" && message.content.includes("不要解释系统实现、检索逻辑、注入策略")
     );
     assert.ok(timeline);
     assert.ok(memory);
+    assert.ok(instruction);
     assert.equal((timeline.content.match(/^- /gm) || []).length, 5);
+    const memoryIndex = forwarded.messages.indexOf(memory);
+    const timelineIndex = forwarded.messages.indexOf(timeline);
+    const instructionIndex = forwarded.messages.indexOf(instruction);
+    const currentUserIndex = forwarded.messages.length - 1;
+    assert.ok(memoryIndex < timelineIndex);
+    assert.ok(timelineIndex < instructionIndex);
+    assert.ok(instructionIndex < currentUserIndex);
     assert.equal(forwarded.messages.at(-1).role, "user");
     assert.equal(forwarded.messages.at(-1).content, currentQuestion);
     assert.equal(forwarded.messages.some(message =>

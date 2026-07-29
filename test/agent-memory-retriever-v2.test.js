@@ -95,6 +95,7 @@ test("identity, sensitive Memory, and non-whitelist fields are filtered", () => 
   const result = retrieve([
     memory("identity", "relationship", "Companion名称", "身份数据", 5),
     memory("sensitive", "fact", "Credential", "Bearer token secret", 5),
+    memory("reasoning", "fact", null, "<think>internal provider analysis</think>", 5),
     memory("safe", "fact", "安全事实", "可以检索的内容", 3, undefined, {
       apiKey: "forbidden",
       sourceSessionId: "forbidden",

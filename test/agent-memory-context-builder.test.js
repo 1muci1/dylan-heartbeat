@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const { test } = require("node:test");
 const {
   AgentMemoryContextBuilder,
+  buildMemoryOverviewResponseInstruction,
   HEADER,
   MEMORY_CATEGORIES
 } = require("../agent-memory-context-builder");
@@ -122,15 +123,21 @@ test("overview context preserves grouped details and instructs honest cross-cate
       })
     ]
   }, { maxItems: 24, maxCharacters: 12000 });
-  const data = dataOf(message).overview;
-  assert.equal(data.identityRelationship[0].title, "相遇与关系");
-  assert.equal(data.academicLife[0].content, "用户是数字媒体艺术专业");
-  assert.equal(data.academicLife[0].sourceGroup, "academicLife");
-  assert.equal(data.academicLife[0].whySelected, "代表学业与现实生活");
-  assert.match(message.content, /给出跨类别的具体例子/);
-  assert.match(message.content, /这类细节当前上下文里不多/);
-  assert.match(message.content, /不得编造/);
+  assert.match(message.content, /【记忆概览：核心关系】/);
+  assert.match(message.content, /具体事实：相遇与关系：用户与沉的长期陪伴关系/);
+  assert.match(message.content, /【记忆概览：学业生活】/);
+  assert.match(message.content, /具体事实：学习专业：用户是数字媒体艺术专业/);
+  assert.doesNotMatch(message.content, /whySelected|sourceGroup|selectedReason|tokenEstimate|rejectedReasons|检索|注入/);
   assert.ok(message.content.length <= 12000);
+
+  const instruction = buildMemoryOverviewResponseInstruction();
+  assert.equal(instruction.role, "system");
+  assert.match(instruction.content, /不要解释系统实现、检索逻辑、注入策略/);
+  assert.match(instruction.content, /至少覆盖 4 个有资料的类别/);
+  assert.match(instruction.content, /每类给 2～4 个具体例子/);
+  assert.match(instruction.content, /能，我现在能看到的不只是骨架了/);
+  assert.match(instruction.content, /这类细节当前上下文里不多/);
+  assert.match(instruction.content, /不要编造未提供的内容/);
 });
 
 test("returns no context for an empty Retriever result", () => {

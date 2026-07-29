@@ -51,6 +51,7 @@ const OVERVIEW_GROUPS = Object.freeze({
 const IDENTITY_TITLES = new Set(["Companion名称", "用户称呼"]);
 const CORE_MEMORY_PATTERN = /(?:用户画像|基本资料|学习专业|专业|学校|学历|年级|学校阶段|生活节奏|作息|关系设定|相遇与关系|AI\s*Companion|沉的小世界|重要偏好|长期偏好|主动联系偏好|毕设方向|当前项目)/iu;
 const SENSITIVE_MEMORY_PATTERN = /(?:\bapi[\s_-]*key\b|\b(?:access|bearer|device)?[\s_-]*token\b|\bpassword\b|\bpasswd\b|\bcookie\b|\bprivate[\s_-]*key\b|\botp\b|\bverification[\s_-]*code\b|API\s*密钥|访问令牌|密码|私钥|验证码|身份证|银行卡|银行账号|精确住址|门禁|医疗诊断|设备\s*token)/iu;
+const INTERNAL_REASONING_ARTIFACT_PATTERN = /(?:<\s*\/?\s*think\s*>|reasoning_content|assistant\s+analysis|模型内部(?:推理|分析))/iu;
 
 function categorySource(memory) {
   return /^memory-import:v1:(fact|preference|event|relationship):/.test(memory.source || "")
@@ -96,7 +97,8 @@ function minimumItemCharacters(memory) {
 
 function safeCandidate(memory, options = {}) {
   if (!memory || (!options.includeIdentity && IDENTITY_TITLES.has(memory.title))) return false;
-  return !SENSITIVE_MEMORY_PATTERN.test(`${memory.title || ""}\n${memory.content || ""}`);
+  const text = `${memory.title || ""}\n${memory.content || ""}`;
+  return !SENSITIVE_MEMORY_PATTERN.test(text) && !INTERNAL_REASONING_ARTIFACT_PATTERN.test(text);
 }
 
 function isCoreMemory(memory) {
@@ -480,6 +482,7 @@ module.exports = {
   DEFAULT_OVERVIEW_PER_GROUP_LIMIT,
   DEFAULT_RECENT_LIMIT,
   IDENTITY_TITLES,
+  INTERNAL_REASONING_ARTIFACT_PATTERN,
   SENSITIVE_MEMORY_PATTERN,
   AgentMemoryRetriever,
   DEFAULT_CHARACTER_BUDGET,

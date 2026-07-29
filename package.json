@@ -8,7 +8,8 @@
     "wake": "node wake_up.js",
     "delivery-worker": "node proactive-delivery-runtime.js",
     "test": "node --test test/*.test.js",
-    "migrate:memory": "node scripts/migrate-memory-json.js"
+    "migrate:memory": "node scripts/migrate-memory-json.js",
+    "mcp:draw": "node mcp-draw-server.js"
   },
   "keywords": [
     "fastify",

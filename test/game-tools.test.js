@@ -107,7 +107,7 @@ test("MCP plan documents all four stages and Chen remains the player", () => {
   ), "utf8");
   assert.match(plan, /网页游戏与临时回合服务已完成。✅/);
   assert.match(plan, /内部 game tools 已完成/);
-  assert.match(plan, /接入真实 MCP server/);
+  assert.match(plan, /真实 MCP Server stdio transport 已完成/);
   assert.match(plan, /主动发起和继续游戏/);
   assert.match(plan, /用户可见玩家身份始终是沉/);
 });

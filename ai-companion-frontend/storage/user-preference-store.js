@@ -21,6 +21,16 @@
   });
   const clone = value => JSON.parse(JSON.stringify(value));
   const isObject = value => value && typeof value === "object" && !Array.isArray(value);
+  const storageError = cause => {
+    const quota = cause?.name === "QuotaExceededError"
+      || cause?.code === 22
+      || cause?.code === 1014;
+    const error = new Error(quota
+      ? "本地存储空间不足，设置没有保存。请压缩或清理较大的头像/背景图片后重试。"
+      : "本地设置写入失败，请检查浏览器存储权限后重试。");
+    error.code = quota ? "STORAGE_QUOTA_EXCEEDED" : "STORAGE_WRITE_FAILED";
+    return error;
+  };
   const isPersistentAvatarImage = value => {
     const image = String(value || "").trim();
     return /^data:image\//iu.test(image) || image.startsWith("https://") || image.startsWith("/");
@@ -119,6 +129,22 @@
     if (!isObject(result.ui)) result.ui = {};
     return result;
   };
+  const removeDuplicateAvatarRoot = value => {
+    const next = isObject(value) ? clone(value) : {};
+    const avatar = isObject(next.avatar) ? next.avatar : null;
+    if (!avatar || !Object.hasOwn(avatar, "imageData")) return { changed: false, value: next };
+    const rootImage = avatar.imageData;
+    const userImage = isObject(avatar.userAvatar) ? avatar.userAvatar.imageData : null;
+    const chenImage = isObject(avatar.chenAvatar) ? avatar.chenAvatar.imageData : null;
+    const duplicate = typeof rootImage === "string"
+      && rootImage
+      && (rootImage === userImage || rootImage === chenImage);
+    if (rootImage == null || duplicate) {
+      delete avatar.imageData;
+      return { changed: true, value: next };
+    }
+    return { changed: false, value: next };
+  };
 
   class UserPreferenceStore {
     #storage;
@@ -134,16 +160,48 @@
     }
     loadSync() {
       if (!this.#storage) return clone(DEFAULTS);
-      try { return normalize(JSON.parse(this.#storage.getItem(this.#key) || "null")); } catch { return clone(DEFAULTS); }
+      try {
+        const raw = this.#storage.getItem(this.#key);
+        const parsed = JSON.parse(raw || "null");
+        const migration = removeDuplicateAvatarRoot(parsed);
+        if (raw && migration.changed) {
+          const migrated = JSON.stringify(migration.value);
+          try {
+            this.#storage.setItem(this.#key, migrated);
+            if (this.#storage.getItem(this.#key) !== migrated) throw storageError();
+          } catch {
+            // 迁移失败时继续读取原数据，不破坏现有头像。
+            return normalize(parsed);
+          }
+        }
+        return normalize(migration.value);
+      } catch {
+        return clone(DEFAULTS);
+      }
     }
     async load() { return this.loadSync(); }
     save(patch) {
       const next = normalize(merge(this.loadSync(), patch));
-      if (this.#storage) {
-        try { this.#storage.setItem(this.#key, JSON.stringify(next)); } catch { /* storage unavailable */ }
+      if (!this.#storage) throw storageError();
+      const persistable = removeDuplicateAvatarRoot(next).value;
+      const serialized = JSON.stringify(persistable);
+      let previous = null;
+      try {
+        previous = this.#storage.getItem(this.#key);
+        this.#storage.setItem(this.#key, serialized);
+        if (this.#storage.getItem(this.#key) !== serialized) throw storageError();
+      } catch (cause) {
+        try {
+          if (previous == null) this.#storage.removeItem(this.#key);
+          else this.#storage.setItem(this.#key, previous);
+        } catch {
+          // 回滚失败时仍只报告安全错误，不包含偏好正文。
+        }
+        throw cause?.code?.startsWith?.("STORAGE_") ? cause : storageError(cause);
       }
-      this.#notify(next);
-      return clone(next);
+      const verified = normalize(JSON.parse(this.#storage.getItem(this.#key)));
+      this.#notify(verified);
+      return clone(verified);
     }
     reset() {
       if (this.#storage) {
@@ -161,7 +219,7 @@
         throw error;
       }
       const key = target === "user" ? "userAvatar" : "chenAvatar";
-      return this.save({ avatar: { ...value, [key]: value } });
+      return this.save({ avatar: { [key]: value } });
     }
     getAvatar(target = "chen") {
       const value = this.loadSync().avatar;
@@ -235,6 +293,8 @@
     getUserAvatarImage,
     isPersistentAvatarImage,
     normalize,
+    removeDuplicateAvatarRoot,
+    storageError,
     stripSensitive
   };
 });

@@ -41,11 +41,64 @@ test("avatar crop, scale, border, and image data are restored", () => {
   const shared = storage();
   const store = new UserPreferenceStore({ storage: shared });
   store.saveAvatar({ source: "upload", imageData: "data:image/png;base64,AAAA", crop: { x: 22, y: 73 }, scale: 1.4, border: "soft" });
-  const avatar = new UserPreferenceStore({ storage: shared }).loadSync().avatar;
+  const avatar = new UserPreferenceStore({ storage: shared }).loadSync().avatar.chenAvatar;
   assert.equal(avatar.source, "upload");
   assert.equal(avatar.crop.x, 22);
   assert.equal(avatar.border, "soft");
   assert.equal(avatar.imageData, "data:image/png;base64,AAAA");
+});
+
+test("quota failures are safe and do not emit preference changes", () => {
+  const events = [];
+  const quota = Object.assign(new Error("data:image/png;base64,SECRET"), { name: "QuotaExceededError" });
+  const failingStorage = {
+    getItem() { return null; },
+    setItem() { throw quota; },
+    removeItem() {}
+  };
+  const eventTarget = {
+    CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init.detail; } },
+    dispatchEvent(event) { events.push(event); },
+    addEventListener() {},
+    removeEventListener() {}
+  };
+  const store = new UserPreferenceStore({ storage: failingStorage, eventTarget });
+  assert.throws(
+    () => store.saveAvatar({ imageData: "data:image/png;base64,SECRET" }, "user"),
+    error => error.code === "STORAGE_QUOTA_EXCEEDED" && !/SECRET|base64/iu.test(error.message)
+  );
+  assert.equal(events.length, 0);
+});
+
+test("new avatars use nested fields and duplicate legacy roots migrate safely", () => {
+  const shared = storage();
+  new UserPreferenceStore({ storage: shared }).saveAvatar({
+    source: "upload",
+    imageData: "data:image/png;base64,USER"
+  }, "user");
+  let raw = JSON.parse(shared.getItem("xinban-user-preferences-v1"));
+  assert.equal(Object.hasOwn(raw.avatar, "imageData"), false);
+  assert.equal(raw.avatar.userAvatar.imageData, "data:image/png;base64,USER");
+
+  shared.setItem("xinban-user-preferences-v1", JSON.stringify({
+    avatar: {
+      imageData: "data:image/png;base64,USER",
+      userAvatar: { imageData: "data:image/png;base64,USER" },
+      chenAvatar: { imageData: "data:image/png;base64,CHEN" }
+    }
+  }));
+  new UserPreferenceStore({ storage: shared }).loadSync();
+  raw = JSON.parse(shared.getItem("xinban-user-preferences-v1"));
+  assert.equal(Object.hasOwn(raw.avatar, "imageData"), false);
+  assert.equal(raw.avatar.userAvatar.imageData, "data:image/png;base64,USER");
+  assert.equal(raw.avatar.chenAvatar.imageData, "data:image/png;base64,CHEN");
+
+  shared.setItem("xinban-user-preferences-v1", JSON.stringify({
+    avatar: { imageData: "data:image/png;base64,LEGACY" }
+  }));
+  const legacy = new UserPreferenceStore({ storage: shared });
+  assert.equal(legacy.getChenAvatarImage(), "data:image/png;base64,LEGACY");
+  assert.equal(JSON.parse(shared.getItem("xinban-user-preferences-v1")).avatar.imageData, "data:image/png;base64,LEGACY");
 });
 
 test("mirrored model selection is restored independently of chat state", () => {

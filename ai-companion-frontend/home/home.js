@@ -212,14 +212,16 @@
         fileInput.click();
       });
     });
-    fileInput.addEventListener("change", () => {
+    fileInput.addEventListener("change", async () => {
       const file = fileInput.files?.[0];
-      if (!file || !/^image\/(?:png|jpeg|webp)$/iu.test(file.type) || file.size > 2 * 1024 * 1024) return;
-      const Reader = windowRef?.FileReader;
-      if (!Reader) return;
-      const reader = new Reader();
-      reader.onload = () => {
-        const imageData = String(reader.result || "");
+      if (!file || !/^image\/(?:png|jpeg|webp)$/iu.test(file.type) || file.size > 12 * 1024 * 1024) return;
+      try {
+        const imageData = await windowRef.CompanionAvatarPicker?.optimizeImageFile?.(file, {
+          windowRef,
+          documentRef,
+          maxDimension: 512,
+          quality: .84
+        });
         if (!imageData.startsWith("data:image/") || imageData.startsWith("blob:")) return;
         store.saveAvatar({
           source: "upload",
@@ -228,8 +230,9 @@
           scale: 1,
           border: "moon"
         }, target);
-      };
-      reader.readAsDataURL(file);
+      } catch (error) {
+        windowRef.alert?.(error.message || "头像保存失败，请重试");
+      }
     });
     return Object.freeze({ fileInput, triggers });
   };

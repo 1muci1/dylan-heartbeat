@@ -46,8 +46,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const preferenceMessage = message => { if (preferenceResult) preferenceResult.textContent = message; };
   document.querySelector("[data-preference-save]")?.addEventListener("click", () => {
     if (!preferenceStore) return;
-    preferenceStore.save(preferenceStore.loadSync());
-    preferenceMessage("设置已保存到本设备");
+    try {
+      preferenceStore.save(preferenceStore.loadSync());
+      preferenceMessage("设置已保存到本设备");
+    } catch (error) {
+      preferenceMessage(error.message || "设置保存失败，请重试");
+    }
   });
   document.querySelector("[data-preference-reset]")?.addEventListener("click", () => {
     if (!preferenceStore) return;
@@ -65,36 +69,55 @@ document.addEventListener("DOMContentLoaded", () => {
   const backgroundResult = document.querySelector("[data-chat-background-result]");
   let pendingBackground = null;
   const showBackgroundResult = message => { if (backgroundResult) backgroundResult.textContent = message; };
-  backgroundFile?.addEventListener("change", () => {
+  backgroundFile?.addEventListener("change", async () => {
     const file = backgroundFile.files?.[0];
     if (!file) return;
-    if (!/^image\/(?:png|jpeg|webp)$/iu.test(file.type) || file.size > 2 * 1024 * 1024) {
+    if (!/^image\/(?:png|jpeg|webp)$/iu.test(file.type) || file.size > 12 * 1024 * 1024) {
       pendingBackground = null;
       if (backgroundSave) backgroundSave.disabled = true;
-      showBackgroundResult("请选择 2MB 以内的 PNG、JPG 或 WebP 图片");
+      showBackgroundResult("请选择 12MB 以内的 PNG、JPG 或 WebP 图片");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      pendingBackground = String(reader.result || "");
+    if (backgroundSave) backgroundSave.disabled = true;
+    showBackgroundResult("正在压缩背景图片…");
+    try {
+      pendingBackground = await window.CompanionAvatarPicker?.optimizeImageFile?.(file, {
+        windowRef: window,
+        documentRef: document,
+        maxDimension: 1600,
+        quality: .8
+      });
+      if (!pendingBackground?.startsWith("data:image/") || pendingBackground.length > 2.8 * 1024 * 1024) {
+        throw new Error("图片压缩后仍然过大，请选择更小的图片");
+      }
       if (backgroundPreview) { backgroundPreview.hidden = false; backgroundPreview.style.backgroundImage = `url(${JSON.stringify(pendingBackground)})`; }
       if (backgroundSave) backgroundSave.disabled = false;
       showBackgroundResult("已预览，点击应用背景保存");
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      pendingBackground = null;
+      showBackgroundResult(error.message || "背景图片处理失败，请重试");
+    }
   });
   backgroundSave?.addEventListener("click", () => {
     if (!preferenceStore || !pendingBackground) return;
-    preferenceStore.saveChatBackground({ imageData: pendingBackground, position: "center", size: "cover", overlay: .35 });
-    showBackgroundResult("聊天背景已应用");
+    try {
+      preferenceStore.saveChatBackground({ imageData: pendingBackground, position: "center", size: "cover", overlay: .35 });
+      showBackgroundResult("聊天背景已应用");
+    } catch (error) {
+      showBackgroundResult(error.message || "背景保存失败，请重试");
+    }
   });
   document.querySelector("[data-chat-background-clear]")?.addEventListener("click", () => {
     if (!preferenceStore) return;
-    preferenceStore.saveChatBackground({ imageData: null, position: "center", size: "cover", overlay: .35 });
-    pendingBackground = null;
-    if (backgroundPreview) { backgroundPreview.hidden = true; backgroundPreview.style.backgroundImage = "none"; }
-    if (backgroundSave) backgroundSave.disabled = true;
-    showBackgroundResult("聊天背景已清除");
+    try {
+      preferenceStore.saveChatBackground({ imageData: null, position: "center", size: "cover", overlay: .35 });
+      pendingBackground = null;
+      if (backgroundPreview) { backgroundPreview.hidden = true; backgroundPreview.style.backgroundImage = "none"; }
+      if (backgroundSave) backgroundSave.disabled = true;
+      showBackgroundResult("聊天背景已清除");
+    } catch (error) {
+      showBackgroundResult(error.message || "背景清除失败，请重试");
+    }
   });
   const configStore = window.AppConfig;
   const provider = window.AppProvider;
@@ -107,7 +130,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const fields = providerPanel.fields;
   const storedConfig = configStore.getProviderConfig();
-  preferenceStore?.saveModel(storedConfig.model);
+  try { preferenceStore?.saveModel(storedConfig.model); } catch { /* selectedModelId 仅为镜像 */ }
   providerPanel.fill({
     ...storedConfig,
     token: storedConfig.auth.token,
@@ -170,8 +193,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const config = configStore.getProviderConfig();
     const preferences = preferenceStore?.loadSync?.();
     return {
-      appVersion: window.CompanionP4BShell?.APP_VERSION || "v36",
-      swCacheName: window.CompanionP4BShell?.SW_CACHE_NAME || "xinban-shell-v36-p4b",
+      appVersion: window.CompanionP4BShell?.APP_VERSION || "v37",
+      swCacheName: window.CompanionP4BShell?.SW_CACHE_NAME || "xinban-shell-v37-p4b",
       providerConfigured: Boolean(config.type && config.baseUrl),
       modelConfigured: Boolean(config.model),
       displayNameConfigured: Boolean(config.displayName),
@@ -209,12 +232,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    const config = configStore.saveProviderConfig(readFormConfig());
-    preferenceStore?.saveModel(config.model);
-    updateCurrentSummary(config);
-    updateModeLabel();
-    showResult("模型配置已保存", "success");
-    window.setTimeout(() => providerPanel.close(), 700);
+    try {
+      const config = configStore.saveProviderConfig(readFormConfig());
+      try { preferenceStore?.saveModel(config.model); } catch { /* selectedModelId 仅为镜像 */ }
+      updateCurrentSummary(config);
+      updateModeLabel();
+      showResult("模型配置已保存", "success");
+      window.setTimeout(() => providerPanel.close(), 700);
+    } catch (error) {
+      showResult(error.message || "模型配置保存失败，请重试", "error");
+    }
   });
 
   testButton.addEventListener("click", async () => {

@@ -7,6 +7,48 @@
 })(typeof window !== "undefined" ? window : null, () => {
   const IMAGE_TYPES = /^image\/(?:png|jpeg|webp)$/iu;
   const MAX_BYTES = 2 * 1024 * 1024;
+  const MAX_SOURCE_BYTES = 12 * 1024 * 1024;
+  const readAsDataUrl = (file, windowRef) => new Promise((resolve, reject) => {
+    const Reader = windowRef?.FileReader;
+    if (!Reader) return reject(new Error("当前浏览器无法读取图片"));
+    const reader = new Reader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("图片读取失败，请重新选择"));
+    reader.readAsDataURL(file);
+  });
+  const optimizeImageFile = async (file, {
+    windowRef,
+    documentRef,
+    maxDimension = 512,
+    quality = .84
+  } = {}) => {
+    const original = await readAsDataUrl(file, windowRef);
+    if (!original.startsWith("data:image/")) throw new Error("图片读取失败，请重新选择");
+    const ImageCtor = windowRef?.Image;
+    if (!ImageCtor || !documentRef?.createElement) return original;
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const instance = new ImageCtor();
+        instance.onload = () => resolve(instance);
+        instance.onerror = reject;
+        instance.src = original;
+      });
+      const longest = Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height);
+      if (!longest || (longest <= maxDimension && file.size <= MAX_BYTES)) return original;
+      const scale = Math.min(1, maxDimension / longest);
+      const canvas = documentRef.createElement("canvas");
+      canvas.width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
+      canvas.height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
+      const context = canvas.getContext?.("2d");
+      if (!context) return original;
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      const type = file.type === "image/png" ? "image/webp" : file.type;
+      const optimized = canvas.toDataURL?.(type, quality);
+      return String(optimized || "").startsWith("data:image/") ? optimized : original;
+    } catch {
+      return original;
+    }
+  };
 
   const mount = ({ documentRef, windowRef, store, selector = "[data-avatar-target]" } = {}) => {
     if (!documentRef?.createElement || !documentRef?.body || !store?.saveAvatar) return null;
@@ -40,29 +82,27 @@
     });
     modal.querySelector(".avatar-editor__close")?.addEventListener("click", close);
     modal.querySelector("[data-avatar-editor-cancel]")?.addEventListener("click", close);
-    fileInput?.addEventListener("change", () => {
+    fileInput?.addEventListener("change", async () => {
       const file = fileInput.files?.[0];
-      if (!file || !IMAGE_TYPES.test(file.type) || file.size > MAX_BYTES) {
-        status.textContent = "请选择 2MB 以内的 PNG、JPG 或 WebP 图片";
+      if (!file || !IMAGE_TYPES.test(file.type) || file.size > MAX_SOURCE_BYTES) {
+        status.textContent = "请选择 12MB 以内的 PNG、JPG 或 WebP 图片";
         saveButton.disabled = true;
         return;
       }
-      const Reader = windowRef?.FileReader;
-      if (!Reader) return;
-      const reader = new Reader();
-      reader.onload = () => {
-        const imageData = String(reader.result || "");
-        if (!imageData.startsWith("data:image/")) {
-          status.textContent = "图片读取失败，请重新选择";
-          return;
-        }
+      saveButton.disabled = true;
+      status.textContent = "正在压缩图片…";
+      try {
+        const imageData = await optimizeImageFile(file, { windowRef, documentRef, maxDimension: 512, quality: .84 });
+        if (imageData.length > MAX_BYTES * 1.4) throw new Error("图片压缩后仍然过大，请选择更小的图片");
         pending = imageData;
         preview.style.backgroundImage = `url(${JSON.stringify(pending)})`;
         preview.textContent = "";
         saveButton.disabled = false;
         status.textContent = "预览已更新";
-      };
-      reader.readAsDataURL(file);
+      } catch (error) {
+        pending = null;
+        status.textContent = error.message || "图片处理失败，请重新选择";
+      }
     });
     saveButton?.addEventListener("click", () => {
       if (!pending || pending.startsWith("blob:")) return;
@@ -83,5 +123,5 @@
     return Object.freeze({ close, fileInput, modal, open });
   };
 
-  return { MAX_BYTES, mount };
+  return { MAX_BYTES, MAX_SOURCE_BYTES, mount, optimizeImageFile };
 });

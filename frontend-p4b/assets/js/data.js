@@ -295,6 +295,22 @@
       detail: { source: PROVIDER_STORAGE_KEY, provider: detail }
     }));
   };
+  const providerStorageError = cause => {
+    const quota = cause?.name === "QuotaExceededError"
+      || cause?.code === 22
+      || cause?.code === 1014;
+    const error = new Error(quota
+      ? "本地存储空间不足，配置没有保存。请压缩或清理较大的头像/背景图片后重试。"
+      : "模型配置写入失败，请检查浏览器存储权限后重试。");
+    error.code = quota ? "STORAGE_QUOTA_EXCEEDED" : "STORAGE_WRITE_FAILED";
+    return error;
+  };
+  const sameProviderSummary = (expected, actual) => (
+    expected.model === actual.model
+    && expected.displayName === actual.displayName
+    && expected.supportsImages === actual.supportsImages
+    && Boolean(expected.auth?.token) === Boolean(actual.auth?.token)
+  );
 
   window.AppConfig = {
     key: PROVIDER_STORAGE_KEY,
@@ -315,10 +331,21 @@
 
     saveProviderConfig(config) {
       const normalizedConfig = normalizeProviderConfig(config);
+      const serialized = JSON.stringify(normalizedConfig);
+      let previous = null;
       try {
-        localStorage.setItem(PROVIDER_STORAGE_KEY, JSON.stringify(normalizedConfig));
-      } catch {
-        // 本地存储不可用时保留当前页面内的填写结果。
+        previous = localStorage.getItem(PROVIDER_STORAGE_KEY);
+        localStorage.setItem(PROVIDER_STORAGE_KEY, serialized);
+        const verified = normalizeProviderConfig(JSON.parse(localStorage.getItem(PROVIDER_STORAGE_KEY)));
+        if (!sameProviderSummary(normalizedConfig, verified)) throw providerStorageError();
+      } catch (cause) {
+        try {
+          if (previous == null) localStorage.removeItem(PROVIDER_STORAGE_KEY);
+          else localStorage.setItem(PROVIDER_STORAGE_KEY, previous);
+        } catch {
+          // 回滚失败时仍只报告安全错误，不包含 Provider 配置正文。
+        }
+        throw cause?.code?.startsWith?.("STORAGE_") ? cause : providerStorageError(cause);
       }
       notifyProviderConfigChange(normalizedConfig);
       return normalizedConfig;

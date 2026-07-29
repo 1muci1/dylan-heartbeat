@@ -9,7 +9,7 @@ const { test } = require("node:test");
 const root = path.join(__dirname, "..");
 const read = relative => fs.readFileSync(path.join(root, relative), "utf8");
 
-test("Service Worker controller change refreshes only once per v36 tab session", async () => {
+test("Service Worker controller change refreshes only once per v37 tab session", async () => {
   const source = read("frontend-p4b/assets/js/common.js");
   const session = new Map();
   const listeners = {};
@@ -44,7 +44,7 @@ test("Service Worker controller change refreshes only once per v36 tab session",
   listeners.controllerchange();
   listeners.controllerchange();
   assert.equal(reloads, 1);
-  assert.equal(session.get("p4b-sw-controller-refresh-v36"), "1");
+  assert.equal(session.get("p4b-sw-controller-refresh-v37"), "1");
 });
 
 test("chat recovery hooks reapply model badge, avatars, and background without rebuilding state", () => {
@@ -122,7 +122,48 @@ test("P4B pages register early and home re-applies avatar preferences after Safa
   const home = read("ai-companion-frontend/home/home.js");
   assert.match(home, /addEventListener\?\.\("pageshow"/);
   assert.match(home, /reapplyPreferenceAvatars/);
-  assert.match(read("ai-companion-frontend/home/index.html"), /home\.js\?v=35/);
+  assert.match(read("ai-companion-frontend/home/index.html"), /home\.js\?v=37/);
+});
+
+test("Provider quota failure preserves old config and emits no success event", () => {
+  const source = read("frontend-p4b/assets/js/data.js");
+  const previous = JSON.stringify({
+    model: "old-model",
+    displayName: "Old",
+    supportsImages: false,
+    auth: { token: "old-secret" }
+  });
+  let stored = previous;
+  const events = [];
+  class TestCustomEvent {
+    constructor(type, init) { this.type = type; this.detail = init?.detail; }
+  }
+  const quota = Object.assign(new Error("secret data:image/png;base64,BAD"), { name: "QuotaExceededError" });
+  const context = {
+    window: { dispatchEvent: event => events.push(event) },
+    localStorage: {
+      getItem: () => stored,
+      setItem(_key, value) {
+        if (value !== previous) throw quota;
+        stored = value;
+      },
+      removeItem() {}
+    },
+    CustomEvent: TestCustomEvent,
+    JSON, Object, String, Boolean, Set
+  };
+  vm.runInNewContext(source, context);
+  assert.throws(
+    () => context.window.AppConfig.saveProviderConfig({
+      model: "new-model",
+      displayName: "New",
+      supportsImages: true,
+      auth: { token: "new-secret" }
+    }),
+    error => error.code === "STORAGE_QUOTA_EXCEEDED" && !/secret|base64/iu.test(error.message)
+  );
+  assert.equal(stored, previous);
+  assert.equal(events.some(event => event.type === "provider-config-change"), false);
 });
 
 test("mobile chat uses one bottom-nav reservation without repeating the safe area in composer", () => {

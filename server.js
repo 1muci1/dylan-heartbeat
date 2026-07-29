@@ -33,6 +33,11 @@ const { GameEventService } = require("./game-event-service");
 const { registerGameEventRoutes } = require("./game-event-routes");
 const { DrawGameService } = require("./draw-game-service");
 const { registerDrawGameRoutes } = require("./draw-game-routes");
+const {
+  GameTools,
+  buildDrawGameChatContext,
+  detectDrawGameIntent
+} = require("./game-tools");
 const { StateStore } = require("./state-store");
 const { StateProjector } = require("./state-projector");
 const { registerStateRoutes } = require("./state-routes");
@@ -109,6 +114,7 @@ const stateProjector = new StateProjector({ stateStore });
 const eventStore = new EventStore({ database: databaseConnection.db, stateProjector, logger: app.log });
 const gameEventService = new GameEventService({ eventStore });
 const drawGameService = new DrawGameService();
+const gameTools = new GameTools({ service: drawGameService });
 const sessionStore = new SessionStore({ database: databaseConnection.db, filename: databaseConnection.filename });
 const structuredMemoryStore = new StructuredMemoryStore({ database: databaseConnection.db, filename: databaseConnection.filename, eventStore, logger: app.log });
 const agentMemoryRetriever = new AgentMemoryRetriever({
@@ -987,6 +993,11 @@ app.post("/v1/chat/completions", async (req, reply) => {
     const identityBoundaryContext = agentIdentityBoundaryBuilder.build();
     const identityContext = agentIdentityContextBuilder.build();
     const latestUserContent = latestUserContentOf(kelivoMessages);
+    const drawGameIntent = detectDrawGameIntent(latestUserContent);
+    const drawGameToolResult = drawGameIntent?.toolName === "draw_start"
+      ? gameTools.execute("draw_start", { artist: "chen" })
+      : null;
+    const drawGameContext = buildDrawGameChatContext(drawGameIntent, drawGameToolResult);
     const memoryQuery = memoryQueryOf(kelivoMessages) || latestUserContent;
     const memoryIntent = detectMemoryIntent(memoryQuery);
     const memoryLimit = memoryIntent === "overview" ? 24 : 12;
@@ -1010,7 +1021,8 @@ app.post("/v1/chat/completions", async (req, reply) => {
       identityContext,
       memoryContext,
       timelineContext.message,
-      memoryOverviewInstruction
+      memoryOverviewInstruction,
+      drawGameContext
     ].filter(Boolean);
     if (runtimeContexts.length) {
       const firstConversationMessage = llmMessages.findIndex(message => message.role !== "system");

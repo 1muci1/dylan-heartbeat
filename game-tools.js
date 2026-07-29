@@ -4,6 +4,9 @@ const { ToolRegistry } = require("./tool-registry");
 const { validateToolInput } = require("./tool-execution-gateway");
 
 const GAME_TOOL_NAMES = Object.freeze(["draw_start", "draw_status", "draw_guess"]);
+const ACTIVE_DRAW_MODE = "chen_draw_user_guess";
+const GLOBAL_DRAW_SCOPE = "global";
+const RECENT_DRAW_RESTART_MS = 15 * 60 * 1000;
 const base = (name, description, properties, required = []) => Object.freeze({
   name,
   description,
@@ -150,6 +153,226 @@ function detectDrawGameIntent(content) {
   return Object.freeze({ type: "lobby", toolName: null });
 }
 
+function activeDrawScopeId(sessionId) {
+  const normalized = String(sessionId || "").trim();
+  // This is a private single-user runtime. Requests without a stable Session ID
+  // share one fallback pointer; it can later be upgraded to a per-client scope.
+  return normalized ? `session:${normalized}` : GLOBAL_DRAW_SCOPE;
+}
+
+function isDrawHintIntent(content) {
+  const text = String(content || "").trim().replace(/\s+/g, "");
+  return /^(?:给我)?(?:再)?(?:给点|来点)?提示(?:一下)?[吧呀啊。！!？?]*$/u.test(text) ||
+    /^太难了[吧呀啊。！!？?]*$/u.test(text);
+}
+
+function isDrawRestartIntent(content) {
+  const text = String(content || "").trim().replace(/\s+/g, "");
+  return /^(?:再来一局|重新画一个|换一个)[吧呀啊。！!？?]*$/u.test(text);
+}
+
+function extractActiveDrawGuess(content) {
+  const text = String(content || "").trim();
+  if (!text || text.length > 40) return null;
+  const compact = text.replace(/\s+/g, "");
+  const explicit = compact.match(
+    /^(?:我猜(?:是)?|猜|是|答案是|我觉得(?:是)?|应该是)([\p{L}\p{N}]{1,12}?)(?:吗|吧|呢)?[。！!？?]*$/u
+  );
+  if (explicit?.[1]) return explicit[1];
+  if (
+    /^[\p{Script=Han}]{1,6}[。！!？?]*$/u.test(compact) &&
+    !/(今天|好累|累了|困了|睡觉|聊聊|记得|陪我|想要|想睡|难过|开心|谢谢|你好|在吗)/u.test(compact)
+  ) {
+    return compact.replace(/[。！!？?]+$/u, "");
+  }
+  return null;
+}
+
+function saveActiveDrawRound(store, toolResult, sessionId, now = () => new Date()) {
+  if (!store || !toolResult?.ok || !toolResult.roundId) return null;
+  const round = store.getRound(toolResult.roundId);
+  if (!round) return null;
+  const timestamp = now().toISOString();
+  const scopeId = activeDrawScopeId(sessionId);
+  const activeRound = store.setActiveRound(scopeId, {
+    roundId: round.id,
+    mode: ACTIVE_DRAW_MODE,
+    created_at: round.createdAt || timestamp,
+    updated_at: timestamp,
+    expires_at: round.expiresAt,
+    source: "chat"
+  });
+  store.clearRecentRound?.(scopeId);
+  return activeRound;
+}
+
+function touchActiveDrawRound(store, scopeId, activeRound, now = () => new Date()) {
+  if (!store || !activeRound?.roundId) return null;
+  return store.setActiveRound(scopeId, {
+    ...activeRound,
+    updated_at: now().toISOString(),
+    source: "chat"
+  });
+}
+
+async function callDrawToolWithFallback({
+  name,
+  mcpInput,
+  internalInput,
+  callMcpTool,
+  internalTools,
+  logger
+}) {
+  let result = null;
+  try {
+    result = await callMcpTool(name, mcpInput);
+  } catch {
+    result = null;
+  }
+  if (result?.ok || result?.error?.code === "DRAW_ROUND_NOT_FOUND") return result;
+  logger?.warn?.({
+    code: "DRAW_MCP_FALLBACK_INTERNAL",
+    tool: name
+  }, "draw MCP fallback");
+  return internalTools.execute(name, internalInput);
+}
+
+async function startChatDrawRound({
+  sessionId,
+  store,
+  callMcpTool,
+  internalTools,
+  logger,
+  now
+}) {
+  const result = await callDrawToolWithFallback({
+    name: "draw_start",
+    mcpInput: { answer: "沉的随机题目", artist: "chen" },
+    internalInput: { artist: "chen" },
+    callMcpTool,
+    internalTools,
+    logger
+  });
+  if (result?.ok) saveActiveDrawRound(store, result, sessionId, now);
+  return result;
+}
+
+async function resolveActiveDrawGameTurn({
+  content,
+  sessionId,
+  hasImages = false,
+  store,
+  service,
+  callMcpTool,
+  internalTools,
+  logger,
+  now = () => new Date()
+} = {}) {
+  const scopeId = activeDrawScopeId(sessionId);
+  const activeRound = store?.getActiveRound?.(scopeId) || null;
+  const recentRound = store?.getRecentRound?.(scopeId) || null;
+  if (
+    isDrawRestartIntent(content) &&
+    !hasImages &&
+    (
+      (activeRound && activeRound.mode === ACTIVE_DRAW_MODE && !activeRound.expired) ||
+      recentRound
+    )
+  ) {
+    const result = await startChatDrawRound({
+      sessionId, store, callMcpTool, internalTools, logger, now
+    });
+    return result?.ok
+      ? {
+          handled: true,
+          response: `我重新画好啦，去游戏页猜猜看：${result.gameUrl ||
+            `/game/#draw?roundId=${encodeURIComponent(result.roundId)}`}`,
+          toolName: "draw_start",
+          roundId: result.roundId
+        }
+      : { handled: true, response: "沉的画画工具暂时没连上，等我一下再试试。", toolName: "draw_start" };
+  }
+  if (activeRound?.expired) {
+    return {
+      handled: true,
+      response: "这一局画作已经失效了，我们重新开一局吧。",
+      toolName: null
+    };
+  }
+  if (!activeRound || activeRound.mode !== ACTIVE_DRAW_MODE || hasImages) return null;
+  if (isDrawHintIntent(content)) {
+    try {
+      const hint = service.drawHint(activeRound.roundId).message;
+      touchActiveDrawRound(store, scopeId, activeRound, now);
+      return {
+        handled: true,
+        response: hint,
+        toolName: null,
+        roundId: activeRound.roundId
+      };
+    } catch (error) {
+      if (error?.code === "DRAW_ROUND_NOT_FOUND") {
+        store.clearActiveRound(scopeId);
+        return {
+          handled: true,
+          response: "这一局画作已经失效了，我们重新开一局吧。",
+          toolName: null
+        };
+      }
+      return { handled: true, response: "我暂时没想好怎么提示，再观察一下形状。", toolName: null };
+    }
+  }
+  const guess = extractActiveDrawGuess(content);
+  if (!guess) return null;
+  const result = await callDrawToolWithFallback({
+    name: "draw_guess",
+    mcpInput: { roundId: activeRound.roundId, guess, guesser: "user" },
+    internalInput: { roundId: activeRound.roundId, content: guess, guesser: "user" },
+    callMcpTool,
+    internalTools,
+    logger
+  });
+  if (result?.error?.code === "DRAW_ROUND_NOT_FOUND") {
+    store.clearActiveRound(scopeId);
+    return {
+      handled: true,
+      response: "这一局画作已经失效了，我们重新开一局吧。",
+      toolName: "draw_guess"
+    };
+  }
+  if (!result?.ok) {
+    return {
+      handled: true,
+      response: "沉的画画工具暂时没连上，等我一下再试试。",
+      toolName: "draw_guess"
+    };
+  }
+  const guessed = result.guessed === true || result.result === "猜对了";
+  if (guessed) {
+    const completedAt = now();
+    const roundExpiry = Date.parse(activeRound.expires_at || "");
+    const restartExpiry = Math.min(
+      Number.isFinite(roundExpiry) ? roundExpiry : completedAt.getTime() + RECENT_DRAW_RESTART_MS,
+      completedAt.getTime() + RECENT_DRAW_RESTART_MS
+    );
+    store.clearActiveRound(scopeId);
+    store.setRecentRound?.(scopeId, {
+      roundId: activeRound.roundId,
+      completed_at: completedAt.toISOString(),
+      expires_at: new Date(restartExpiry).toISOString(),
+      source: "chat"
+    });
+  } else touchActiveDrawRound(store, scopeId, activeRound, now);
+  return {
+    handled: true,
+    response: guessed
+      ? "猜对啦，就是这个。沉认真记下这一局。"
+      : "还不是这个。要不要再猜一次？",
+    toolName: "draw_guess",
+    guessed
+  };
+}
+
 function buildDrawGameChatContext(intent, toolResult = null) {
   if (!intent) return null;
   if (intent.type === "user_draw") {
@@ -176,32 +399,34 @@ async function resolveDrawGameIntentTool({
   intent,
   callMcpTool,
   internalTools,
-  logger
+  logger,
+  store,
+  sessionId,
+  now
 } = {}) {
   if (intent?.toolName !== "draw_start") return null;
-  let result = null;
-  try {
-    result = await callMcpTool("draw_start", {
-      answer: "沉的随机题目",
-      artist: "chen"
-    });
-  } catch {
-    result = null;
-  }
-  if (result?.ok) return result;
-  logger?.warn?.({
-    code: "DRAW_MCP_FALLBACK_INTERNAL",
-    tool: "draw_start"
-  }, "draw MCP fallback");
-  return internalTools.execute("draw_start", { artist: "chen" });
+  return startChatDrawRound({
+    sessionId,
+    store,
+    callMcpTool,
+    internalTools,
+    logger,
+    now
+  });
 }
 
 module.exports = {
+  ACTIVE_DRAW_MODE,
   GAME_TOOL_DEFINITIONS,
   GAME_TOOL_NAMES,
   GameToolError,
   GameTools,
+  activeDrawScopeId,
   buildDrawGameChatContext,
   detectDrawGameIntent,
+  extractActiveDrawGuess,
+  isDrawHintIntent,
+  isDrawRestartIntent,
+  resolveActiveDrawGameTurn,
   resolveDrawGameIntentTool
 };

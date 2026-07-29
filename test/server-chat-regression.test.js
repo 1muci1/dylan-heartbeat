@@ -15,6 +15,7 @@ process.env.TARGET_API_KEY = "upstream-test-key";
 process.env.GATEWAY_API_KEY = "gateway-test-key";
 process.env.CHAT_IMAGE_UPLOAD_DIR = path.join(dir, "images");
 process.env.STICKER_UPLOAD_DIR = path.join(dir, "stickers");
+process.env.DRAW_ROUND_STORE_FILE = path.join(dir, "draw-rounds.json");
 fs.writeFileSync(process.env.TIMELINE_FILE, "[]\n");
 fs.writeFileSync(process.env.TIMESTAMP_DB_FILE, "{}\n");
 

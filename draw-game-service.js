@@ -78,6 +78,17 @@ class DrawGameService {
     const accepted = [round.answer, ...round.aliases].some(value => normalizeGuess(value) === guess);
     return { result: accepted ? "猜对了" : "没猜中" };
   }
+
+  drawHint(roundId) {
+    const round = this.store.getRound(String(roundId));
+    if (!round) throw Object.assign(new Error("画作回合不存在或已过期"), { statusCode: 404, code: "DRAW_ROUND_NOT_FOUND" });
+    const characterCount = Array.from(String(round.answer || "")).length;
+    return {
+      message: characterCount > 0
+        ? `我只能悄悄告诉你：答案是 ${characterCount} 个字，再观察一下形状。`
+        : "我只能悄悄告诉你：它是我画的那个东西，再观察一下形状。"
+    };
+  }
 }
 
 module.exports = { DrawGameService, PRESETS, normalizeGuess };

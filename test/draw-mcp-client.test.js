@@ -31,6 +31,18 @@ function fakeBridge(options = {}) {
     async callTool(request) {
       calls.push({ operation: "call", request });
       if (options.callError) throw new Error("private path must not escape");
+      if (options.roundNotFound) {
+        return {
+          isError: true,
+          structuredContent: {
+            ok: false,
+            error: {
+              code: "DRAW_ROUND_NOT_FOUND",
+              message: "画作回合不存在或已过期"
+            }
+          }
+        };
+      }
       if (request.name === "draw_start") {
         return {
           structuredContent: {
@@ -121,6 +133,22 @@ test("Draw MCP status and wrong guess remain public and safe", async t => {
   assert.doesNotMatch(JSON.stringify(guess), /answer|aliases|stack|path|token/i);
 });
 
+test("Draw MCP client preserves only the safe round-not-found code", async t => {
+  const { bridge } = fakeBridge({ roundNotFound: true });
+  t.after(() => bridge.close());
+  assert.deepEqual(await bridge.callTool("draw_guess", {
+    roundId: "expired",
+    guess: "猫",
+    guesser: "user"
+  }), {
+    ok: false,
+    error: {
+      code: "DRAW_ROUND_NOT_FOUND",
+      message: "沉的画画工具暂时没有连上。"
+    }
+  });
+});
+
 test("Draw MCP client rejects unknown tools before transport", async t => {
   const { bridge, calls } = fakeBridge();
   t.after(() => bridge.close());
@@ -186,5 +214,5 @@ test("Gateway prefers MCP only for Chen draw intent and keeps a safe fallback", 
   assert.match(server, /callMcpTool: callDrawMcpTool/);
   assert.match(gameTools, /intent\?\.toolName !== "draw_start"/);
   assert.match(gameTools, /DRAW_MCP_FALLBACK_INTERNAL/);
-  assert.match(gameTools, /internalTools\.execute\("draw_start", \{ artist: "chen" \}\)/);
+  assert.match(gameTools, /internalTools\.execute\(name, internalInput\)/);
 });

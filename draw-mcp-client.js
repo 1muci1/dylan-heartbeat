@@ -136,9 +136,14 @@ class DrawMcpClient {
         name,
         arguments: args
       }), this.timeoutMs);
-      if (result?.isError === true) return safeFailure("DRAW_MCP_CALL_FAILED");
       const payload = result?.structuredContent;
-      if (!payload || payload.ok !== true) return safeFailure("DRAW_MCP_CALL_FAILED");
+      if (result?.isError === true || !payload || payload.ok !== true) {
+        return safeFailure(
+          payload?.error?.code === "DRAW_ROUND_NOT_FOUND"
+            ? "DRAW_ROUND_NOT_FOUND"
+            : "DRAW_MCP_CALL_FAILED"
+        );
+      }
       return publicToolResult(name, payload);
     } catch (error) {
       const code = error?.code === "DRAW_MCP_TIMEOUT"

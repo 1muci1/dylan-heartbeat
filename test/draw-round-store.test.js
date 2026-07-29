@@ -165,6 +165,34 @@ test("round store supports safe updates without changing the round id", t => {
   assert.equal(store.getRound("round-1").outcome, "guessed_correct");
 });
 
+test("active chat rounds are session-scoped and expire with their drawing", t => {
+  let now = Date.parse("2026-07-29T00:00:00.000Z");
+  const { store } = fixture(t, { ttlMs: 1000, now: () => now });
+  store.createRound({
+    id: "round-active",
+    answer: "花",
+    aliases: ["花朵"],
+    artist: "chen",
+    canvas: { width: 600, height: 420 },
+    strokes,
+    createdAt: "2026-07-29T00:00:00.000Z"
+  });
+  const active = store.setActiveRound("session:one", {
+    roundId: "round-active",
+    mode: "chen_draw_user_guess",
+    created_at: "2026-07-29T00:00:00.000Z",
+    updated_at: "2026-07-29T00:00:00.000Z",
+    source: "chat"
+  });
+  assert.equal(active.mode, "chen_draw_user_guess");
+  assert.equal(active.source, "chat");
+  assert.equal(store.getActiveRound("session:two"), null);
+  now += 1001;
+  assert.equal(store.getActiveRound("session:one").expired, true);
+  assert.equal(store.getActiveRound("session:one"), null);
+  assert.equal(store.getRound("round-active"), null);
+});
+
 test("runtime draw store file is gitignored", () => {
   const ignore = fs.readFileSync(path.join(__dirname, "..", ".gitignore"), "utf8");
   assert.match(ignore, /runtime-data\/draw-rounds\.json\*/);

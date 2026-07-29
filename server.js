@@ -37,6 +37,7 @@ const {
   GameTools,
   buildDrawGameChatContext,
   detectDrawGameIntent,
+  resolveActiveDrawGameTurn,
   resolveDrawGameIntentTool
 } = require("./game-tools");
 const {
@@ -357,6 +358,53 @@ function latestUserContentOf(messages) {
     }
   }
   return "";
+}
+
+function sendLocalAssistantCompletion({ reply, body, content, sessionTurn, requestOrigin }) {
+  const model = typeof body?.model === "string" ? body.model : "";
+  const id = `chatcmpl-draw-${Date.now()}`;
+  sessionTurn?.complete(content, null);
+  if (body?.stream) {
+    reply.raw.writeHead(200, {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      ...(ALLOWED_FRONTEND_ORIGINS.has(requestOrigin)
+        ? { "Access-Control-Allow-Origin": requestOrigin }
+        : {}),
+      Vary: "Origin"
+    });
+    const chunks = [
+      {
+        id,
+        object: "chat.completion.chunk",
+        created: Math.floor(Date.now() / 1000),
+        model,
+        choices: [{ index: 0, delta: { role: "assistant", content }, finish_reason: null }]
+      },
+      {
+        id,
+        object: "chat.completion.chunk",
+        created: Math.floor(Date.now() / 1000),
+        model,
+        choices: [{ index: 0, delta: {}, finish_reason: "stop" }]
+      }
+    ];
+    for (const chunk of chunks) reply.raw.write(`data: ${JSON.stringify(chunk)}\n\n`);
+    reply.raw.end("data: [DONE]\n\n");
+    return;
+  }
+  return reply.send({
+    id,
+    object: "chat.completion",
+    created: Math.floor(Date.now() / 1000),
+    model,
+    choices: [{
+      index: 0,
+      message: { role: "assistant", content },
+      finish_reason: "stop"
+    }]
+  });
 }
 
 function memoryQueryOf(messages, maxMessages = 6) {
@@ -1002,12 +1050,33 @@ app.post("/v1/chat/completions", async (req, reply) => {
     const identityBoundaryContext = agentIdentityBoundaryBuilder.build();
     const identityContext = agentIdentityContextBuilder.build();
     const latestUserContent = latestUserContentOf(kelivoMessages);
+    const activeDrawTurn = await resolveActiveDrawGameTurn({
+      content: latestUserContent,
+      sessionId,
+      hasImages: hasImageContent(originalMessages),
+      store: drawGameService.store,
+      service: drawGameService,
+      callMcpTool: callDrawMcpTool,
+      internalTools: gameTools,
+      logger: app.log
+    });
+    if (activeDrawTurn?.handled) {
+      return sendLocalAssistantCompletion({
+        reply,
+        body,
+        content: activeDrawTurn.response,
+        sessionTurn,
+        requestOrigin: req.headers.origin
+      });
+    }
     const drawGameIntent = detectDrawGameIntent(latestUserContent);
     const drawGameToolResult = await resolveDrawGameIntentTool({
       intent: drawGameIntent,
       callMcpTool: callDrawMcpTool,
       internalTools: gameTools,
-      logger: app.log
+      logger: app.log,
+      store: drawGameService.store,
+      sessionId
     });
     const drawGameContext = buildDrawGameChatContext(drawGameIntent, drawGameToolResult);
     const memoryQuery = memoryQueryOf(kelivoMessages) || latestUserContent;

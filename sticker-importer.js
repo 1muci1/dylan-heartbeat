@@ -13,6 +13,57 @@ const KEYWORDS = [
 ];
 const IMAGE_URL_RE = /https?:\/\/[^\s<>"'（）()]+?\.(?:png|jpe?g|webp|gif)(?:\?[^\s<>"'（）()]*)?/ig;
 
+function normalizeImageUrl(value) {
+  const raw = String(value || "").trim();
+  try {
+    const url = new URL(raw, "http://local.invalid");
+    url.hash = "";
+    url.hostname = url.hostname.toLowerCase();
+    return raw.startsWith("/") ? `${url.pathname}${url.search}` : url.toString();
+  } catch {
+    return raw;
+  }
+}
+
+function mergeStickerItem(target, source) {
+  const before = JSON.stringify(target);
+  const targetDescription = String(target.description || "").trim();
+  const sourceDescription = String(source.description || "").trim();
+  if (sourceDescription.length > targetDescription.length) target.description = sourceDescription;
+  target.tags = [...new Set([
+    ...(Array.isArray(target.tags) ? target.tags : []),
+    ...(Array.isArray(source.tags) ? source.tags : [])
+  ].map(String).map(tag => tag.trim()).filter(Boolean))];
+  target.needsReview = target.needsReview === true && source.needsReview === true;
+  return JSON.stringify(target) !== before;
+}
+
+function dedupePacks(data) {
+  const packs = Array.isArray(data?.packs) ? data.packs : [];
+  const seen = new Map();
+  let removedCount = 0;
+  let mergedCount = 0;
+  for (const pack of packs) {
+    const unique = [];
+    for (const item of Array.isArray(pack.items) ? pack.items : []) {
+      const key = normalizeImageUrl(item.imageUrl);
+      if (!key || !seen.has(key)) {
+        if (key) seen.set(key, item);
+        unique.push(item);
+        continue;
+      }
+      removedCount += 1;
+      if (mergeStickerItem(seen.get(key), item)) mergedCount += 1;
+    }
+    pack.items = unique;
+  }
+  return {
+    data: { ...data, version: Number(data?.version) || 1, packs: packs.filter(pack => pack.items.length) },
+    removedCount,
+    mergedCount
+  };
+}
+
 function tagsFor(description, title = "") {
   const tags = new Set();
   const source = `${description} ${title}`;
@@ -153,7 +204,20 @@ class StickerImporter {
     const zipEntries = path.extname(source.record.safeName).toLowerCase() === ".zip"
       ? new Map(readZipEntries(source.buffer, { maxEntries: 100 }).map(entry => [entry.name, entry.data]))
       : null;
-    const items = candidates.filter((_, index) => selected.has(index)).map(item => {
+    const selectedItems = candidates.filter((_, index) => selected.has(index));
+    const selectedByUrl = new Map();
+    let skippedDuplicateCount = 0;
+    let mergedCount = 0;
+    for (const item of selectedItems) {
+      const key = normalizeImageUrl(item.imageUrl);
+      if (key && selectedByUrl.has(key)) {
+        skippedDuplicateCount += 1;
+        if (mergeStickerItem(selectedByUrl.get(key), item)) mergedCount += 1;
+      } else {
+        selectedByUrl.set(key || `candidate:${selectedByUrl.size}`, { ...item, tags: [...item.tags] });
+      }
+    }
+    const resolvedItems = [...selectedByUrl.values()].map(item => {
       let imageUrl = item.imageUrl;
       if (item.zipEntry || item.uploadFile) {
         const data = item.uploadFile ? source.buffer : zipEntries?.get(item.zipEntry);
@@ -168,14 +232,45 @@ class StickerImporter {
         tags: item.tags, needsReview: item.needsReview === true
       };
     });
-    const packs = this.readPacks();
-    const pack = {
-      id: crypto.randomUUID(), sourceFileId: fileId,
-      createdAt: new Date().toISOString(), items
+    const existingDedupe = dedupePacks(this.readPacks());
+    const packs = existingDedupe.data;
+    mergedCount += existingDedupe.mergedCount;
+    let existingMetadataChanged = false;
+    const existingByUrl = new Map();
+    for (const pack of packs.packs) {
+      for (const item of pack.items || []) {
+        const key = normalizeImageUrl(item.imageUrl);
+        if (key && !existingByUrl.has(key)) existingByUrl.set(key, item);
+      }
+    }
+    const importedItems = [];
+    for (const item of resolvedItems) {
+      const existing = existingByUrl.get(normalizeImageUrl(item.imageUrl));
+      if (!existing) {
+        importedItems.push(item);
+        existingByUrl.set(normalizeImageUrl(item.imageUrl), item);
+        continue;
+      }
+      skippedDuplicateCount += 1;
+      if (mergeStickerItem(existing, item)) {
+        mergedCount += 1;
+        existingMetadataChanged = true;
+      }
+    }
+    let packId = "";
+    if (importedItems.length) {
+      const pack = {
+        id: crypto.randomUUID(), sourceFileId: fileId,
+        createdAt: new Date().toISOString(), items: importedItems
+      };
+      packId = pack.id;
+      packs.packs.unshift(pack);
+    }
+    if (importedItems.length || existingMetadataChanged || existingDedupe.removedCount) atomicJson(this.packFile, packs);
+    return {
+      ok: true, packId, importedCount: importedItems.length,
+      skippedDuplicateCount, mergedCount, items: importedItems
     };
-    packs.packs.unshift(pack);
-    atomicJson(this.packFile, packs);
-    return { ok: true, packId: pack.id, importedCount: items.length, items };
   }
 
   list() {
@@ -190,6 +285,9 @@ module.exports = {
   IMAGE_URL_RE,
   KEYWORDS,
   StickerImporter,
+  dedupePacks,
+  mergeStickerItem,
+  normalizeImageUrl,
   parseCsv,
   parseJson,
   parseUrlDescriptionText,

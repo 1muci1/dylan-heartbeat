@@ -49,6 +49,24 @@
   };
   const normalizeStickerPacks = values => (Array.isArray(values) ? values : [])
     .flatMap(normalizeStickerPack);
+  const normalizeStickerUrl = value => {
+    const raw = String(value || "").trim();
+    try {
+      const parsed = new URL(raw, window.location?.origin || "http://local.invalid");
+      parsed.hash = "";
+      parsed.hostname = parsed.hostname.toLowerCase();
+      return raw.startsWith("/") ? `${parsed.pathname}${parsed.search}` : parsed.toString();
+    } catch { return raw; }
+  };
+  const dedupeStickers = values => {
+    const seen = new Set();
+    return values.filter(item => {
+      const key = normalizeStickerUrl(item.url);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
   const matchesSticker = (item, keyword) => {
     const term = String(keyword || "").trim().toLowerCase();
     return !term || `${item.description} ${item.label} ${item.tags}`.toLowerCase().includes(term);
@@ -70,7 +88,7 @@
       listLocal(keyword),
       listImported(keyword)
     ]);
-    return local.concat(imported);
+    return dedupeStickers(local.concat(imported));
   };
   const uploadSticker = async (file, label, tags) => { const body = new FormData(); body.append("label", label || ""); body.append("tags", tags || ""); body.append("file", file); return (await request("/api/v1/stickers", { method: "POST", body })).data; };
   const update = async (id, values) => (await request(`/api/v1/stickers/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(values) })).data;
@@ -103,7 +121,7 @@
     ? pathname
     : URL.createObjectURL(await request(pathname));
   window.AppMedia = Object.freeze({
-    list, listLocal, listImported, normalizeStickerItem, normalizeStickerPack,
+    list, listLocal, listImported, normalizeStickerItem, normalizeStickerPack, dedupeStickers,
     uploadSticker, update, remove, restore, uploadImages, uploadChatFile, uploadChatFiles,
     previewStickerImport, confirmStickerImport, blobUrl, request
   });

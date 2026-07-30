@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
       grid.replaceChildren();
       for (const item of items) {
         const card = document.createElement("article"); card.className = "manager-card";
-        const img = document.createElement("img"); img.alt = item.label || "Sticker";
+        const img = document.createElement("img"); img.alt = item.label || "Sticker"; img.loading = "lazy";
         media.blobUrl(item.url).then(url => img.src = url);
         const title = document.createElement("strong"); title.textContent = item.label || "未命名";
         const tags = document.createElement("small"); tags.textContent = item.tags || "无标签";
@@ -50,7 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
       previewPayload.items.forEach(item => {
         const card = document.createElement("label"); card.className = "import-item";
         const checkbox = document.createElement("input"); checkbox.type = "checkbox"; checkbox.checked = true; checkbox.value = item.index;
-        const image = document.createElement("img"); image.alt = item.description || "待确认表情";
+        const image = document.createElement("img"); image.alt = item.description || "待确认表情"; image.loading = "lazy";
         if (item.imageUrl) image.src = item.imageUrl;
         else if (item.uploadFile && importFile.files[0]?.type?.startsWith("image/")) {
           image.src = URL.createObjectURL(importFile.files[0]);
@@ -71,7 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       importStatus.textContent = "正在导入…";
       const result = await media.confirmStickerImport(previewPayload.fileId, selectedIndexes);
-      importStatus.textContent = `已导入 ${result.importedCount} 个表情`;
+      importStatus.textContent = `已导入 ${result.importedCount} 个，跳过 ${result.skippedDuplicateCount || 0} 个重复表情。`;
       previewPayload = null; importPreview.hidden = true; importFile.value = "";
       load();
     } catch (error) { importStatus.textContent = error.message || "表情包导入失败"; }

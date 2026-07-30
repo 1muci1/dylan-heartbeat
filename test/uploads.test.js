@@ -10,7 +10,7 @@ const Fastify = require("fastify");
 const multipart = require("@fastify/multipart");
 const { extractDocxText, extractFile, readZipEntries } = require("../file-extractors");
 const { UploadStore } = require("../upload-store");
-const { StickerImporter, parseUrlDescriptionText } = require("../sticker-importer");
+const { StickerImporter, dedupePacks, parseUrlDescriptionText } = require("../sticker-importer");
 const { registerUploadRoutes } = require("../upload-routes");
 
 function zip(entries) {
@@ -189,8 +189,59 @@ test("sticker preview does not save a pack; confirm saves metadata without downl
   assert.equal(fs.existsSync(path.join(dir, "sticker-packs.json")), false);
   const result = importer.confirm(upload.fileId, [0]);
   assert.equal(result.importedCount, 1);
+  assert.equal(result.skippedDuplicateCount, 0);
   assert.equal(importer.list()[0].url, "https://example.test/cat.jpg");
   assert.equal(fs.readdirSync(store.rootDir).filter(name => /\.(?:png|jpg)$/i.test(name)).length, 0);
+});
+
+test("sticker packs dedupe repeated imports by normalized URL and merge useful metadata", () => {
+  const base = Array.from({ length: 35 }, (_, index) => ({
+    id: `base-${index}`,
+    imageUrl: `https://EXAMPLE.test/${index}.gif#copy`,
+    description: index === 0 ? "哭" : `动作${index}`,
+    tags: index === 0 ? ["哭"] : ["小猫"],
+    needsReview: true
+  }));
+  const packs = {
+    version: 1,
+    packs: Array.from({ length: 6 }, (_, packIndex) => ({
+      id: `pack-${packIndex}`,
+      active: packIndex === 0,
+      items: base.map((item, index) => ({
+        ...item,
+        id: `${packIndex}-${index}`,
+        imageUrl: item.imageUrl.replace("#copy", packIndex % 2 ? "" : "#copy"),
+        description: index === 0 && packIndex === 5 ? "小白猫哭得很伤心" : item.description,
+        tags: index === 0 && packIndex === 4 ? ["小猫", "委屈"] : item.tags,
+        needsReview: packIndex !== 3
+      }))
+    }))
+  };
+  const result = dedupePacks(packs);
+  assert.equal(result.data.packs.length, 1);
+  assert.equal(result.data.packs[0].items.length, 35);
+  assert.equal(result.removedCount, 175);
+  const crying = result.data.packs[0].items[0];
+  assert.equal(crying.description, "小白猫哭得很伤心");
+  assert.deepEqual(crying.tags, ["哭", "小猫", "委屈"]);
+  assert.equal(crying.needsReview, false);
+  assert.equal(result.data.packs[0].active, true);
+});
+
+test("confirming the same sticker document twice skips duplicates without growing storage", async t => {
+  const { importer, store } = await fixture(t);
+  const buffer = Buffer.from([
+    "https://example.test/a.gif（小猫哭）",
+    "https://example.test/b.gif（小猫收到）"
+  ].join("\n"));
+  const extraction = extractFile({ name: "daimao.txt", buffer, mime: "text/plain" });
+  const upload = store.save({ buffer, originalName: "daimao.txt", mime: "text/plain", extraction });
+  const first = importer.confirm(upload.fileId);
+  const second = importer.confirm(upload.fileId);
+  assert.equal(first.importedCount, 2);
+  assert.equal(second.importedCount, 0);
+  assert.equal(second.skippedDuplicateCount, 2);
+  assert.equal(importer.list().length, 2);
 });
 
 test("zip reader rejects path traversal and imports only safe image entries", async t => {
@@ -248,6 +299,16 @@ test("frontend file chips, removal and current-turn file protocol do not persist
   assert.equal(messages[0].content[1].preview.length, 500);
   assert.equal(messages[0].content[1].extracted_text_length, 1200);
   assert.doesNotMatch(JSON.stringify(messages), /不得发送的完整正文|extractedText/);
+  const stickerMessages = window.MessageProtocol.toOpenAIMessages([{
+    id: "sticker-current", role: "user",
+    content: "用户发送了一个表情：[Sticker: 小白猫哭；标签：小猫 哭]",
+    sticker: {
+      id: "sticker-id", description: "小白猫哭", tags: "小猫 哭",
+      url: "https://example.test/private-sticker.gif"
+    }
+  }]);
+  assert.match(stickerMessages[0].content, /小白猫哭/);
+  assert.doesNotMatch(JSON.stringify(stickerMessages), /private-sticker|image_url/);
 });
 
 test("shared sticker normalization displays imported packs and filters description and tags", async () => {
@@ -277,19 +338,34 @@ test("shared sticker normalization displays imported packs and filters descripti
   assert.deepEqual([...filtered.map(item => item.id)], ["sticker-4"]);
   assert.equal(window.AppMedia.normalizeStickerPack({ items: imported }).length, 35);
   assert.equal(window.AppMedia.normalizeStickerPack({ active: false, items: imported })[0].status, "disabled");
+  assert.equal(window.AppMedia.dedupeStickers([
+    ...all,
+    { ...all[0], id: "duplicate", url: `${all[0].url}#copy` }
+  ]).length, 35);
 });
 
 test("chat sticker refresh, friendly empty/error states, click send and file status transitions are wired", () => {
   const chat = fs.readFileSync(path.join(__dirname, "..", "frontend-p4b/assets/js/chat.js"), "utf8");
+  const manager = fs.readFileSync(path.join(__dirname, "..", "frontend-p4b/assets/js/sticker-manager.js"), "utf8");
+  assert.match(manager, /已导入 \$\{result\.importedCount\} 个，跳过 \$\{result\.skippedDuplicateCount \|\| 0\} 个重复表情/);
   assert.match(chat, /stickerButton\?\.addEventListener\("click"[\s\S]*loadStickers\(\)/);
   assert.match(chat, /await media\.list\(stickerSearch\?\.value \|\| ""\)/);
-  assert.match(chat, /empty\.hidden = Boolean\(items\.length\)/);
-  assert.match(chat, /stickerCache = items/);
+  assert.match(chat, /empty\.hidden = Boolean\(stickerCache\.length\)/);
+  assert.match(chat, /stickerCache = media\.dedupeStickers/);
+  assert.match(chat, /STICKER_PAGE_SIZE = 40/);
+  assert.match(chat, /stickerCache\.slice\(visibleStickerCount, visibleStickerCount \+ STICKER_PAGE_SIZE\)/);
+  assert.match(chat, /image\.loading = "lazy"/);
+  assert.match(chat, /window\.setTimeout\(loadStickers, 200\)/);
+  assert.match(chat, /media\.dedupeStickers/);
   assert.match(chat, /status\.textContent = "表情包暂时没加载出来，稍后再试。"/);
   const stickerCatch = chat.slice(chat.indexOf("const loadStickers"), chat.indexOf("const sendSticker"));
   assert.doesNotMatch(stickerCatch.slice(stickerCatch.indexOf("catch")), /stickerGrid\.replaceChildren/);
   assert.match(chat, /button\.onclick = \(\) => sendSticker\(sticker\)/);
-  assert.match(chat, /createUserMessage\(`\[Sticker:/);
+  assert.match(chat, /用户发送了一个表情：\[Sticker:/);
+  assert.match(chat, /requestAssistantReply\(message, null, \{ timeoutMs: 60000 \}\)/);
+  assert.match(chat, /if \(pendingRow\.isConnected\) pendingRow\.remove\(\)/);
+  const stickerSend = chat.slice(chat.indexOf("const sendSticker"), chat.indexOf("const handleSend"));
+  assert.doesNotMatch(stickerSend, /sticker\.url|image_url/);
   assert.match(chat, /uploadState === "uploading"/);
   assert.match(chat, /uploadState === "error"/);
   assert.match(chat, /retryDocumentUpload/);

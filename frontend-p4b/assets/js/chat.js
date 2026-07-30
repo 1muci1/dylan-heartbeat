@@ -542,7 +542,8 @@ document.addEventListener("DOMContentLoaded", () => {
         chatCount: state.stats.chatCount,
         headers: serverSessionId
           ? { "X-Session-Id": serverSessionId }
-          : {}
+          : {},
+        timeoutMs: Number(options.timeoutMs) || 60000
       })) {
         const event = typeof chunk === "string" ? { type: "content", content: chunk } : chunk;
         if (event.type === "thinking") {
@@ -608,6 +609,8 @@ document.addEventListener("DOMContentLoaded", () => {
       messageContent.append(createMessageElement(errorMessage, true));
       updateStatusLine(friendlyMessage);
       scrollToLatest();
+    } finally {
+      if (pendingRow.isConnected) pendingRow.remove();
     }
   };
 
@@ -625,6 +628,9 @@ document.addEventListener("DOMContentLoaded", () => {
   let pendingFiles = [];
   let pendingDocuments = [];
   let stickerCache = [];
+  let visibleStickerCount = 0;
+  let stickerSearchTimer = 0;
+  const STICKER_PAGE_SIZE = 40;
   const supportsImages = () => window.AppConfig?.getProviderConfig?.().supportsImages === true;
   const formatFileSize = size => {
     const bytes = Number(size) || 0;
@@ -694,23 +700,34 @@ document.addEventListener("DOMContentLoaded", () => {
     renderPendingFiles();
     uploadPendingDocument(pending);
   };
+  const renderStickerPage = reset => {
+    const empty = document.querySelector(".sticker-empty");
+    if (reset) {
+      visibleStickerCount = 0;
+      stickerGrid.replaceChildren();
+    }
+    const nextItems = stickerCache.slice(visibleStickerCount, visibleStickerCount + STICKER_PAGE_SIZE);
+    visibleStickerCount += nextItems.length;
+    empty.textContent = "暂无 Sticker";
+    empty.hidden = Boolean(stickerCache.length);
+    for (const sticker of nextItems) {
+      const button = document.createElement("button"); button.type = "button";
+      button.title = `${sticker.description || sticker.label || "Sticker"} ${sticker.tags || ""}`.trim();
+      const image = document.createElement("img");
+      image.alt = sticker.description || sticker.label || "Sticker";
+      image.loading = "lazy";
+      media.blobUrl(sticker.url).then(value => image.src = value).catch(() => { image.alt = "Sticker 加载失败"; });
+      button.append(image); button.onclick = () => sendSticker(sticker); stickerGrid.append(button);
+    }
+  };
   const loadStickers = async () => {
     const empty = document.querySelector(".sticker-empty");
     const status = document.querySelector(".sticker-status");
     try {
       const items = await media.list(stickerSearch?.value || "");
-      stickerCache = items;
-      stickerGrid.replaceChildren();
-      empty.textContent = "暂无 Sticker";
-      empty.hidden = Boolean(items.length);
+      stickerCache = media.dedupeStickers ? media.dedupeStickers(items) : items;
+      renderStickerPage(true);
       status.hidden = true;
-      for (const sticker of items) {
-        const button = document.createElement("button"); button.type = "button";
-        button.title = `${sticker.description || sticker.label || "Sticker"} ${sticker.tags || ""}`.trim();
-        const image = document.createElement("img"); image.alt = sticker.description || sticker.label || "Sticker";
-        media.blobUrl(sticker.url).then(value => image.src = value).catch(() => { image.alt = "Sticker 加载失败"; });
-        button.append(image); button.onclick = () => sendSticker(sticker); stickerGrid.append(button);
-      }
     } catch {
       empty.hidden = Boolean(stickerCache.length);
       status.hidden = false;
@@ -719,8 +736,12 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   const sendSticker = sticker => {
     if (api.loading) return; stickerPanel.hidden = true; stickerButton.setAttribute("aria-expanded", "false");
-    const message = messageProtocol.createUserMessage(`[Sticker: ${sticker.label || "Sticker"}]`, { type: "sticker", sticker });
-    appendAndPersist(message, state => { state.stats.chatCount += 1; }); requestAssistantReply(message);
+    const description = String(sticker.description || sticker.label || "Sticker").trim().slice(0, 160);
+    const tags = String(sticker.tags || "").trim().slice(0, 160);
+    const semantic = `用户发送了一个表情：[Sticker: ${description}${tags ? `；标签：${tags}` : ""}]`;
+    const message = messageProtocol.createUserMessage(semantic, { type: "sticker", sticker });
+    appendAndPersist(message, state => { state.stats.chatCount += 1; });
+    requestAssistantReply(message, null, { timeoutMs: 60000 });
   };
 
   const handleSend = async () => {
@@ -924,7 +945,14 @@ document.addEventListener("DOMContentLoaded", () => {
     await Promise.allSettled(pending.map(uploadPendingDocument));
   });
   stickerButton?.addEventListener("click", () => { stickerPanel.hidden = !stickerPanel.hidden; stickerButton.setAttribute("aria-expanded", String(!stickerPanel.hidden)); if (!stickerPanel.hidden) loadStickers(); });
-  stickerSearch?.addEventListener("input", loadStickers);
+  stickerPanel?.addEventListener("scroll", () => {
+    if (stickerPanel.scrollTop + stickerPanel.clientHeight >= stickerPanel.scrollHeight - 48
+      && visibleStickerCount < stickerCache.length) renderStickerPage(false);
+  });
+  stickerSearch?.addEventListener("input", () => {
+    window.clearTimeout(stickerSearchTimer);
+    stickerSearchTimer = window.setTimeout(loadStickers, 200);
+  });
   composer.addEventListener("submit", (event) => {
     event.preventDefault();
     handleSend();

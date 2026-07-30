@@ -100,7 +100,7 @@ test("vision-enabled providers send only the current image and omit historical i
   assert.doesNotMatch(JSON.stringify(messages), /old-image/);
 });
 
-test("chat blocks unsupported image sending while preserving preview and clears state on request failures", () => {
+test("chat blocks unsupported image sending and preserves previews on request failures", () => {
   const chat = fs.readFileSync(path.join(frontend, "assets/js/chat.js"), "utf8");
   const unsupportedStart = chat.indexOf("if (pendingFiles.length && !supportsImages())");
   const unsupportedEnd = chat.indexOf("let attachments = []", unsupportedStart);
@@ -109,7 +109,10 @@ test("chat blocks unsupported image sending while preserving preview and clears 
   assert.match(unsupported, /showToast\(message\)/);
   assert.match(unsupported, /return;/);
   assert.doesNotMatch(unsupported, /clearPendingFiles|uploadImages|requestAssistantReply/);
-  assert.match(chat, /catch \(error\) \{\s*clearPendingFiles\(\);/);
+  assert.match(chat, /图片上传失败，请稍后重试/);
+  const assistantCatch = chat.slice(chat.indexOf("const requestAssistantReply"), chat.indexOf("const picker"));
+  assert.doesNotMatch(assistantCatch.slice(assistantCatch.indexOf("catch (error)")), /clearPendingFiles/);
+  assert.match(chat, /onFailure:\s*\(\) =>/);
   assert.match(chat, /const supportsImages = \(\) => window\.AppConfig/);
   assert.match(chat, /imageMessageId: userMessage\.attachments\?\.length \? userMessage\.id : null/);
 });

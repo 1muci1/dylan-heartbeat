@@ -9,7 +9,7 @@ const { test } = require("node:test");
 const root = path.join(__dirname, "..");
 const read = relative => fs.readFileSync(path.join(root, relative), "utf8");
 
-test("Service Worker controller change refreshes only once per v39 tab session", async () => {
+test("Service Worker controller change refreshes only once per v40 tab session", async () => {
   const source = read("frontend-p4b/assets/js/common.js");
   const session = new Map();
   const listeners = {};
@@ -44,7 +44,8 @@ test("Service Worker controller change refreshes only once per v39 tab session",
   listeners.controllerchange();
   listeners.controllerchange();
   assert.equal(reloads, 1);
-  assert.equal(session.get("p4b-sw-controller-refresh-v39"), "1");
+  assert.equal(session.get("p4b-sw-controller-refresh-v40"), "1");
+  assert.equal(windowRef.XINBAN_BUILD, "v40-p4b");
 });
 
 test("chat recovery hooks reapply model badge, avatars, and background without rebuilding state", () => {

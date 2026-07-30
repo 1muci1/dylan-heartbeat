@@ -414,7 +414,7 @@
 .sticker-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin-top: 10px; }
 .sticker-grid button { width: 100%; height: auto; aspect-ratio: 1; border-radius: 10px; background: #f4f0f6; }
 .sticker-grid img { width: 100%; height: 100%; object-fit: contain; }
-.sticker-empty { padding: 14px; color: #998f9d; font-size: 11px; text-align: center; }
+.sticker-empty,.sticker-status { padding: 14px; color: #998f9d; font-size: 11px; text-align: center; }
 
 .composer button {
   display: grid;

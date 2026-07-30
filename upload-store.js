@@ -142,12 +142,16 @@ class UploadStore {
     };
   }
 
-  chatContext(fileId) {
+  chatContext(fileId, options = {}) {
     const record = this.get(fileId);
-    if (!record.canUseInChat || !record.extractedText) {
+    const suppliedPreview = String(options.preview || "").slice(0, 500).trim();
+    const storedPreview = String(record.extractedTextPreview || "").slice(0, 500).trim();
+    const fallbackText = String(record.extractedText || "").slice(0, 1000).trim();
+    const safeText = (suppliedPreview || storedPreview || fallbackText).slice(0, 1000);
+    if (!record.canUseInChat || !safeText) {
       return `[附件：${record.safeName}，${record.mime}]\n这个文件已上传，但暂时不能提取文字内容。`;
     }
-    return `[附件：${record.safeName}，${record.mime}]\n${record.extractedText}`;
+    return `[附件：${record.safeName}，${record.mime}，${record.size} bytes，已提取 ${record.extractedTextLength} 字符]\n${safeText}`;
   }
 }
 

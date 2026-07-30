@@ -237,11 +237,17 @@ test("frontend file chips, removal and current-turn file protocol do not persist
   vm.runInNewContext(fs.readFileSync(path.join(root, "assets/js/message.js"), "utf8"), { window, Intl, Date, Math });
   const messages = window.MessageProtocol.toOpenAIMessages([{
     id: "current", role: "user", content: "请读附件",
-    files: [{ fileId: "file-id", name: "notes.txt", mime: "text/plain" }]
+    files: [{
+      fileId: "file-id", name: "notes.txt", mime: "text/plain", size: 1200,
+      kind: "document", extractedTextPreview: "甲".repeat(600),
+      extractedTextLength: 1200, extractedText: "不得发送的完整正文"
+    }]
   }], { activeFileMessageId: "current" });
   assert.equal(messages[0].content[1].type, "file");
   assert.equal(messages[0].content[1].file_id, "file-id");
-  assert.doesNotMatch(JSON.stringify(messages), /extractedText/);
+  assert.equal(messages[0].content[1].preview.length, 500);
+  assert.equal(messages[0].content[1].extracted_text_length, 1200);
+  assert.doesNotMatch(JSON.stringify(messages), /不得发送的完整正文|extractedText/);
 });
 
 test("shared sticker normalization displays imported packs and filters description and tags", async () => {
@@ -278,13 +284,27 @@ test("chat sticker refresh, friendly empty/error states, click send and file sta
   assert.match(chat, /stickerButton\?\.addEventListener\("click"[\s\S]*loadStickers\(\)/);
   assert.match(chat, /await media\.list\(stickerSearch\?\.value \|\| ""\)/);
   assert.match(chat, /empty\.hidden = Boolean\(items\.length\)/);
-  assert.match(chat, /empty\.textContent = "表情包暂时没加载出来，稍后再试。"/);
+  assert.match(chat, /stickerCache = items/);
+  assert.match(chat, /status\.textContent = "表情包暂时没加载出来，稍后再试。"/);
+  const stickerCatch = chat.slice(chat.indexOf("const loadStickers"), chat.indexOf("const sendSticker"));
+  assert.doesNotMatch(stickerCatch.slice(stickerCatch.indexOf("catch")), /stickerGrid\.replaceChildren/);
   assert.match(chat, /button\.onclick = \(\) => sendSticker\(sticker\)/);
   assert.match(chat, /createUserMessage\(`\[Sticker:/);
   assert.match(chat, /uploadState === "uploading"/);
   assert.match(chat, /uploadState === "error"/);
   assert.match(chat, /retryDocumentUpload/);
-  assert.match(chat, /clearPendingFiles\(\);[\s\S]*requestAssistantReply\(message\)/);
+  assert.match(chat, /onFailure:\s*\(\) =>/);
+  assert.match(chat, /\.\.\.draftDocuments\.filter/);
+  for (const text of [
+    "网络暂时连不上，稍后再试。",
+    "连接授权失效了，刷新后再试。",
+    "这次文件内容太大了，换个小一点的文件或删掉附件再试。",
+    "这个附件暂时不能发送，删掉后再试。",
+    "沉刚刚没有接住这条消息，稍后再试。",
+    "回复中途断了一下，内容没有完整收到。",
+    "这次发送失败了，稍后再试。"
+  ]) assert.match(chat, new RegExp(text.replace(/[。]/g, "\\。")));
+  assert.doesNotMatch(chat, /连接暂时中断了，请检查网络后再试/);
 });
 
 test("runtime upload and sticker pack paths are ignored by git", () => {

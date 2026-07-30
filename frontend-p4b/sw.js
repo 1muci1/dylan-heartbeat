@@ -1,24 +1,5 @@
-const CACHE_NAME = "xinban-shell-v39-p4b";
-const STALE_CACHE_NAMES = new Set([
-  "xinban-shell-v21-p4b",
-  "xinban-shell-v22-p4b",
-  "xinban-shell-v23-p4b",
-  "xinban-shell-v24-p4b",
-  "xinban-shell-v25-p4b",
-  "xinban-shell-v26-p4b",
-  "xinban-shell-v27-p4b",
-  "xinban-shell-v28-p4b",
-  "xinban-shell-v29-p4b",
-  "xinban-shell-v30-p4b",
-  "xinban-shell-v31-p4b",
-  "xinban-shell-v32-p4b",
-  "xinban-shell-v33-p4b",
-  "xinban-shell-v34-p4b",
-  "xinban-shell-v35-p4b",
-  "xinban-shell-v36-p4b"
-  ,"xinban-shell-v37-p4b"
-  ,"xinban-shell-v38-p4b"
-]);
+const CACHE_NAME = "xinban-shell-v40-p4b";
+const CACHE_PREFIX = "xinban-shell-";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -32,25 +13,25 @@ const APP_SHELL = [
   "./manifest.json",
   "./assets/css/common.css",
   "./assets/css/home.css",
-  "./assets/css/chat.css",
+  "./assets/css/chat.css?v=v40-p4b",
   "./assets/css/dashboard.css",
   "./assets/css/settings.css",
   "/shared/provider-config-panel.css",
   "./assets/css/memory.css",
-  "./assets/css/stickers.css",
+  "./assets/css/stickers.css?v=v40-p4b",
   "./assets/css/ai-memory-review.css",
   "./assets/css/proactive-explanation.css",
   "./assets/js/data.js",
   "./assets/js/appearance.js",
   "./assets/js/model-registry.js",
   "./assets/js/model-switcher.js",
-  "./assets/js/message.js",
+  "./assets/js/message.js?v=v40-p4b",
   "./assets/js/provider.js",
-  "./assets/js/api.js",
-  "./assets/js/common.js",
+  "./assets/js/api.js?v=v40-p4b",
+  "./assets/js/common.js?v=v40-p4b",
   "./assets/js/sessions.js",
-  "./assets/js/stickers.js",
-  "./assets/js/sticker-manager.js",
+  "./assets/js/stickers.js?v=v40-p4b",
+  "./assets/js/sticker-manager.js?v=v40-p4b",
   "./assets/js/home.js",
   "./assets/js/chat-preferences.js",
   "./assets/js/avatar-chat.js",
@@ -59,9 +40,9 @@ const APP_SHELL = [
   "./assets/js/settings-return.js",
   "./assets/js/settings-section.js",
   "/shared/provider-config-panel.js",
-  "./assets/js/chat.js",
+  "./assets/js/chat.js?v=v40-p4b",
   "./assets/js/dashboard.js",
-  "./assets/js/settings.js",
+  "./assets/js/settings.js?v=v40-p4b",
   "./assets/js/memory.js",
   "./assets/js/ai-memory-review.js",
   "./assets/js/proactive-explanation.js",
@@ -77,14 +58,32 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) => Promise.all(
-      keys.filter((key) => STALE_CACHE_NAMES.has(key)).map((key) => caches.delete(key))
-    ))
+      keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
+        .map((key) => caches.delete(key))
+    )).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
-  if (event.request.headers.has("Authorization") || new URL(event.request.url).pathname.startsWith("/api/")) return;
+  const url = new URL(event.request.url);
+  if (event.request.headers.has("Authorization")
+    || url.pathname.startsWith("/api/")
+    || url.pathname.startsWith("/v1/")) return;
+  const acceptsHtml = (event.request.headers.get("Accept") || "").includes("text/html");
+  if (event.request.mode === "navigate" || acceptsHtml) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request).then((cached) => cached || caches.match("./index.html")))
+    );
+    return;
+  }
   event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request)));
 });

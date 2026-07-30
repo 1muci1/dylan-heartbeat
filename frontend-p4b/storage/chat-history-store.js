@@ -46,7 +46,8 @@
       size: Number(value.size) || 0,
       kind: String(value.kind || ""),
       canUseInChat: value.canUseInChat === true,
-      extractedTextPreview: String(value.extractedTextPreview || "").slice(0, 500)
+      extractedTextPreview: String(value.extractedTextPreview || "").slice(0, 500),
+      extractedTextLength: Number(value.extractedTextLength) || 0
     };
   };
 

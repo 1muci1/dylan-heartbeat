@@ -297,7 +297,8 @@ test("Sticker messages persist as sticker and become a short model descriptor", 
 test("chat file text is injected only into the current upstream turn and not persisted as full content", async () => {
   const id = await createSession("File chat");
   const boundary = "----p4afile";
-  const privateFileText = "CURRENT_FILE_ONLY_8f1d";
+  const privateFileText = "甲".repeat(1400) + "FULL_TEXT_MUST_NOT_REACH_MODEL_8f1d";
+  const suppliedPreview = "客户端安全预览_8f1d";
   const payload = Buffer.concat([
     Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="files"; filename="notes.txt"\r\nContent-Type: text/plain\r\n\r\n${privateFileText}\r\n--${boundary}--\r\n`)
   ]);
@@ -320,15 +321,18 @@ test("chat file text is injected only into the current upstream turn and not per
       stream: false,
       messages: [{ role: "user", content: [
         { type: "text", text: "请读附件" },
-        { type: "file", file_id: file.fileId, name: file.name, mime: file.mime }
+        { type: "file", file_id: file.fileId, name: file.name, mime: file.mime, kind: "document", preview: suppliedPreview }
       ] }]
     }
   });
   assert.equal(response.statusCode, 200);
-  assert.match(forwarded.messages.at(-1).content, new RegExp(privateFileText));
+  const forwardedContent = JSON.stringify(forwarded.messages.at(-1).content);
+  assert.match(forwardedContent, new RegExp(suppliedPreview));
+  assert.doesNotMatch(forwardedContent, /FULL_TEXT_MUST_NOT_REACH_MODEL_8f1d/);
+  assert.ok(forwardedContent.length < 1200);
   const user = (await history(id))[0];
   assert.match(user.content, /附件：notes\.txt/);
-  assert.doesNotMatch(user.content, new RegExp(privateFileText));
+  assert.doesNotMatch(user.content, /FULL_TEXT_MUST_NOT_REACH_MODEL_8f1d|客户端安全预览_8f1d/);
 });
 
 test("chat consumes memory context without logging or persisting memory content", async () => {
@@ -606,12 +610,15 @@ test("last-user guard accepts a current multimodal user message", () => {
   );
 });
 
-test("server source logs only a bounded chat summary instead of request bodies", () => {
+test("server source logs only lengths instead of request bodies or previews", () => {
   const source = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
   assert.doesNotMatch(source, /收到 Kelivo 完整请求 Body/);
   assert.doesNotMatch(source, /JSON\.stringify\(sanitizeForLog\(body\)/);
   assert.doesNotMatch(source, /示例事件内容/);
-  assert.match(source, /lastUserContentPreview:\s*safeChatPreview/);
+  assert.match(source, /lastUserContentLength:\s*normalizeContentToText/);
+  assert.match(source, /filePreviewLengths/);
+  assert.match(source, /fileExtractedTextLengths/);
+  assert.doesNotMatch(source, /lastUserContentPreview|safeChatPreview/);
   assert.match(source, /memoryInjectedCount/);
   assert.match(source, /timelineEventCount/);
 });

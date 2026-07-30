@@ -485,7 +485,7 @@ function normalizeStickerParts(messages, metadata, options = {}) {
         return {
           type: "text",
           text: options.includeFileText && messageIndex === latestUserIndex
-            ? uploadStore.chatContext(part.file_id)
+            ? uploadStore.chatContext(part.file_id, { preview: part.preview })
             : `[附件：${file.safeName || file.name || "文件"}，${file.mime}；历史内容已省略]`
         };
       }
@@ -686,14 +686,6 @@ function hasImageContent(messages) {
     if (Array.isArray(content)) return content.some(isImageContentPart);
     return isImageContentPart(content);
   });
-}
-
-function safeChatPreview(content, limit = 80) {
-  return normalizeContentToText(content)
-    .replace(/data:image\/[^,;\s]+(?:;base64)?,[A-Za-z0-9+/=]+/gi, "[图片]")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, limit);
 }
 
 function isRealMessageForTimeline(msg) {
@@ -1149,7 +1141,13 @@ app.post("/v1/chat/completions", async (req, reply) => {
     console.log("chat request summary", {
       messageCount: originalMessages.length,
       lastRoles: originalMessages.slice(-3).map(message => message?.role || "unknown"),
-      lastUserContentPreview: safeChatPreview(latestUserContent),
+      lastUserContentLength: normalizeContentToText(latestUserContent).length,
+      filePreviewLengths: (p4Metadata.files || []).map(file =>
+        Math.min(String(file.extractedTextPreview || "").length, 500)
+      ),
+      fileExtractedTextLengths: (p4Metadata.files || []).map(file =>
+        Number(file.extractedTextLength) || 0
+      ),
       model: typeof body.model === "string" ? body.model : "",
       hasImages: hasImageContent(originalMessages),
       memoryInjectedCount: Array.isArray(memoryRetrieval?.items) ? memoryRetrieval.items.length : 0,

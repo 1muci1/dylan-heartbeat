@@ -504,7 +504,18 @@ document.addEventListener("DOMContentLoaded", () => {
     localHistory.saveMessages(localHistorySessionId, messages).catch(() => {});
   };
 
-  const requestAssistantReply = async (userMessage, requestHistory = null) => {
+  const friendlySendError = (error, hasFiles = false) => {
+    if (error?.code === "CONFIG_ERROR") return "连接还没有配置好，请稍后再试。";
+    if (error?.code === "NETWORK_ERROR") return "网络暂时连不上，稍后再试。";
+    if (error?.status === 401 || error?.status === 403) return "连接授权失效了，刷新后再试。";
+    if (error?.status === 413) return "这次文件内容太大了，换个小一点的文件或删掉附件再试。";
+    if (error?.status === 400 && hasFiles) return "这个附件暂时不能发送，删掉后再试。";
+    if (error?.code === "INVALID_RESPONSE") return "回复中途断了一下，内容没有完整收到。";
+    if (error?.status >= 500 || error?.code === "TIMEOUT") return "沉刚刚没有接住这条消息，稍后再试。";
+    return "这次发送失败了，稍后再试。";
+  };
+
+  const requestAssistantReply = async (userMessage, requestHistory = null, options = {}) => {
     const state = store.getState();
     const history = Array.isArray(requestHistory) ? requestHistory : state.messages;
     const pendingMessage = messageProtocol.createAssistantMessage("…", { transient: true, actionsDisabled: true });
@@ -586,17 +597,16 @@ document.addEventListener("DOMContentLoaded", () => {
         }).catch(() => {});
       }
     } catch (error) {
-      clearPendingFiles();
       pendingRow.remove();
+      const friendlyMessage = friendlySendError(error, Boolean(userMessage.files?.length));
+      options.onFailure?.(error);
       const errorMessage = messageProtocol.createAssistantMessage(
-        error?.code === "CONFIG_ERROR"
-          ? "连接还没有配置好，请稍后再试。"
-          : "连接暂时中断了，请检查网络后再试。",
+        friendlyMessage,
         { transient: true, retryUserMessageId: userMessage.id }
       );
       messageContent.querySelector(".message-row--last")?.classList.remove("message-row--last");
       messageContent.append(createMessageElement(errorMessage, true));
-      updateStatusLine("连接遇到了一点问题");
+      updateStatusLine(friendlyMessage);
       scrollToLatest();
     }
   };
@@ -614,6 +624,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const stickerSearch = document.querySelector(".sticker-panel input");
   let pendingFiles = [];
   let pendingDocuments = [];
+  let stickerCache = [];
   const supportsImages = () => window.AppConfig?.getProviderConfig?.().supportsImages === true;
   const formatFileSize = size => {
     const bytes = Number(size) || 0;
@@ -685,11 +696,14 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   const loadStickers = async () => {
     const empty = document.querySelector(".sticker-empty");
+    const status = document.querySelector(".sticker-status");
     try {
       const items = await media.list(stickerSearch?.value || "");
+      stickerCache = items;
       stickerGrid.replaceChildren();
       empty.textContent = "暂无 Sticker";
       empty.hidden = Boolean(items.length);
+      status.hidden = true;
       for (const sticker of items) {
         const button = document.createElement("button"); button.type = "button";
         button.title = `${sticker.description || sticker.label || "Sticker"} ${sticker.tags || ""}`.trim();
@@ -698,9 +712,9 @@ document.addEventListener("DOMContentLoaded", () => {
         button.append(image); button.onclick = () => sendSticker(sticker); stickerGrid.append(button);
       }
     } catch {
-      stickerGrid.replaceChildren();
-      empty.hidden = false;
-      empty.textContent = "表情包暂时没加载出来，稍后再试。";
+      empty.hidden = Boolean(stickerCache.length);
+      status.hidden = false;
+      status.textContent = "表情包暂时没加载出来，稍后再试。";
     }
   };
   const sendSticker = sticker => {
@@ -735,9 +749,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     let attachments = [];
+    const draftImages = [...pendingFiles];
+    const draftDocuments = pendingDocuments.map(file => ({ ...file }));
     if (pendingFiles.length) {
       try { attachments = await media.uploadImages(pendingFiles, sessionApiAvailable ? activeSessionId : "", text => { if (uploadStatus) uploadStatus.textContent = text; }); }
-      catch (error) { if (uploadStatus) uploadStatus.textContent = error.message; clearPendingFiles(); input.focus(); return; }
+      catch { if (uploadStatus) uploadStatus.textContent = "图片上传失败，请稍后重试"; input.focus(); return; }
     }
 
     const fallbackContent = attachments.length ? "[图片]" : pendingDocuments.length
@@ -746,8 +762,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const message = messageProtocol.createUserMessage(content || fallbackContent, {
       type: attachments.length ? "image" : pendingDocuments.length ? "file" : "text",
       attachments,
-      files: pendingDocuments.map(({ fileId, name, mime, size, kind, canUseInChat, extractedTextPreview }) => (
-        { fileId, name, mime, size, kind, canUseInChat, extractedTextPreview }
+      files: pendingDocuments.map(({ fileId, name, mime, size, kind, canUseInChat, extractedTextPreview, extractedTextLength }) => (
+        {
+          fileId, name, mime, size, kind, canUseInChat,
+          extractedTextPreview: String(extractedTextPreview || "").slice(0, 500),
+          extractedTextLength: Number(extractedTextLength) || 0
+        }
       ))
     });
 
@@ -760,7 +780,22 @@ document.addEventListener("DOMContentLoaded", () => {
     clearPendingFiles();
     input.style.height = "";
     input.focus();
-    requestAssistantReply(message);
+    requestAssistantReply(message, null, {
+      onFailure: () => {
+        if (content && !input.value.includes(content)) {
+          input.value = input.value.trim() ? `${content}\n${input.value}` : content;
+          input.dispatchEvent(new Event("input"));
+        }
+        pendingFiles = [...draftImages, ...pendingFiles];
+        const existingDocuments = new Set(pendingDocuments.map(file => file.fileId || file.clientId));
+        pendingDocuments = [
+          ...draftDocuments.filter(file => !existingDocuments.has(file.fileId || file.clientId)),
+          ...pendingDocuments
+        ];
+        renderPendingFiles();
+        if (uploadStatus) uploadStatus.textContent = "文件已经上传，但这次发送失败了，稍后再试。";
+      }
+    });
   };
 
   const findMessageContext = (messageId) => {

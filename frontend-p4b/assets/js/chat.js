@@ -136,7 +136,16 @@ document.addEventListener("DOMContentLoaded", () => {
       message.attachments.forEach(attachment => { const link = document.createElement("a"); link.target = "_blank"; link.rel = "noopener"; const image = document.createElement("img"); image.alt = "聊天图片"; media?.blobUrl(attachment.url).then(value => { image.src = value; link.href = value; }).catch(() => { image.alt = "图片加载失败"; }); link.append(image); gallery.append(link); });
       bubble.append(gallery);
     }
-    String(message.content || "").split("\n").filter(line => line || (!message.sticker && !message.attachments?.length)).forEach((line) => {
+    if (message.files?.length) {
+      const files = document.createElement("div"); files.className = "message-files";
+      message.files.forEach(file => {
+        const chip = document.createElement("span"); chip.className = "message-file";
+        chip.textContent = `📎 ${file.name || "文件"}`;
+        files.append(chip);
+      });
+      bubble.append(files);
+    }
+    String(message.content || "").split("\n").filter(line => line || (!message.sticker && !message.attachments?.length && !message.files?.length)).forEach((line) => {
       const paragraph = document.createElement("p");
       paragraph.textContent = line;
       bubble.append(paragraph);
@@ -518,6 +527,7 @@ document.addEventListener("DOMContentLoaded", () => {
       for await (const chunk of api.sendStreamMessage(userMessage.content, {
         history,
         imageMessageId: userMessage.attachments?.length ? userMessage.id : null,
+        fileMessageId: userMessage.files?.length ? userMessage.id : null,
         chatCount: state.stats.chatCount,
         headers: serverSessionId
           ? { "X-Session-Id": serverSessionId }
@@ -592,7 +602,9 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const picker = document.querySelector(".image-picker");
+  const filePicker = document.querySelector(".file-picker");
   const imageButton = document.querySelector(".composer__image");
+  const fileButton = document.querySelector(".composer__file");
   const tray = document.querySelector(".attachment-tray");
   const previews = document.querySelector(".attachment-previews");
   const uploadStatus = document.querySelector(".attachment-status");
@@ -601,16 +613,29 @@ document.addEventListener("DOMContentLoaded", () => {
   const stickerGrid = document.querySelector(".sticker-grid");
   const stickerSearch = document.querySelector(".sticker-panel input");
   let pendingFiles = [];
+  let pendingDocuments = [];
   const supportsImages = () => window.AppConfig?.getProviderConfig?.().supportsImages === true;
 
   const clearPendingFiles = () => {
     pendingFiles = [];
+    pendingDocuments = [];
     renderPendingFiles();
     if (picker) picker.value = "";
+    if (filePicker) filePicker.value = "";
   };
   const renderPendingFiles = () => {
-    previews?.replaceChildren(); tray.hidden = !pendingFiles.length;
+    previews?.replaceChildren(); tray.hidden = !pendingFiles.length && !pendingDocuments.length;
     pendingFiles.forEach((file, index) => { const item = document.createElement("div"); item.className = "attachment-preview"; const img = document.createElement("img"); img.src = URL.createObjectURL(file); const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "×"; remove.setAttribute("aria-label", "移除图片"); remove.onclick = () => { pendingFiles.splice(index, 1); renderPendingFiles(); }; item.append(img, remove); previews.append(item); });
+    pendingDocuments.forEach((file, index) => {
+      const item = document.createElement("div"); item.className = "attachment-preview attachment-preview--file";
+      const name = document.createElement("strong"); name.textContent = file.name || "文件";
+      const meta = document.createElement("small");
+      meta.textContent = file.canUseInChat ? `${file.kind} · 可发送` : "无法解析文字";
+      const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "×";
+      remove.setAttribute("aria-label", "移除文件");
+      remove.onclick = () => { pendingDocuments.splice(index, 1); renderPendingFiles(); };
+      item.append(name, meta, remove); previews.append(item);
+    });
   };
   const loadStickers = async () => {
     try { const items = await media.list(stickerSearch?.value || ""); stickerGrid.replaceChildren(); document.querySelector(".sticker-empty").hidden = Boolean(items.length); for (const sticker of items) { const button = document.createElement("button"); button.type = "button"; button.title = sticker.label || "Sticker"; const image = document.createElement("img"); image.alt = sticker.label || "Sticker"; media.blobUrl(sticker.url).then(value => image.src = value); button.append(image); button.onclick = () => sendSticker(sticker); stickerGrid.append(button); } } catch (error) { if (uploadStatus) uploadStatus.textContent = error.message; }
@@ -628,7 +653,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const content = input.value.trim();
-    if (!content && !pendingFiles.length) return;
+    if (!content && !pendingFiles.length && !pendingDocuments.length) return;
 
     if (pendingFiles.length && !supportsImages()) {
       const message = "当前模型未启用图片理解。请到 模型设置 → 支持图片理解 开启后再发送图片。";
@@ -644,7 +669,16 @@ document.addEventListener("DOMContentLoaded", () => {
       catch (error) { if (uploadStatus) uploadStatus.textContent = error.message; clearPendingFiles(); input.focus(); return; }
     }
 
-    const message = messageProtocol.createUserMessage(content || "[图片]", { type: attachments.length ? "image" : "text", attachments });
+    const fallbackContent = attachments.length ? "[图片]" : pendingDocuments.length
+      ? `[文件：${pendingDocuments.map(file => file.name).join("、")}]`
+      : "";
+    const message = messageProtocol.createUserMessage(content || fallbackContent, {
+      type: attachments.length ? "image" : pendingDocuments.length ? "file" : "text",
+      attachments,
+      files: pendingDocuments.map(({ fileId, name, mime, size, kind, canUseInChat }) => (
+        { fileId, name, mime, size, kind, canUseInChat }
+      ))
+    });
 
     appendAndPersist(message, (state) => {
       state.stats.chatCount += 1;
@@ -755,6 +789,7 @@ document.addEventListener("DOMContentLoaded", () => {
   api.onLoadingChange(setRequestState);
   sendButton.addEventListener("click", handleSend);
   imageButton?.addEventListener("click", () => picker?.click());
+  fileButton?.addEventListener("click", () => filePicker?.click());
   picker?.addEventListener("change", () => {
     const files = [...picker.files];
     if (files.length + pendingFiles.length > 4) {
@@ -764,6 +799,26 @@ document.addEventListener("DOMContentLoaded", () => {
       renderPendingFiles();
     }
     picker.value = "";
+  });
+  filePicker?.addEventListener("change", async () => {
+    const files = [...filePicker.files];
+    filePicker.value = "";
+    if (!files.length) return;
+    if (files.length + pendingDocuments.length > 5) {
+      if (uploadStatus) uploadStatus.textContent = "每次最多选择 5 个文件";
+      return;
+    }
+    if (uploadStatus) uploadStatus.textContent = "文件上传中…";
+    try {
+      const uploaded = await media.uploadChatFiles(files);
+      pendingDocuments.push(...uploaded);
+      renderPendingFiles();
+      if (uploadStatus) uploadStatus.textContent = uploaded.some(file => !file.canUseInChat)
+        ? "部分文件暂时不能提取文字内容"
+        : "文件已准备好";
+    } catch (error) {
+      if (uploadStatus) uploadStatus.textContent = error.message || "文件上传失败，请稍后再试";
+    }
   });
   stickerButton?.addEventListener("click", () => { stickerPanel.hidden = !stickerPanel.hidden; stickerButton.setAttribute("aria-expanded", String(!stickerPanel.hidden)); if (!stickerPanel.hidden) loadStickers(); });
   stickerSearch?.addEventListener("input", loadStickers);

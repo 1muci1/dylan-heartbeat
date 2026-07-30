@@ -4,9 +4,18 @@ body { overflow-x: hidden; background: var(--bg); color: #514956; }
 .sticker-manager header a { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 50%; color: #6f5c7d; background: white; font-size: 28px; }
 .sticker-manager h1 { font-size: 22px; }.sticker-manager header p,.manager-status { color: #948999; font-size: 11px; }
 .sticker-upload { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; padding: 14px; border-radius: 16px; background: white; }
+.sticker-import,.single-sticker { display:block; margin-bottom:14px; padding:14px; border-radius:16px; background:white; }
+.sticker-import h2 { margin:0 0 5px; font-size:17px; }.sticker-import p { color:#8e8293; font-size:11px; }
+.sticker-import label { display:grid; gap:6px; margin:10px 0; font-size:12px; }
+.sticker-import button { padding:10px 12px; border:0; border-radius:10px; color:white; background:#725d82; }
+.import-preview-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:12px 0; }
+.import-item { position:relative; min-width:0; padding:7px; border-radius:10px; background:#f5f1f6; }
+.import-item input { position:absolute; top:6px; left:6px; }.import-item img { width:100%; aspect-ratio:1; object-fit:contain; }
+.import-item span { display:block; overflow-wrap:anywhere; font-size:10px; }.import-status { margin-top:9px; }
+.single-sticker summary { color:#725d82; cursor:pointer; }
 .sticker-upload input,.manager-tools input,.manager-tools select { min-width: 0; padding: 10px; border: 1px solid #e8e1eb; border-radius: 10px; }
 .sticker-upload input[type=file],.sticker-upload button,.manager-status { grid-column: 1/-1; }.sticker-upload button { padding: 11px; border: 0; border-radius: 11px; color: white; background: #725d82; }
 .manager-tools { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; margin: 16px 0; }
 .manager-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
 .manager-card { min-width: 0; padding: 9px; border-radius: 14px; background: white; }.manager-card img { width: 100%; aspect-ratio: 1; object-fit: contain; }.manager-card strong,.manager-card small { display:block; overflow-wrap:anywhere; }.manager-card small { color:#998f9d; }.manager-actions { display:flex; gap:5px; margin-top:8px; }.manager-actions button { flex:1; border:0; padding:7px 3px; border-radius:8px; }
-@media(max-width:359px){.sticker-manager{padding-inline:10px}.sticker-upload{grid-template-columns:minmax(0,1fr)}.sticker-upload>*{grid-column:1}.manager-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:359px){.sticker-manager{padding-inline:10px}.sticker-upload{grid-template-columns:minmax(0,1fr)}.sticker-upload>*{grid-column:1}.manager-grid,.import-preview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

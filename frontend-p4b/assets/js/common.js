@@ -2,7 +2,7 @@
 
 ((windowRef, documentRef, navigatorRef) => {
   const APP_VERSION = "v37";
-  const SW_CACHE_NAME = "xinban-shell-v37-p4b";
+  const SW_CACHE_NAME = "xinban-shell-v38-p4b";
   const CONTROLLER_REFRESH_GUARD = "p4b-sw-controller-refresh-v37";
 
   const refreshOnceForController = () => {

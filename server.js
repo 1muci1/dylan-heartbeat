@@ -21,6 +21,9 @@ const { AgentIdentityBoundaryBuilder } = require("./agent-identity-boundary-buil
 const { registerMemoryRoutes } = require("./memory-routes");
 const { MediaStore } = require("./media-store");
 const { registerMediaRoutes } = require("./media-routes");
+const { UploadStore } = require("./upload-store");
+const { StickerImporter } = require("./sticker-importer");
+const { registerUploadRoutes } = require("./upload-routes");
 const { AiMemoryStore } = require("./ai-memory-store");
 const { DeliveryStore } = require("./delivery-store");
 const { ConversationSummaryService } = require("./conversation-summary-service");
@@ -156,6 +159,8 @@ const mediaStore = new MediaStore({
   imageDir: process.env.CHAT_IMAGE_UPLOAD_DIR || "./uploads/chat-images",
   stickerDir: process.env.STICKER_UPLOAD_DIR || "./uploads/stickers"
 });
+const uploadStore = new UploadStore();
+const stickerImporter = new StickerImporter({ uploadStore });
 const aiConfig = readAiConfig();
 const aiMemoryStore = new AiMemoryStore({ database: databaseConnection.db, memoryStore: structuredMemoryStore, eventStore, logger: app.log });
 const deliveryStore = new DeliveryStore({ database: databaseConnection.db });
@@ -192,6 +197,7 @@ registerMemoryRoutes(app, {
   contextBuilder: agentMemoryContextBuilder
 });
 registerMediaRoutes(app, { store: mediaStore, sessionStore });
+registerUploadRoutes(app, { uploadStore, stickerImporter });
 registerAiRoutes(app, { store: aiMemoryStore, runner: aiTaskRunner, config: aiConfig, adapter: aiAdapter });
 registerEventRoutes(app, { store: eventStore });
 registerGameEventRoutes(app, { service: gameEventService });
@@ -445,29 +451,46 @@ function readP4MessageMetadata(messages) {
   const latest = [...messages].reverse().find(message => message?.role === "user");
   const parts = Array.isArray(latest?.content) ? latest.content : [];
   const attachmentIds = [];
+  const fileIds = [];
   let stickerId = null;
   for (const part of parts) {
     const match = String(imageUrlValue(part) || "").match(LOCAL_IMAGE_RE);
     if (match) attachmentIds.push(match[1]);
     if (part?.type === "sticker" && typeof part.sticker_id === "string") stickerId = part.sticker_id;
+    if (part?.type === "file" && typeof part.file_id === "string") fileIds.push(part.file_id);
   }
   if (attachmentIds.length > 4) { const error = new Error("每条消息最多包含 4 张图片"); error.statusCode = 413; throw error; }
   if (attachmentIds.length && !shouldForwardMultimodalContent()) {
     const error = new Error("当前 MULTIMODAL_MODE 不支持图片，请启用 passthrough/vision 后重试");
     error.statusCode = 400; error.code = "MULTIMODAL_NOT_ENABLED"; throw error;
   }
+  if (fileIds.length > 5) { const error = new Error("每条消息最多包含 5 个文件"); error.statusCode = 413; error.code = "TOO_MANY_FILES"; throw error; }
+  const files = fileIds.map(fileId => uploadStore.get(fileId));
   let sticker = null;
   if (stickerId) sticker = mediaStore.getSticker(stickerId);
-  return { attachmentIds, stickerId, sticker,
+  return { attachmentIds, fileIds, files, stickerId, sticker,
     messageType: stickerId ? "sticker" : attachmentIds.length ? "image" : "text" };
 }
 
-function normalizeStickerParts(messages, metadata) {
-  return messages.map(message => {
+function normalizeStickerParts(messages, metadata, options = {}) {
+  const filesById = new Map((metadata.fileIds || []).map((fileId, index) => [fileId, metadata.files?.[index]]));
+  const latestUserIndex = messages.findLastIndex(message => message?.role === "user");
+  return messages.map((message, messageIndex) => {
     if (!Array.isArray(message?.content)) return message;
-    const content = message.content.map(part => part?.type === "sticker"
-      ? { type: "text", text: `[Sticker: ${metadata.sticker?.label || "Sticker"}]` }
-      : part);
+    const content = message.content.map(part => {
+      if (part?.type === "sticker") return { type: "text", text: `[Sticker: ${metadata.sticker?.label || "Sticker"}]` };
+      if (part?.type === "file" && typeof part.file_id === "string") {
+        const file = filesById.get(part.file_id);
+        if (!file) return { type: "text", text: "[附件已失效]" };
+        return {
+          type: "text",
+          text: options.includeFileText && messageIndex === latestUserIndex
+            ? uploadStore.chatContext(part.file_id)
+            : `[附件：${file.safeName || file.name || "文件"}，${file.mime}；历史内容已省略]`
+        };
+      }
+      return part;
+    });
     return { ...message, content };
   });
 }
@@ -884,6 +907,8 @@ const auth = req.headers.authorization || "";
   if (req.url.startsWith("/api/v1/chat/sessions")) return done();
   if (req.url.startsWith("/api/v1/chat/")) return done();
   if (req.url.startsWith("/api/v1/stickers")) return done();
+  if (req.url.startsWith("/api/v1/sticker-imports")) return done();
+  if (req.url.startsWith("/api/v1/uploads")) return done();
   if (req.url.startsWith("/api/v1/memories")) return done();
   if (req.url.startsWith("/api/v1/memory-candidates")) return done();
   if (req.url.startsWith("/api/v1/ai-")) return done();
@@ -951,6 +976,9 @@ app.post("/v1/chat/completions", async (req, reply) => {
     const originalMessages = body.messages || [];
     const p4Metadata = readP4MessageMetadata(originalMessages);
     const kelivoMessages = normalizeStickerParts(originalMessages, p4Metadata);
+    const llmSourceMessages = p4Metadata.fileIds?.length
+      ? normalizeStickerParts(originalMessages, p4Metadata, { includeFileText: true })
+      : kelivoMessages;
     const sessionId = String(req.headers["x-session-id"] || "").trim();
     sessionTurn = beginSessionTurn(sessionStore, sessionId, kelivoMessages, normalizeContentToText, {
       ...p4Metadata,
@@ -977,7 +1005,7 @@ app.post("/v1/chat/completions", async (req, reply) => {
 
     // Kelivo 发图时 content 常是数组。默认转为文本占位，避免非视觉模型/中转站报错。
     // 如上游支持 OpenAI 兼容视觉格式，可设置 MULTIMODAL_MODE=passthrough 原样转发。
-    const llmMessages = embedLocalImages(kelivoMessages)
+    const llmMessages = embedLocalImages(llmSourceMessages)
       .map(prepareMessageForLLM)
       .filter(Boolean);
 
@@ -1113,7 +1141,10 @@ app.post("/v1/chat/completions", async (req, reply) => {
         ...runtimeContexts
       );
     }
-    assertLastUserMessagePreserved(llmMessages, latestUserContent);
+    assertLastUserMessagePreserved(
+      llmMessages,
+      p4Metadata.fileIds?.length ? latestUserContentOf(llmSourceMessages) : latestUserContent
+    );
 
     console.log("chat request summary", {
       messageCount: originalMessages.length,

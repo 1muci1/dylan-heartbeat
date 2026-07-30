@@ -14,6 +14,9 @@ uploads/
 memory-backups/
 audit-backups/
 runtime-data/draw-rounds.json*
+runtime-data/uploads/
+runtime-data/upload-index.json*
+runtime-data/sticker-packs.json*
 
 # Database
 *.sqlite

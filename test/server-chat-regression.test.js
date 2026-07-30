@@ -16,6 +16,9 @@ process.env.GATEWAY_API_KEY = "gateway-test-key";
 process.env.CHAT_IMAGE_UPLOAD_DIR = path.join(dir, "images");
 process.env.STICKER_UPLOAD_DIR = path.join(dir, "stickers");
 process.env.DRAW_ROUND_STORE_FILE = path.join(dir, "draw-rounds.json");
+process.env.UPLOAD_STORE_DIR = path.join(dir, "uploads");
+process.env.UPLOAD_INDEX_FILE = path.join(dir, "upload-index.json");
+process.env.STICKER_PACK_FILE = path.join(dir, "sticker-packs.json");
 fs.writeFileSync(process.env.TIMELINE_FILE, "[]\n");
 fs.writeFileSync(process.env.TIMESTAMP_DB_FILE, "{}\n");
 
@@ -289,6 +292,43 @@ test("Sticker messages persist as sticker and become a short model descriptor", 
   assert.equal(response.statusCode, 200);
   assert.equal(forwarded.messages.at(-1).content, "[Sticker: 开心地挥手]");
   const user = (await history(id))[0]; assert.equal(user.type, "sticker"); assert.equal(user.sticker.id, sticker.id);
+});
+
+test("chat file text is injected only into the current upstream turn and not persisted as full content", async () => {
+  const id = await createSession("File chat");
+  const boundary = "----p4afile";
+  const privateFileText = "CURRENT_FILE_ONLY_8f1d";
+  const payload = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="files"; filename="notes.txt"\r\nContent-Type: text/plain\r\n\r\n${privateFileText}\r\n--${boundary}--\r\n`)
+  ]);
+  const uploaded = await app.inject({
+    method: "POST", url: "/api/v1/uploads/chat-file",
+    headers: { ...auth, "content-type": `multipart/form-data; boundary=${boundary}` }, payload
+  });
+  assert.equal(uploaded.statusCode, 201);
+  const file = uploaded.json().data[0];
+  let forwarded = null;
+  global.fetch = async (_url, options) => {
+    forwarded = JSON.parse(options.body);
+    return new Response(JSON.stringify({ choices: [{ message: { role: "assistant", content: "读完了" } }] }), {
+      status: 200, headers: { "content-type": "application/json" }
+    });
+  };
+  const response = await app.inject({
+    method: "POST", url: "/v1/chat/completions", headers: { "x-session-id": id },
+    payload: {
+      stream: false,
+      messages: [{ role: "user", content: [
+        { type: "text", text: "请读附件" },
+        { type: "file", file_id: file.fileId, name: file.name, mime: file.mime }
+      ] }]
+    }
+  });
+  assert.equal(response.statusCode, 200);
+  assert.match(forwarded.messages.at(-1).content, new RegExp(privateFileText));
+  const user = (await history(id))[0];
+  assert.match(user.content, /附件：notes\.txt/);
+  assert.doesNotMatch(user.content, new RegExp(privateFileText));
 });
 
 test("chat consumes memory context without logging or persisting memory content", async () => {

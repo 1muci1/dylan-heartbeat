@@ -53,10 +53,27 @@
   const OMITTED_HISTORY_IMAGE_TEXT = "[历史图片已省略：避免重复发送图片上下文]";
   const toOpenAIMessages = (
     history = getConversationHistory(),
-    { supportsImages = false, activeImageMessageId = null } = {}
+    { supportsImages = false, activeImageMessageId = null, activeFileMessageId = null } = {}
   ) => normalizeHistory(history)
-    .map(({ id, role, content, attachments, sticker }) => {
+    .map(({ id, role, content, attachments, files, sticker }) => {
       if (role !== "user") return { role, content };
+      if (Array.isArray(files) && files.length) {
+        if (activeFileMessageId && id === activeFileMessageId) return {
+          role,
+          content: [
+            { type: "text", text: content },
+            ...files
+              .filter(item => typeof item?.fileId === "string" && item.fileId)
+              .map(item => ({ type: "file", file_id: item.fileId, name: item.name, mime: item.mime })),
+            ...(supportsImages && activeImageMessageId === id && Array.isArray(attachments)
+              ? attachments
+                .filter(item => typeof item?.url === "string" && item.url)
+                .map(item => ({ type: "image_url", image_url: { url: item.url } }))
+              : [])
+          ]
+        };
+        return { role, content: `${content}\n[历史文件内容已省略]` };
+      }
       if (Array.isArray(attachments) && attachments.length) {
         if (supportsImages && activeImageMessageId && id === activeImageMessageId) return {
           role,

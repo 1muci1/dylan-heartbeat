@@ -391,12 +391,18 @@
   backdrop-filter: blur(20px);
 }
 .composer-tools { display: flex; gap: 5px; }
-.composer .composer__image, .composer .composer__sticker { color: #786587; background: #eee8f3; }
+.composer .composer__image, .composer .composer__file, .composer .composer__sticker { color: #786587; background: #eee8f3; }
 .image-picker { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+.file-picker { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 .attachment-tray, .sticker-panel { position: absolute; right: 12px; bottom: calc(100% + 7px); left: 12px; padding: 10px; border: 1px solid rgba(105,83,121,.1); border-radius: 15px; background: rgba(255,255,255,.97); box-shadow: 0 12px 35px rgba(54,39,66,.14); }
 .attachment-previews { display: flex; overflow-x: auto; gap: 8px; }
 .attachment-preview { position: relative; flex: 0 0 72px; }
 .attachment-preview img { width: 72px; height: 72px; border-radius: 10px; object-fit: cover; }
+.attachment-preview--file { width: 150px; min-height: 72px; padding: 9px 28px 9px 9px; border-radius: 10px; color: #675b6c; background: #f4f0f6; }
+.attachment-preview--file strong,.attachment-preview--file small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.attachment-preview--file small { margin-top:4px; color:#908494; font-size:10px; }
+.message-files { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
+.message-file { display:inline-flex; max-width:100%; padding:6px 9px; border-radius:9px; background:rgba(255,255,255,.12); font-size:11px; overflow-wrap:anywhere; }
 .attachment-preview button { position: absolute; top: -5px; right: -5px; width: 22px; height: 22px; color: white; background: #6f596f; font-size: 12px; }
 .attachment-status { margin-top: 6px; color: #887b8d; font-size: 10px; }
 .sticker-panel { max-height: 300px; overflow: auto; }
@@ -477,7 +483,7 @@
   .composer button { width: 39px; height: 39px; }
   .composer__voice { display: none !important; }
   .composer-tools { gap: 3px; }
-  .composer .composer__image, .composer .composer__sticker { width: 34px; height: 39px; }
+  .composer .composer__image, .composer .composer__file, .composer .composer__sticker { width: 34px; height: 39px; }
   .sticker-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .message-actions { max-width: 100%; overflow-x: auto; }
   .message-action { flex: 0 0 28px; }

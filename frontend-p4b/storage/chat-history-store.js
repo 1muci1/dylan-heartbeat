@@ -37,6 +37,18 @@
     return sticker.id || sticker.url ? sticker : null;
   };
 
+  const cleanFile = value => {
+    if (!value || typeof value !== "object" || !value.fileId) return null;
+    return {
+      fileId: String(value.fileId),
+      name: String(value.name || ""),
+      mime: String(value.mime || ""),
+      size: Number(value.size) || 0,
+      kind: String(value.kind || ""),
+      canUseInChat: value.canUseInChat === true
+    };
+  };
+
   const cleanMessage = value => {
     if (!value || !VALID_ROLES.has(value.role)) return null;
     const content = String(value.content || "").trim();
@@ -54,6 +66,8 @@
       ? value.attachments.map(cleanAttachment).filter(Boolean)
       : [];
     if (attachments.length) message.attachments = attachments;
+    const files = Array.isArray(value.files) ? value.files.map(cleanFile).filter(Boolean) : [];
+    if (files.length) message.files = files;
     const sticker = cleanSticker(value.sticker);
     if (sticker) message.sticker = sticker;
     return message;

@@ -30,13 +30,14 @@
     return () => loadingListeners.delete(listener);
   };
 
-  const buildRequestBody = (history, stream = MODEL_CONFIG.stream, { imageMessageId = null } = {}) => {
+  const buildRequestBody = (history, stream = MODEL_CONFIG.stream, { imageMessageId = null, fileMessageId = null } = {}) => {
     const modelConfig = getModelConfig();
     return {
       model: modelConfig.model,
       messages: messageProtocol.toOpenAIMessages(history, {
         supportsImages: modelConfig.supportsImages,
-        activeImageMessageId: imageMessageId
+        activeImageMessageId: imageMessageId,
+        activeFileMessageId: fileMessageId
       }),
       stream
     };
@@ -62,6 +63,7 @@
     if (!normalizedMessage) throw new TypeError("message 不能为空");
     return request(buildRequestBody(getHistory(normalizedMessage, options), false, {
       imageMessageId: options.imageMessageId
+      ,fileMessageId: options.fileMessageId
     }), options);
   };
 
@@ -77,6 +79,7 @@
     try {
       const body = buildRequestBody(getHistory(normalizedMessage, options), true, {
         imageMessageId: options.imageMessageId
+        ,fileMessageId: options.fileMessageId
       });
       for await (const chunk of provider.stream(body, {
         ...options,

@@ -64,7 +64,10 @@
             { type: "text", text: content },
             ...files
               .filter(item => typeof item?.fileId === "string" && item.fileId)
-              .map(item => ({ type: "file", file_id: item.fileId, name: item.name, mime: item.mime })),
+              .map(item => ({
+                type: "file", file_id: item.fileId, name: item.name, mime: item.mime,
+                preview: String(item.extractedTextPreview || "")
+              })),
             ...(supportsImages && activeImageMessageId === id && Array.isArray(attachments)
               ? attachments
                 .filter(item => typeof item?.url === "string" && item.url)

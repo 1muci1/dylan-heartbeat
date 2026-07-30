@@ -399,6 +399,8 @@
 .attachment-preview { position: relative; flex: 0 0 72px; }
 .attachment-preview img { width: 72px; height: 72px; border-radius: 10px; object-fit: cover; }
 .attachment-preview--file { width: 150px; min-height: 72px; padding: 9px 28px 9px 9px; border-radius: 10px; color: #675b6c; background: #f4f0f6; }
+.attachment-preview--file[role=button] { cursor: pointer; }
+.attachment-preview--error { color: #8c3e51; background: #fff0f3; outline: 1px solid rgba(140,62,81,.18); }
 .attachment-preview--file strong,.attachment-preview--file small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .attachment-preview--file small { margin-top:4px; color:#908494; font-size:10px; }
 .message-files { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }

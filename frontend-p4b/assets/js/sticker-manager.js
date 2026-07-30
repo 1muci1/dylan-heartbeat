@@ -11,7 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const items = statusSelect.value === "active"
         ? await media.list(search.value)
-        : (await media.request(`/api/v1/stickers?keyword=${encodeURIComponent(search.value)}&status=${statusSelect.value}`)).data;
+        : await media.listLocal(search.value, statusSelect.value);
       grid.replaceChildren();
       for (const item of items) {
         const card = document.createElement("article"); card.className = "manager-card";

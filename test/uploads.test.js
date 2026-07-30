@@ -224,7 +224,12 @@ test("frontend file chips, removal and current-turn file protocol do not persist
   assert.match(html, /class="file-picker"/);
   assert.match(chat, /attachment-preview--file/);
   assert.match(chat, /移除文件/);
-  assert.match(chat, /uploadChatFiles/);
+  assert.match(chat, /uploadChatFile/);
+  assert.match(chat, /uploadState: "uploading"/);
+  assert.match(chat, /上传失败，点此重试/);
+  assert.match(chat, /uploadState: "ready"/);
+  assert.ok(chat.indexOf("pendingDocuments.push(...pending)") < chat.indexOf("Promise.allSettled"));
+  assert.match(chat, /pendingDocuments\.splice\(index, 1\)/);
   assert.doesNotMatch(historySource, /extractedText:/);
 
   const state = { messages: [] };
@@ -237,6 +242,49 @@ test("frontend file chips, removal and current-turn file protocol do not persist
   assert.equal(messages[0].content[1].type, "file");
   assert.equal(messages[0].content[1].file_id, "file-id");
   assert.doesNotMatch(JSON.stringify(messages), /extractedText/);
+});
+
+test("shared sticker normalization displays imported packs and filters description and tags", async () => {
+  const source = fs.readFileSync(path.join(__dirname, "..", "frontend-p4b/assets/js/stickers.js"), "utf8");
+  const imported = Array.from({ length: 35 }, (_, index) => ({
+    id: `sticker-${index}`, imageUrl: `https://example.test/${index}.gif`,
+    description: index === 4 ? "小白猫无语" : `小白猫动作${index}`,
+    tags: index === 4 ? ["小猫", "无语"] : ["小猫"]
+  }));
+  const fetch = async url => ({
+    ok: true,
+    headers: { get: () => "application/json" },
+    json: async () => url.endsWith("/api/v1/sticker-imports")
+      ? { data: [{ id: "pack", items: imported }] }
+      : { data: [] }
+  });
+  const window = {
+    AppConfig: { getProviderConfig: () => ({ baseUrl: "https://gateway.test", auth: { type: "bearer", token: "test" } }) }
+  };
+  vm.runInNewContext(source, { window, fetch, FormData, Blob, URL, XMLHttpRequest: function () {} });
+  const all = await window.AppMedia.list("");
+  assert.equal(all.length, 35);
+  assert.equal(all[4].label, "小白猫无语");
+  assert.equal(all[4].tags, "小猫 无语");
+  assert.equal(all[4].status, "active");
+  const filtered = await window.AppMedia.list("无语");
+  assert.deepEqual([...filtered.map(item => item.id)], ["sticker-4"]);
+  assert.equal(window.AppMedia.normalizeStickerPack({ items: imported }).length, 35);
+  assert.equal(window.AppMedia.normalizeStickerPack({ active: false, items: imported })[0].status, "disabled");
+});
+
+test("chat sticker refresh, friendly empty/error states, click send and file status transitions are wired", () => {
+  const chat = fs.readFileSync(path.join(__dirname, "..", "frontend-p4b/assets/js/chat.js"), "utf8");
+  assert.match(chat, /stickerButton\?\.addEventListener\("click"[\s\S]*loadStickers\(\)/);
+  assert.match(chat, /await media\.list\(stickerSearch\?\.value \|\| ""\)/);
+  assert.match(chat, /empty\.hidden = Boolean\(items\.length\)/);
+  assert.match(chat, /empty\.textContent = "表情包暂时没加载出来，稍后再试。"/);
+  assert.match(chat, /button\.onclick = \(\) => sendSticker\(sticker\)/);
+  assert.match(chat, /createUserMessage\(`\[Sticker:/);
+  assert.match(chat, /uploadState === "uploading"/);
+  assert.match(chat, /uploadState === "error"/);
+  assert.match(chat, /retryDocumentUpload/);
+  assert.match(chat, /clearPendingFiles\(\);[\s\S]*requestAssistantReply\(message\)/);
 });
 
 test("runtime upload and sticker pack paths are ignored by git", () => {

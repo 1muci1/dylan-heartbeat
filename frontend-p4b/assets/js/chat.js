@@ -615,6 +615,12 @@ document.addEventListener("DOMContentLoaded", () => {
   let pendingFiles = [];
   let pendingDocuments = [];
   const supportsImages = () => window.AppConfig?.getProviderConfig?.().supportsImages === true;
+  const formatFileSize = size => {
+    const bytes = Number(size) || 0;
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KiB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
+  };
 
   const clearPendingFiles = () => {
     pendingFiles = [];
@@ -630,15 +636,72 @@ document.addEventListener("DOMContentLoaded", () => {
       const item = document.createElement("div"); item.className = "attachment-preview attachment-preview--file";
       const name = document.createElement("strong"); name.textContent = file.name || "文件";
       const meta = document.createElement("small");
-      meta.textContent = file.canUseInChat ? `${file.kind} · 可发送` : "无法解析文字";
+      if (file.uploadState === "uploading") meta.textContent = `${formatFileSize(file.size)} · 上传中`;
+      else if (file.uploadState === "error") meta.textContent = "上传失败，点此重试";
+      else meta.textContent = file.canUseInChat
+        ? `${formatFileSize(file.size)} · 可发送`
+        : `${formatFileSize(file.size)} · 无法解析文字`;
+      if (file.uploadState === "error") {
+        item.classList.add("attachment-preview--error");
+        item.tabIndex = 0; item.setAttribute("role", "button");
+        item.onclick = event => {
+          if (event.target.closest("button")) return;
+          retryDocumentUpload(file.clientId);
+        };
+        item.onkeydown = event => {
+          if (event.key === "Enter" || event.key === " ") { event.preventDefault(); retryDocumentUpload(file.clientId); }
+        };
+      }
       const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "×";
       remove.setAttribute("aria-label", "移除文件");
       remove.onclick = () => { pendingDocuments.splice(index, 1); renderPendingFiles(); };
       item.append(name, meta, remove); previews.append(item);
     });
   };
+  const uploadPendingDocument = async pending => {
+    try {
+      const uploaded = await media.uploadChatFile(pending.sourceFile);
+      const current = pendingDocuments.find(file => file.clientId === pending.clientId);
+      if (!current) return;
+      Object.assign(current, uploaded, { uploadState: "ready", sourceFile: pending.sourceFile });
+      if (uploadStatus) uploadStatus.textContent = current.canUseInChat
+        ? "文件已准备好"
+        : "文件已上传，但暂时不能提取文字";
+    } catch {
+      const current = pendingDocuments.find(file => file.clientId === pending.clientId);
+      if (!current) return;
+      current.uploadState = "error";
+      if (uploadStatus) uploadStatus.textContent = "文件上传失败，可点击附件重试";
+    }
+    renderPendingFiles();
+  };
+  const retryDocumentUpload = clientId => {
+    const pending = pendingDocuments.find(file => file.clientId === clientId);
+    if (!pending || pending.uploadState !== "error") return;
+    pending.uploadState = "uploading";
+    if (uploadStatus) uploadStatus.textContent = "文件上传中…";
+    renderPendingFiles();
+    uploadPendingDocument(pending);
+  };
   const loadStickers = async () => {
-    try { const items = await media.list(stickerSearch?.value || ""); stickerGrid.replaceChildren(); document.querySelector(".sticker-empty").hidden = Boolean(items.length); for (const sticker of items) { const button = document.createElement("button"); button.type = "button"; button.title = sticker.label || "Sticker"; const image = document.createElement("img"); image.alt = sticker.label || "Sticker"; media.blobUrl(sticker.url).then(value => image.src = value); button.append(image); button.onclick = () => sendSticker(sticker); stickerGrid.append(button); } } catch (error) { if (uploadStatus) uploadStatus.textContent = error.message; }
+    const empty = document.querySelector(".sticker-empty");
+    try {
+      const items = await media.list(stickerSearch?.value || "");
+      stickerGrid.replaceChildren();
+      empty.textContent = "暂无 Sticker";
+      empty.hidden = Boolean(items.length);
+      for (const sticker of items) {
+        const button = document.createElement("button"); button.type = "button";
+        button.title = `${sticker.description || sticker.label || "Sticker"} ${sticker.tags || ""}`.trim();
+        const image = document.createElement("img"); image.alt = sticker.description || sticker.label || "Sticker";
+        media.blobUrl(sticker.url).then(value => image.src = value).catch(() => { image.alt = "Sticker 加载失败"; });
+        button.append(image); button.onclick = () => sendSticker(sticker); stickerGrid.append(button);
+      }
+    } catch {
+      stickerGrid.replaceChildren();
+      empty.hidden = false;
+      empty.textContent = "表情包暂时没加载出来，稍后再试。";
+    }
   };
   const sendSticker = sticker => {
     if (api.loading) return; stickerPanel.hidden = true; stickerButton.setAttribute("aria-expanded", "false");
@@ -654,6 +717,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const content = input.value.trim();
     if (!content && !pendingFiles.length && !pendingDocuments.length) return;
+    if (pendingDocuments.some(file => file.uploadState === "uploading")) {
+      if (uploadStatus) uploadStatus.textContent = "文件仍在上传，请稍候";
+      return;
+    }
+    if (pendingDocuments.some(file => file.uploadState === "error")) {
+      if (uploadStatus) uploadStatus.textContent = "请重试或移除上传失败的文件";
+      return;
+    }
 
     if (pendingFiles.length && !supportsImages()) {
       const message = "当前模型未启用图片理解。请到 模型设置 → 支持图片理解 开启后再发送图片。";
@@ -675,8 +746,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const message = messageProtocol.createUserMessage(content || fallbackContent, {
       type: attachments.length ? "image" : pendingDocuments.length ? "file" : "text",
       attachments,
-      files: pendingDocuments.map(({ fileId, name, mime, size, kind, canUseInChat }) => (
-        { fileId, name, mime, size, kind, canUseInChat }
+      files: pendingDocuments.map(({ fileId, name, mime, size, kind, canUseInChat, extractedTextPreview }) => (
+        { fileId, name, mime, size, kind, canUseInChat, extractedTextPreview }
       ))
     });
 
@@ -809,16 +880,13 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     if (uploadStatus) uploadStatus.textContent = "文件上传中…";
-    try {
-      const uploaded = await media.uploadChatFiles(files);
-      pendingDocuments.push(...uploaded);
-      renderPendingFiles();
-      if (uploadStatus) uploadStatus.textContent = uploaded.some(file => !file.canUseInChat)
-        ? "部分文件暂时不能提取文字内容"
-        : "文件已准备好";
-    } catch (error) {
-      if (uploadStatus) uploadStatus.textContent = error.message || "文件上传失败，请稍后再试";
-    }
+    const pending = files.map(file => ({
+      clientId: crypto.randomUUID(), name: file.name, size: file.size,
+      sourceFile: file, uploadState: "uploading"
+    }));
+    pendingDocuments.push(...pending);
+    renderPendingFiles();
+    await Promise.allSettled(pending.map(uploadPendingDocument));
   });
   stickerButton?.addEventListener("click", () => { stickerPanel.hidden = !stickerPanel.hidden; stickerButton.setAttribute("aria-expanded", String(!stickerPanel.hidden)); if (!stickerPanel.hidden) loadStickers(); });
   stickerSearch?.addEventListener("input", loadStickers);

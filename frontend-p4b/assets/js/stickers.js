@@ -11,14 +11,66 @@
     if (!response.ok) { let payload; try { payload = await response.json(); } catch {} throw new Error(payload?.error?.message || `请求失败（${response.status}）`); }
     return response.headers.get("content-type")?.includes("application/json") ? response.json() : response.blob();
   }
+  const normalizeStatus = value => {
+    if (value?.status) return String(value.status);
+    if (value?.enabled === false || value?.active === false || value?.using === false) return "disabled";
+    return "active";
+  };
+  const normalizeStickerItem = (value, pack = {}) => {
+    if (!value || typeof value !== "object") return null;
+    const urlValue = String(value.url || value.imageUrl || "").trim();
+    if (!urlValue) return null;
+    const tagsValue = Array.isArray(value.tags) ? value.tags.join(" ") : String(value.tags || "");
+    return {
+      id: String(value.id || ""),
+      url: urlValue,
+      label: String(value.label || value.description || "Sticker"),
+      description: String(value.description || value.label || ""),
+      tags: tagsValue,
+      status: normalizeStatus(
+        ["status", "enabled", "active", "using"].some(field => Object.prototype.hasOwnProperty.call(value, field))
+          ? value
+          : pack
+      ),
+      packId: String(value.packId || pack.id || pack.packId || ""),
+      imported: value.imported === true || pack.imported === true || Boolean(pack.items || pack.stickers)
+    };
+  };
+  const normalizeStickerPack = value => {
+    if (!value || typeof value !== "object") return [];
+    const items = Array.isArray(value.items) ? value.items
+      : Array.isArray(value.stickers) ? value.stickers
+        : null;
+    if (!items) {
+      const item = normalizeStickerItem(value);
+      return item ? [item] : [];
+    }
+    return items.map(item => normalizeStickerItem(item, value)).filter(Boolean);
+  };
+  const normalizeStickerPacks = values => (Array.isArray(values) ? values : [])
+    .flatMap(normalizeStickerPack);
+  const matchesSticker = (item, keyword) => {
+    const term = String(keyword || "").trim().toLowerCase();
+    return !term || `${item.description} ${item.label} ${item.tags}`.toLowerCase().includes(term);
+  };
+  const listLocal = async (keyword = "", status = "active") => {
+    const payload = await request(`/api/v1/stickers?keyword=${encodeURIComponent(keyword)}&status=${encodeURIComponent(status)}`);
+    return normalizeStickerPacks(payload.data || [])
+      .filter(item => status !== "active" || item.status === "active")
+      .filter(item => matchesSticker(item, keyword));
+  };
+  const listImported = async keyword => {
+    const payload = await request("/api/v1/sticker-imports");
+    return normalizeStickerPacks(payload.data || [])
+      .filter(item => item.status === "active")
+      .filter(item => matchesSticker(item, keyword));
+  };
   const list = async keyword => {
-    const term = String(keyword || "").toLowerCase();
     const [local, imported] = await Promise.all([
-      request(`/api/v1/stickers?keyword=${encodeURIComponent(keyword || "")}`).then(payload => payload.data || []),
-      request("/api/v1/sticker-imports").then(payload => payload.data || []).catch(() => [])
+      listLocal(keyword),
+      listImported(keyword)
     ]);
-    return local.concat(imported.filter(item => !term
-      || `${item.label || ""} ${item.tags || ""}`.toLowerCase().includes(term)));
+    return local.concat(imported);
   };
   const uploadSticker = async (file, label, tags) => { const body = new FormData(); body.append("label", label || ""); body.append("tags", tags || ""); body.append("file", file); return (await request("/api/v1/stickers", { method: "POST", body })).data; };
   const update = async (id, values) => (await request(`/api/v1/stickers/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(values) })).data;
@@ -39,6 +91,7 @@
     const payload = await request("/api/v1/uploads/chat-file", { method: "POST", body });
     return payload.data || [];
   };
+  const uploadChatFile = async file => (await uploadChatFiles([file]))[0];
   const previewStickerImport = async file => {
     const body = new FormData(); body.append("file", file);
     return request("/api/v1/sticker-imports/preview", { method: "POST", body });
@@ -46,12 +99,12 @@
   const confirmStickerImport = (fileId, selectedIndexes) => request("/api/v1/sticker-imports/confirm", {
     method: "POST", body: JSON.stringify({ fileId, selectedIndexes })
   });
-  const listImported = async () => (await request("/api/v1/sticker-imports")).data || [];
   const blobUrl = async pathname => /^https?:\/\//i.test(pathname)
     ? pathname
     : URL.createObjectURL(await request(pathname));
   window.AppMedia = Object.freeze({
-    list, uploadSticker, update, remove, restore, uploadImages, uploadChatFiles,
-    previewStickerImport, confirmStickerImport, listImported, blobUrl, request
+    list, listLocal, listImported, normalizeStickerItem, normalizeStickerPack,
+    uploadSticker, update, remove, restore, uploadImages, uploadChatFile, uploadChatFiles,
+    previewStickerImport, confirmStickerImport, blobUrl, request
   });
 })();

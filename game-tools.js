@@ -143,14 +143,20 @@ class GameTools {
 
 function detectDrawGameIntent(content) {
   const text = String(content || "").trim().replace(/\s+/g, "");
-  if (!text || !/(你画我猜|画你猜|猜我画)/u.test(text)) return null;
+  if (!text || /(记得|记忆|回忆|之前|刚才).*?(游戏|五子棋|下棋|画)/u.test(text)) return null;
   if (/(我画你猜|你来猜我画的|我画.*沉猜|我来画)/u.test(text)) {
     return Object.freeze({ type: "user_draw", toolName: null });
   }
   if (/(沉.*你画我猜|你画我猜|你来画|沉画)/u.test(text)) {
     return Object.freeze({ type: "chen_draw", toolName: "draw_start" });
   }
-  return Object.freeze({ type: "lobby", toolName: null });
+  if (/(五子棋|陪我下棋|和我下棋|我们下棋)/u.test(text)) {
+    return Object.freeze({ type: "gomoku", toolName: null });
+  }
+  if (/(沉沉?和我玩游戏|陪我玩游戏|我想和你玩|我们玩游戏|玩个游戏)/u.test(text)) {
+    return Object.freeze({ type: "lobby", toolName: null });
+  }
+  return null;
 }
 
 function activeDrawScopeId(sessionId) {
@@ -375,10 +381,22 @@ async function resolveActiveDrawGameTurn({
 
 function buildDrawGameChatContext(intent, toolResult = null) {
   if (!intent) return null;
+  if (intent.type === "lobby") {
+    return {
+      role: "system",
+      content: "用户想让沉陪玩。请以沉的口吻说“好呀，辞辞想玩哪个？我可以陪你下五子棋，也可以玩你画我猜。”并提供 /game/ 链接。不要解释工具实现。"
+    };
+  }
+  if (intent.type === "gomoku") {
+    return {
+      role: "system",
+      content: "用户想和沉下五子棋。请以沉的口吻说“来，我陪你下五子棋。你先手。”并提供 /game/#gomoku 链接。棋盘落子只由游戏页本地规则处理。"
+    };
+  }
   if (intent.type === "user_draw") {
     return {
       role: "system",
-      content: "用户明确想玩“我画，沉猜”。请以沉的口吻简短邀请用户前往 /game/#draw 画画，不要调用其他工具。"
+      content: "用户明确想玩“我画，沉猜”。请以沉的口吻说“好，你画，我认真猜。”并提供 /game/#draw 链接，不要调用其他工具。"
     };
   }
   if (intent.type === "chen_draw" && toolResult?.ok) {

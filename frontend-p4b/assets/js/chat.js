@@ -17,6 +17,26 @@ document.addEventListener("DOMContentLoaded", () => {
   const toast = document.querySelector(".chat-toast");
   const media = window.AppMedia;
   if (!messageList || !messageContent || !composer || !input || !sendButton) return;
+  const GAME_SUMMARY_KEY = "xinban-recent-game-summary-v1";
+  const recentGameContext = (() => {
+    const fromGame = new URLSearchParams(window.location.search).get("fromGame");
+    if (!["gomoku", "draw"].includes(fromGame)) return null;
+    try {
+      const value = JSON.parse(window.sessionStorage?.getItem(GAME_SUMMARY_KEY) || "null");
+      if (!value || value.game !== fromGame) return null;
+      const result = String(value.result || "").slice(0, 24);
+      const lastMessage = String(value.lastMessage || "").trim().slice(0, 120);
+      return { game: fromGame, result, lastMessage };
+    } catch { return null; }
+  })();
+  const withRecentGameContext = history => {
+    if (!recentGameContext || !Array.isArray(history)) return history;
+    const gameName = recentGameContext.game === "gomoku" ? "五子棋" : "你画我猜";
+    return [{
+      role: "system",
+      content: `用户刚从和沉玩的${gameName}页面回来。最近结果：${recentGameContext.result || "未记录"}；页面留言：${recentGameContext.lastMessage || "无"}。请自然接话，不要写入 Memory，不要声称自己决定了棋盘规则。`
+    }, ...history];
+  };
 
   const setText = (selector, value) => {
     const element = document.querySelector(selector);
@@ -526,7 +546,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const requestAssistantReply = async (userMessage, requestHistory = null, options = {}) => {
     const state = store.getState();
-    const history = Array.isArray(requestHistory) ? requestHistory : state.messages;
+    const history = withRecentGameContext(
+      Array.isArray(requestHistory) ? requestHistory : state.messages
+    );
     const pendingMessage = messageProtocol.createAssistantMessage("…", { transient: true, actionsDisabled: true });
     document.querySelector(".message-row--last")?.classList.remove("message-row--last");
     const pendingRow = createMessageElement(pendingMessage, true);

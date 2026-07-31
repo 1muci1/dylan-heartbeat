@@ -18,9 +18,10 @@ const read = name => fs.readFileSync(path.join(root, name), "utf8");
 test("game lobby exposes playable and extensible game cards", () => {
   const html = read("index.html");
   assert.match(html, /小窝游戏厅/);
-  for (const title of ["五子棋", "你画我猜", "记忆问答"]) assert.match(html, new RegExp(title));
-  assert.match(html, /和沉下一局/);
-  assert.match(html, /你画给沉猜，或者沉画给你猜/);
+  for (const title of ["和沉下五子棋", "我画，沉猜", "记忆问答"]) assert.match(html, new RegExp(title));
+  assert.match(html, /沉陪你玩/);
+  assert.match(html, /沉画，我猜/);
+  assert.doesNotMatch(html, /AI 下棋|AI 猜图|机器人|智能体/);
   assert.match(html, /即将开放/);
   for (const file of ["game.css", "identity.css", "gomoku-board.css", "gomoku.js", "game.js"]) {
     assert.ok(fs.existsSync(path.join(root, file)));
@@ -171,7 +172,8 @@ test("drawing frontend sends structured strokes and uses public draw status", ()
   assert.match(js, /沉暂时连接不上游戏服务/);
   assert.match(js, /submitButton\.disabled = true/);
   assert.match(js, /result\.textContent = "沉正在看你的画……"/);
-  assert.doesNotMatch(js, /localStorage|sessionStorage/);
+  assert.match(js, /sessionStorage/);
+  assert.doesNotMatch(js, /localStorage/);
 });
 
 test("user drawing validates the hidden answer and real strokes before any request", () => {
@@ -223,9 +225,9 @@ test("guess result actions are tappable buttons with visible in-card feedback", 
   }
   const actionMarkup = html.slice(html.indexOf("guess-result__actions"), html.indexOf("data-chen-feedback-text"));
   assert.doesNotMatch(actionMarkup, /disabled/);
-  assert.match(js, /太好了，沉猜对了！/);
+  assert.match(js, /我猜对啦！/);
   assert.match(js, /state\.roundOutcome = "guessed_correct"/);
-  assert.match(js, /没关系，可以给沉一点提示，或者再让她猜一次/);
+  assert.match(js, /还不是这个吗？那你给我一点提示/);
   assert.match(css, /\.guess-result[\s\S]*z-index:\s*3/);
   assert.match(css, /\.guess-result[\s\S]*pointer-events:\s*auto/);
   assert.doesNotMatch(css, /\.guess-result[^}]*pointer-events:\s*none/);
@@ -278,11 +280,39 @@ test("all visible players are Chen and the game reuses both preference avatars",
   assert.match(js, /沉落子了/);
   assert.match(js, /state\.locked/);
   assert.match(js, /if \(state\.over \|\| state\.locked\) return/);
-  assert.match(js, /你赢了。沉认真记下这一局。/);
+  assert.match(js, /你赢啦……沉有点不服气，再来一局吗/);
   assert.match(js, /沉赢了。沉认真记下这一局。/);
   assert.match(js, /沉正在看你的画/);
   assert.match(js, /你是沉，在和辞辞玩你画我猜/);
   assert.doesNotMatch(html, /规则 AI|电脑玩家|AI 落子|bot/i);
+});
+
+test("game companion layer exposes Chen presence, end links and a session-only summary", () => {
+  const html = read("index.html");
+  const js = read("game.js");
+  assert.match(html, /data-chen-status[^>]*>沉在等你/);
+  assert.match(html, /回聊天找沉/);
+  assert.match(html, /回聊天和沉说说这一局/);
+  assert.match(html, /\/chat\.html\?fromGame=gomoku/);
+  assert.match(html, /\/chat\.html\?fromGame=draw/);
+  assert.match(js, /xinban-recent-game-summary-v1/);
+  assert.match(js, /finishGame\("gomoku"/);
+  assert.match(js, /沉正在想/);
+  assert.match(js, /沉堵住了这一手/);
+  assert.match(js, /沉好像看到机会了/);
+  assert.match(js, /这一局居然打平了/);
+  assert.match(js, /还不是哦，再看看/);
+  assert.doesNotMatch(js, /Memory|\/api\/v1\/memories/);
+});
+
+test("chat reads recent game summary without persisting it as Memory", () => {
+  const chat = fs.readFileSync(path.join(root, "..", "..", "frontend-p4b", "assets", "js", "chat.js"), "utf8");
+  assert.match(chat, /new URLSearchParams\(window\.location\.search\)\.get\("fromGame"\)/);
+  assert.match(chat, /xinban-recent-game-summary-v1/);
+  assert.match(chat, /withRecentGameContext/);
+  assert.match(chat, /不要写入 Memory/);
+  const context = chat.slice(chat.indexOf("const recentGameContext"), chat.indexOf("const setText"));
+  assert.doesNotMatch(context, /saveState|appendAndPersist|\/api\/v1\/memories/);
 });
 
 test("MCP plan keeps Chen as the player identity", () => {

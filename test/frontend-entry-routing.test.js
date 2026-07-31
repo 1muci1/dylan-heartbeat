@@ -38,12 +38,11 @@ test("new Home and Chat navigation use canonical absolute routes", () => {
   assert.doesNotMatch(chat, /<title>心伴/);
 });
 
-test("new shell app navigation never points at the legacy root chat page", () => {
+test("new shell app navigation only uses the root chat bridge for game return context", () => {
   for (const relativePath of [
     "ai-companion-frontend/home/index.html",
     "ai-companion-frontend/calendar/index.html",
     "ai-companion-frontend/space/index.html",
-    "ai-companion-frontend/game/index.html",
     "frontend-p4b/index.html",
     "frontend-p4b/chat.html",
     "frontend-p4b/settings.html",
@@ -52,4 +51,8 @@ test("new shell app navigation never points at the legacy root chat page", () =>
   ]) {
     assert.doesNotMatch(read(relativePath), /href="\/chat\.html"/, relativePath);
   }
+  const game = read("ai-companion-frontend/game/index.html");
+  assert.match(game, /href="\/chat\.html"/);
+  assert.match(game, /href="\/chat\.html\?fromGame=gomoku"/);
+  assert.match(game, /href="\/chat\.html\?fromGame=draw"/);
 });

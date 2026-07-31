@@ -84,9 +84,15 @@ test("draw-game intent distinguishes who draws and ignores ordinary chat", () =>
   assert.deepEqual(detectDrawGameIntent("你来猜我画的"), { type: "user_draw", toolName: null });
   assert.deepEqual(detectDrawGameIntent("沉你画我猜"), { type: "chen_draw", toolName: "draw_start" });
   assert.deepEqual(detectDrawGameIntent("你画我猜"), { type: "chen_draw", toolName: "draw_start" });
+  assert.deepEqual(detectDrawGameIntent("沉沉和我玩游戏"), { type: "lobby", toolName: null });
+  assert.deepEqual(detectDrawGameIntent("陪我玩游戏"), { type: "lobby", toolName: null });
+  assert.deepEqual(detectDrawGameIntent("陪我下棋"), { type: "gomoku", toolName: null });
+  assert.deepEqual(detectDrawGameIntent("我们玩五子棋"), { type: "gomoku", toolName: null });
   assert.equal(detectDrawGameIntent("今天有点累，陪我聊聊"), null);
   assert.equal(detectDrawGameIntent("帮我看看这张图片"), null);
   assert.equal(detectDrawGameIntent("你记得我的专业吗"), null);
+  assert.equal(detectDrawGameIntent("你记得我们之前玩过五子棋吗"), null);
+  assert.equal(detectDrawGameIntent("刚才五子棋好难"), null);
 });
 
 test("chat guidance keeps Chen identity and the game link without exposing implementation", () => {
@@ -99,6 +105,12 @@ test("chat guidance keeps Chen identity and the game link without exposing imple
   );
   assert.match(chenContext.content, /我画好啦，去游戏页猜猜看/);
   assert.match(chenContext.content, /\/game\/#draw/);
+  const lobbyContext = buildDrawGameChatContext({ type: "lobby", toolName: null });
+  assert.match(lobbyContext.content, /好呀，辞辞想玩哪个/);
+  assert.match(lobbyContext.content, /\/game\//);
+  const gomokuContext = buildDrawGameChatContext({ type: "gomoku", toolName: null });
+  assert.match(gomokuContext.content, /来，我陪你下五子棋。你先手/);
+  assert.match(gomokuContext.content, /\/game\/#gomoku/);
 });
 
 test("only Chen-draw intent calls MCP while user-draw and ordinary chat stay local", async () => {

@@ -28,6 +28,7 @@
   const preferenceStore = window.CompanionUserPreferences?.UserPreferenceStore
     ? new window.CompanionUserPreferences.UserPreferenceStore()
     : null;
+  const GAME_SUMMARY_KEY = "xinban-recent-game-summary-v1";
 
   function applyPlayerAvatar(node, image, fallback) {
     if (!node) return;
@@ -42,6 +43,24 @@
     const userImage = preferenceStore.getUserAvatarImage(preferences);
     $$("[data-game-chen-avatar]").forEach(node => applyPlayerAvatar(node, chenImage, "沉"));
     $$("[data-game-user-avatar]").forEach(node => applyPlayerAvatar(node, userImage, "我"));
+  }
+  function setChenStatus(text) {
+    const node = $("[data-chen-status]");
+    if (node) node.textContent = text;
+  }
+  function saveGameSummary(game, result, lastMessage) {
+    const summary = {
+      game: game === "draw" ? "draw" : "gomoku",
+      result: String(result || "").slice(0, 24),
+      lastMessage: String(lastMessage || "").trim().slice(0, 120)
+    };
+    try { window.sessionStorage?.setItem(GAME_SUMMARY_KEY, JSON.stringify(summary)); } catch {}
+    return summary;
+  }
+  function finishGame(game, result, message, status) {
+    saveGameSummary(game, result, message);
+    setChenStatus(status);
+    $$(`[data-game-chat-return][href*="fromGame=${game}"]`).forEach(link => { link.hidden = false; });
   }
 
   function provider() {
@@ -93,7 +112,12 @@
     $$("[data-view]").forEach(view => { view.hidden = view.dataset.view !== name; });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
-  $$("[data-open-game]").forEach(button => button.addEventListener("click", () => showView(button.dataset.openGame)));
+  $$("[data-open-game]").forEach(button => button.addEventListener("click", () => {
+    const view = button.dataset.openGame;
+    window.location.hash = view === "drawing" ? "draw" : view;
+    showView(view);
+    setChenStatus(view === "gomoku" ? "沉在等你落子" : "沉看着你的画");
+  }));
   $$("[data-back]").forEach(button => button.addEventListener("click", () => showView("lobby")));
 
   function roundIdFromLocation(locationLike = window.location) {
@@ -121,7 +145,8 @@
     try {
       const status = await gameFetch(`/api/game/draw/status/${encodeURIComponent(roundId)}`);
       $("[data-preset-drawing]").innerHTML = status.drawing_svg;
-      $("[data-preset-result]").textContent = "沉画了一张图，你来猜。";
+      $("[data-preset-result]").textContent = "沉画好啦，你来猜。";
+      setChenStatus("沉画好啦");
     } catch (error) {
       state.roundId = null;
       $("[data-preset-drawing]").replaceChildren();
@@ -160,6 +185,8 @@
     state.thinkingTimer = null;
     renderBoard();
     setGomokuStatus("当前回合：轮到你。");
+    setChenStatus("沉在等你");
+    $$('[data-game-chat-return][href*="fromGame=gomoku"]').forEach(link => { link.hidden = true; });
   }
   $("[data-gomoku-board]").addEventListener("click", event => {
     if (state.over || state.locked) return;
@@ -172,11 +199,15 @@
     if (state.board[row][column]) return;
     state.board[row][column] = 1;
     if (isWin(state.board, row, column, 1)) {
-      state.over = true; state.locked = false; renderBoard(); setGomokuStatus("你赢了。沉认真记下这一局。"); return;
+      const message = "你赢啦……沉有点不服气，再来一局吗？";
+      state.over = true; state.locked = false; renderBoard(); setGomokuStatus(message);
+      finishGame("gomoku", "user_win", message, "沉输了但不服气");
+      return;
     }
     state.locked = true;
     renderBoard();
     setGomokuStatus("当前回合：轮到沉，沉正在想……");
+    setChenStatus("沉正在想");
     const scheduled = scheduleChenMove(state.board, { onMove: move => {
       state.thinkingTimer = null;
       if (state.over) return;
@@ -184,18 +215,26 @@
         state.over = true;
         state.locked = false;
         renderBoard();
-        setGomokuStatus("棋盘满了，这局是平局。");
+        const message = "这一局居然打平了。";
+        setGomokuStatus(message);
+        finishGame("gomoku", "draw", message, "沉认真看着棋盘");
         return;
       }
       state.board[move.row][move.column] = 2;
       state.locked = false;
       if (isWin(state.board, move.row, move.column, 2)) {
         state.over = true;
-        setGomokuStatus("沉赢了。沉认真记下这一局。");
+        const message = "沉赢了。沉认真记下这一局。";
+        setGomokuStatus(message);
+        finishGame("gomoku", "chen_win", message, "沉赢了");
       } else {
-        setGomokuStatus(move.reason === "block"
+        const message = move.reason === "block"
           ? "沉堵住了这一手。当前回合：轮到你。"
-          : "沉落子了。当前回合：轮到你。");
+          : move.reason === "attack-four" || move.reason === "attack-three"
+            ? "沉好像看到机会了。当前回合：轮到你。"
+            : "沉落子了。当前回合：轮到你。";
+        setGomokuStatus(message);
+        setChenStatus("沉落子了");
       }
       renderBoard();
     } });
@@ -277,6 +316,7 @@
     submitButton.disabled = true;
     try {
       result.textContent = "沉正在看你的画……";
+      setChenStatus("沉认真看你的画");
       const started = await gameFetch("/api/game/draw/start", {
         method: "POST",
         body: JSON.stringify({ artist: "user", answer, strokes: state.strokes })
@@ -286,7 +326,7 @@
       state.drawingStatus = status;
       state.roundOutcome = "awaiting_feedback";
       const guess = await askChen(status);
-      $("[data-chen-guess-text]").textContent = `沉猜：${guess}`;
+      $("[data-chen-guess-text]").textContent = `沉猜了一下：${guess}`;
       $("[data-chen-feedback-text]").textContent = "告诉沉她有没有猜对吧。";
       $("[data-chen-hint-form]").hidden = true;
       $$("[data-chen-feedback]").forEach(button => { button.disabled = false; });
@@ -305,14 +345,15 @@
     if (feedback === "correct") {
       state.roundOutcome = "guessed_correct";
       $("[data-chen-guess]").dataset.outcome = state.roundOutcome;
-      feedbackText.textContent = "太好了，沉猜对了！";
+      feedbackText.textContent = "我猜对啦！";
+      finishGame("draw", "chen_win", "我猜对啦！", "沉猜对啦");
       $$("[data-chen-feedback]").forEach(button => { button.disabled = true; });
       $("[data-chen-hint-form]").hidden = true;
     }
     if (feedback === "wrong") {
       state.roundOutcome = "guessed_wrong";
       $("[data-chen-guess]").dataset.outcome = state.roundOutcome;
-      feedbackText.textContent = "没关系，可以给沉一点提示，或者再让她猜一次。";
+      feedbackText.textContent = "还不是这个吗？那你给我一点提示。";
       $("[data-chen-hint-form]").hidden = false;
     }
     if (feedback === "hint") {
@@ -348,11 +389,13 @@
   }));
   $("[data-chen-start]").addEventListener("click", async () => {
     try {
+      setChenStatus("沉正在想");
       const started = await gameFetch("/api/game/draw/start", { method: "POST", body: JSON.stringify({ artist: "chen" }) });
       state.roundId = started.round_id;
       const status = await gameFetch(`/api/game/draw/status/${encodeURIComponent(state.roundId)}`);
       $("[data-preset-drawing]").innerHTML = status.drawing_svg;
-      $("[data-preset-result]").textContent = "沉画了一张图，你来猜。";
+      $("[data-preset-result]").textContent = "沉画好啦，你来猜。";
+      setChenStatus("沉画好啦");
     } catch (error) { $("[data-preset-result]").textContent = error.message; }
   });
   $("[data-preset-guess]").addEventListener("submit", async event => {
@@ -362,9 +405,13 @@
       const body = await gameFetch(`/api/game/draw/guess/${encodeURIComponent(state.roundId)}`, {
         method: "POST", body: JSON.stringify({ guesser: "user", content: new FormData(event.currentTarget).get("guess") })
       });
-      $("[data-preset-result]").textContent = body.result === "猜对了"
-        ? "猜对了，沉很开心。"
-        : "还没猜中。";
+      if (body.result === "猜对了") {
+        const message = "猜对啦，就是这个。";
+        $("[data-preset-result]").textContent = message;
+        finishGame("draw", "user_win", message, "沉画好啦");
+      } else {
+        $("[data-preset-result]").textContent = "还不是哦，再看看。";
+      }
     } catch (error) { $("[data-preset-result]").textContent = error.message; }
   });
 
@@ -376,8 +423,15 @@
     protocol,
     restoreSharedDrawRound,
     roundIdFromLocation,
+    saveGameSummary,
     validateUserDrawing
   });
+  const initialHash = String(window.location.hash || "").replace(/^#/, "").split("?")[0];
+  if (initialHash === "gomoku") showView("gomoku");
+  if (initialHash === "draw") {
+    showView("drawing");
+    selectDrawMode(roundIdFromLocation() ? "chen" : "user");
+  }
   resetGomoku();
   redraw();
   applyGameAvatars();

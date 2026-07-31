@@ -86,7 +86,7 @@ test("chat model settings navigation carries its current route", () => {
   const settings = read("settings.html");
   const chat = read("chat.html");
   assert.match(switcher, /settings\.html\?returnTo=\$\{encodeURIComponent\(currentRoute\)\}/);
-  assert.match(chat, /settings\.html\?returnTo=%2Ffrontend-p4b%2Fchat\.html/);
+  assert.match(chat, /settings\.html\?returnTo=%2Fchat\.html/);
   assert.match(settings, /data-settings-back/);
   assert.match(settings, /assets\/js\/settings-return\.js/);
 });

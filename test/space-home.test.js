@@ -209,7 +209,7 @@ test("Home helper functions resolve day, sunset, and night states deterministica
 test("Home contains all documented cards and no runtime backdoors", () => {
   const html = fs.readFileSync(path.join(homeRoot, "index.html"), "utf8");
   const entries = [
-    ['href="/frontend-p4b/chat.html"', "和沉聊天"],
+    ['href="/chat.html"', "和沉聊天"],
     ['href="/space/"', "空间设置"],
     ['href="/collaboration/"', "和 AI 一起讨论"],
     ['href="/game/"', "一起玩"],

@@ -10,7 +10,7 @@ const read = relativePath => fs.readFileSync(path.join(root, relativePath), "utf
 const canonicalRoutes = [
   'href="/home/"',
   'href="/game/"',
-  'href="/frontend-p4b/chat.html"',
+  'href="/chat.html"',
   'href="/collaboration/"'
 ];
 
@@ -19,8 +19,9 @@ test("root entry and legacy chat entry route into the canonical companion shell"
   const chatEntry = read("ai-companion-frontend/chat.html");
 
   assert.match(index, /window\.location\.replace\("\/home\/"\)/);
-  assert.match(chatEntry, /window\.location\.replace\("\/frontend-p4b\/chat\.html"\)/);
-  assert.match(chatEntry, /rel="canonical" href="\/frontend-p4b\/chat\.html"/);
+  assert.match(chatEntry, /window\.location\.replace\("\/chat\.html"\)/);
+  assert.match(chatEntry, /rel="canonical" href="\/chat\.html"/);
+  assert.doesNotMatch(chatEntry, /\/frontend-p4b\/chat\.html|\.\.\/chat\.html/);
   assert.doesNotMatch(chatEntry, /心伴/);
 });
 
@@ -33,12 +34,13 @@ test("new Home and Chat navigation use canonical absolute routes", () => {
     assert.match(chat, new RegExp(route.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   assert.match(home, /href="\/space\/"/);
-  assert.match(chat, /href="\/frontend-p4b\/settings\.html\?returnTo=%2Ffrontend-p4b%2Fchat\.html"/);
-  assert.doesNotMatch(home, /href="\/chat\.html"/);
+  assert.match(chat, /href="\/settings\.html\?returnTo=%2Fchat\.html"/);
+  assert.match(home, /href="\/chat\.html"/);
+  assert.doesNotMatch(chat, /href="\/frontend-p4b\/chat\.html"|\.\.\/chat\.html/);
   assert.doesNotMatch(chat, /<title>心伴/);
 });
 
-test("new shell app navigation only uses the root chat bridge for game return context", () => {
+test("new shell app navigation uses the formal root chat entry", () => {
   for (const relativePath of [
     "ai-companion-frontend/home/index.html",
     "ai-companion-frontend/calendar/index.html",
@@ -49,10 +51,11 @@ test("new shell app navigation only uses the root chat bridge for game return co
     "frontend-p4b/dashboard.html",
     "frontend-p4b/proactive-explanation.html"
   ]) {
-    assert.doesNotMatch(read(relativePath), /href="\/chat\.html"/, relativePath);
+    assert.match(read(relativePath), /href="\/chat\.html"/, relativePath);
   }
   const game = read("ai-companion-frontend/game/index.html");
   assert.match(game, /href="\/chat\.html"/);
   assert.match(game, /href="\/chat\.html\?fromGame=gomoku"/);
   assert.match(game, /href="\/chat\.html\?fromGame=draw"/);
+  assert.doesNotMatch(game, /\/frontend-p4b\/chat\.html|\.\.\/chat\.html|ai-companion-frontend\/chat\.html/);
 });

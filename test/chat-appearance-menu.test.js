@@ -14,7 +14,7 @@ test("the existing session drawer separates model and appearance shortcuts", () 
   const html = read("chat.html");
   const drawerStart = html.indexOf('<aside class="session-drawer"');
   const model = html.indexOf('session-settings-link--model', drawerStart);
-  const appearance = html.indexOf('href="/frontend-p4b/settings.html?returnTo=%2Ffrontend-p4b%2Fchat.html#appearance"', drawerStart);
+  const appearance = html.indexOf('href="/settings.html?returnTo=%2Fchat.html#appearance"', drawerStart);
   const newSession = html.indexOf('class="session-new"', drawerStart);
   assert.ok(drawerStart >= 0);
   assert.ok(model > drawerStart && model < appearance && appearance < newSession);
@@ -32,11 +32,11 @@ test("model and appearance shortcuts keep chat as return target and use separate
   const html = read("chat.html");
   assert.match(
     html,
-    /href="\/frontend-p4b\/settings\.html\?returnTo=%2Ffrontend-p4b%2Fchat\.html#model"/
+    /href="\/settings\.html\?returnTo=%2Fchat\.html#model"/
   );
   assert.match(
     html,
-    /href="\/frontend-p4b\/settings\.html\?returnTo=%2Ffrontend-p4b%2Fchat\.html#appearance"/
+    /href="\/settings\.html\?returnTo=%2Fchat\.html#appearance"/
   );
   assert.equal(
     resolveReturnTarget({

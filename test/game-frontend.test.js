@@ -296,6 +296,14 @@ test("game companion layer exposes Chen presence, end links and a session-only s
   assert.match(html, /\/chat\.html\?fromGame=gomoku/);
   assert.match(html, /\/chat\.html\?fromGame=draw/);
   assert.match(js, /xinban-recent-game-summary-v1/);
+  assert.match(js, /function buildChatUrlFromGame\(gameType\)/);
+  assert.match(js, /`\/chat\.html\?fromGame=\$\{gameType\}`/);
+  assert.match(js, /gameType === "gomoku" \|\| gameType === "draw"/);
+  assert.match(js, /window\.XINBAN_GAME_BUILD = "game-v46-p4b"/);
+  for (const asset of ["game.css", "identity.css", "gomoku-board.css", "gomoku.js", "game.js"]) {
+    assert.match(html, new RegExp(`${asset.replace(".", "\\.")}\\?v=game-v46-p4b`));
+  }
+  assert.doesNotMatch(html + js, /\/frontend-p4b\/chat\.html|\.\.\/chat\.html|ai-companion-frontend\/chat\.html/);
   assert.match(js, /finishGame\("gomoku"/);
   assert.match(js, /沉正在想/);
   assert.match(js, /沉堵住了这一手/);

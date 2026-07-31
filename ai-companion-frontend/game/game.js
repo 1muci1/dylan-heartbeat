@@ -1,6 +1,7 @@
 "use strict";
 
 (() => {
+  window.XINBAN_GAME_BUILD = "game-v46-p4b";
   const { SIZE, emptyBoard, isWin, pointToCell, scheduleChenMove } = window.CompanionGomoku;
   const protocol = window.CompanionDrawingProtocol;
   const state = {
@@ -29,6 +30,16 @@
     ? new window.CompanionUserPreferences.UserPreferenceStore()
     : null;
   const GAME_SUMMARY_KEY = "xinban-recent-game-summary-v1";
+  function buildChatUrlFromGame(gameType) {
+    return gameType === "gomoku" || gameType === "draw"
+      ? `/chat.html?fromGame=${gameType}`
+      : "/chat.html";
+  }
+  function updateChatReturnLinks(gameType = "") {
+    $$("[data-chat-return]").forEach(link => {
+      link.href = buildChatUrlFromGame(link.dataset.gameType || gameType);
+    });
+  }
 
   function applyPlayerAvatar(node, image, fallback) {
     if (!node) return;
@@ -60,7 +71,7 @@
   function finishGame(game, result, message, status) {
     saveGameSummary(game, result, message);
     setChenStatus(status);
-    $$(`[data-game-chat-return][href*="fromGame=${game}"]`).forEach(link => { link.hidden = false; });
+    $$(`[data-game-chat-return][data-game-type="${game}"]`).forEach(link => { link.hidden = false; });
   }
 
   function provider() {
@@ -110,6 +121,7 @@
 
   function showView(name) {
     $$("[data-view]").forEach(view => { view.hidden = view.dataset.view !== name; });
+    updateChatReturnLinks(name === "gomoku" ? "gomoku" : name === "drawing" ? "draw" : "");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
   $$("[data-open-game]").forEach(button => button.addEventListener("click", () => {
@@ -186,7 +198,7 @@
     renderBoard();
     setGomokuStatus("当前回合：轮到你。");
     setChenStatus("沉在等你");
-    $$('[data-game-chat-return][href*="fromGame=gomoku"]').forEach(link => { link.hidden = true; });
+    $$('[data-game-chat-return][data-game-type="gomoku"]').forEach(link => { link.hidden = true; });
   }
   $("[data-gomoku-board]").addEventListener("click", event => {
     if (state.over || state.locked) return;
@@ -424,6 +436,7 @@
     restoreSharedDrawRound,
     roundIdFromLocation,
     saveGameSummary,
+    buildChatUrlFromGame,
     validateUserDrawing
   });
   const initialHash = String(window.location.hash || "").replace(/^#/, "").split("?")[0];
@@ -435,6 +448,7 @@
   resetGomoku();
   redraw();
   applyGameAvatars();
+  updateChatReturnLinks(initialHash === "gomoku" ? "gomoku" : initialHash === "draw" ? "draw" : "");
   preferenceStore?.subscribe?.(applyGameAvatars);
   restoreSharedDrawRound();
   window.addEventListener("pageshow", () => applyGameAvatars());

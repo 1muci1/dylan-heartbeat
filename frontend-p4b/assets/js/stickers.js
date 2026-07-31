@@ -116,11 +116,26 @@
       }).slice(0, 2);
     return { ...parsed, stickers };
   };
-  const ASSISTANT_GAME_LINK_RE = /(^|[\s(（])((?:\/game\/)(?:#(?:gomoku|draw)(?:\?roundId=[\p{L}\p{N}._~-]{1,120})?)?)(?=$|[\s)）。，！？!?])/giu;
+  const SAFE_ASSISTANT_GAME_PATH = String.raw`\/game\/(?:#(?:gomoku|draw)(?:\?roundId=[\p{L}\p{N}._~-]{1,120})?)?`;
+  const ASSISTANT_GAME_MARKDOWN_RE = new RegExp(
+    String.raw`\[[^\]\r\n]{1,160}\]\((${SAFE_ASSISTANT_GAME_PATH})\)`,
+    "giu"
+  );
+  const ASSISTANT_GAME_LINK_RE = new RegExp(
+    String.raw`(^|[^A-Za-z0-9_/:.])(${SAFE_ASSISTANT_GAME_PATH})(?=$|[\s)）。，！？!?\]】])`,
+    "giu"
+  );
   const parseAssistantGameLinks = content => {
     const gameLinks = [];
-    const text = String(content || "").replace(ASSISTANT_GAME_LINK_RE, (match, prefix, href) => {
+    const remember = href => {
       if (!gameLinks.includes(href) && gameLinks.length < 2) gameLinks.push(href);
+    };
+    const withoutMarkdown = String(content || "").replace(ASSISTANT_GAME_MARKDOWN_RE, (match, href) => {
+      remember(href);
+      return "";
+    });
+    const text = withoutMarkdown.replace(ASSISTANT_GAME_LINK_RE, (match, prefix, href) => {
+      remember(href);
       return prefix;
     }).replace(/\n{3,}/g, "\n\n").trim();
     return { text, gameLinks };

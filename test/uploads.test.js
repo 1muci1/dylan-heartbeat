@@ -392,10 +392,40 @@ test("shared sticker normalization displays imported packs and filters descripti
   );
   assert.equal(gameLinks.text, "来下棋。\n\n再画画：");
   assert.deepEqual([...gameLinks.gameLinks], ["/game/#gomoku", "/game/#draw?roundId=round-1"]);
+  const embeddedGame = window.AppMedia.parseAssistantGameLinks(
+    "来，我陪你下五子棋。/game/#gomoku"
+  );
+  assert.equal(embeddedGame.text, "来，我陪你下五子棋。");
+  assert.deepEqual([...embeddedGame.gameLinks], ["/game/#gomoku"]);
+  for (const [markdown, href] of [
+    ["[/game/#gomoku](/game/#gomoku)", "/game/#gomoku"],
+    ["[去和沉下五子棋](/game/#gomoku)", "/game/#gomoku"],
+    ["[去玩你画我猜](/game/#draw?roundId=abc)", "/game/#draw?roundId=abc"]
+  ]) {
+    const markdownGame = window.AppMedia.parseAssistantGameLinks(markdown);
+    assert.equal(markdownGame.text, "");
+    assert.deepEqual([...markdownGame.gameLinks], [href]);
+  }
+  const combinedAssistant = window.AppMedia.parseAssistantGameLinks(
+    "好呀。\n[[sticker:开心]]\n[去和沉下五子棋](/game/#gomoku)"
+  );
+  assert.equal(combinedAssistant.text, "好呀。\n[[sticker:开心]]");
+  assert.deepEqual([...combinedAssistant.gameLinks], ["/game/#gomoku"]);
+  const cappedGames = window.AppMedia.parseAssistantGameLinks(
+    "/game/\n/game/#gomoku\n/game/#draw?roundId=abc"
+  );
+  assert.equal(cappedGames.gameLinks.length, 2);
+  assert.doesNotMatch(cappedGames.text, /\/game\//);
   for (const unsafeLink of [
     "https://example.test/game/#gomoku",
     "javascript:/game/#gomoku",
-    "data:/game/#draw"
+    "data:/game/#draw",
+    "[外站](https://example.test/game/#gomoku)",
+    "[危险](javascript:/game/#gomoku)",
+    "[危险](data:/game/#draw)",
+    "//evil.com/game/#gomoku",
+    "/game/../.env",
+    "/.env"
   ]) {
     const unsafeGame = window.AppMedia.parseAssistantGameLinks(unsafeLink);
     assert.equal(unsafeGame.gameLinks.length, 0);

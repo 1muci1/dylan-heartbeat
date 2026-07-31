@@ -126,11 +126,19 @@ document.addEventListener("DOMContentLoaded", () => {
       const thinking = document.createElement("div"); thinking.className = "thinking-content"; thinking.textContent = message.thinking;
       details.append(summary, thinking); group.append(details);
     }
-    if (message.sticker?.url) {
-      const image = document.createElement("img"); image.className = "message-sticker"; image.alt = message.sticker.label || "Sticker";
-      media?.blobUrl(message.sticker.url).then(value => { image.src = value; }).catch(() => { image.alt = "Sticker 加载失败"; });
+    const messageStickers = [
+      ...(message.sticker ? [message.sticker] : []),
+      ...(Array.isArray(message.stickers) ? message.stickers : [])
+    ].slice(0, 2);
+    messageStickers.forEach(sticker => {
+      if (!sticker?.url) return;
+      const image = document.createElement("img");
+      image.className = "message-sticker";
+      image.alt = sticker.description || sticker.label || "Sticker";
+      image.loading = "lazy";
+      media?.blobUrl(sticker.url).then(value => { image.src = value; }).catch(() => { image.alt = "Sticker 加载失败"; });
       bubble.append(image);
-    }
+    });
     if (message.attachments?.length) {
       const gallery = document.createElement("div"); gallery.className = "message-images";
       message.attachments.forEach(attachment => { const link = document.createElement("a"); link.target = "_blank"; link.rel = "noopener"; const image = document.createElement("img"); image.alt = "聊天图片"; media?.blobUrl(attachment.url).then(value => { image.src = value; link.href = value; }).catch(() => { image.alt = "图片加载失败"; }); link.append(image); gallery.append(link); });
@@ -177,6 +185,7 @@ document.addEventListener("DOMContentLoaded", () => {
     window.CompanionChatAvatars?.apply();
     window.CompanionChatPreferences?.apply();
     scrollToLatest();
+    hydrateAssistantStickerMessages(messages);
   };
 
   const sessionToggle = document.querySelector("#session-toggle");
@@ -566,10 +575,12 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       const activeProvider = window.AppConfig?.getProviderConfig() || data.PROVIDER_CONFIG;
-      const reply = messageProtocol.createAssistantMessage(completeReply, {
+      const resolvedStickerReply = await resolveAssistantStickerReply(completeReply);
+      const reply = messageProtocol.createAssistantMessage(resolvedStickerReply.content, {
         provider: activeProvider.mode === "real" ? activeProvider.type : "mock",
         model: activeProvider.model || null,
-        thinking: completeThinking || null
+        thinking: completeThinking || null,
+        stickers: resolvedStickerReply.stickers
       });
 
       appendAndPersist(reply, (nextState) => {
@@ -630,6 +641,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let stickerCache = [];
   let visibleStickerCount = 0;
   let stickerSearchTimer = 0;
+  let stickerHydrationPending = false;
   const STICKER_PAGE_SIZE = 40;
   const supportsImages = () => window.AppConfig?.getProviderConfig?.().supportsImages === true;
   const formatFileSize = size => {
@@ -733,6 +745,42 @@ document.addEventListener("DOMContentLoaded", () => {
       status.hidden = false;
       status.textContent = "表情包暂时没加载出来，稍后再试。";
     }
+  };
+  const resolveAssistantStickerReply = async content => {
+    const parsed = media.parseAssistantStickerDirectives?.(content);
+    if (!parsed?.keywords?.length) return { content, stickers: [] };
+    let available = stickerCache;
+    try {
+      available = await media.list("");
+      stickerCache = media.dedupeStickers ? media.dedupeStickers(available) : available;
+      available = stickerCache;
+    } catch {
+      // 使用上一次成功加载的 Sticker；没有缓存时保留原始文本。
+    }
+    const resolved = media.resolveAssistantStickers?.(content, available);
+    if (!resolved?.stickers?.length) return { content, stickers: [] };
+    return { content: resolved.text, stickers: resolved.stickers };
+  };
+  const hydrateAssistantStickerMessages = messages => {
+    if (stickerHydrationPending || !Array.isArray(messages)
+      || !messages.some(message => message.role === "assistant"
+        && media.parseAssistantStickerDirectives?.(message.content)?.keywords?.length)) return;
+    stickerHydrationPending = true;
+    Promise.all(messages.map(async message => {
+      if (message.role !== "assistant") return message;
+      const resolved = await resolveAssistantStickerReply(message.content);
+      return resolved.stickers.length
+        ? { ...message, content: resolved.content, stickers: resolved.stickers }
+        : message;
+    })).then(nextMessages => {
+      const changed = nextMessages.some((message, index) => message !== messages[index]);
+      if (!changed) return;
+      const state = store.getState();
+      state.messages = nextMessages;
+      const saved = messageProtocol.saveConversationHistory(nextMessages, state);
+      persistLocalMessages(saved.messages);
+      renderMessages(saved.messages);
+    }).catch(() => {}).finally(() => { stickerHydrationPending = false; });
   };
   const sendSticker = sticker => {
     if (api.loading) return; stickerPanel.hidden = true; stickerButton.setAttribute("aria-expanded", "false");

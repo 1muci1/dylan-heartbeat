@@ -19,7 +19,9 @@
   const createMessage = (role, content, metadata = {}) => {
     const normalizedContent = String(content || "").trim();
     if (!validRoles.has(role)) throw new TypeError(`不支持的消息角色：${role}`);
-    if (!normalizedContent) throw new TypeError("消息内容不能为空");
+    if (!normalizedContent && !metadata.sticker && !metadata.stickers?.length) {
+      throw new TypeError("消息内容不能为空");
+    }
 
     const now = new Date();
     return {
@@ -38,7 +40,8 @@
   const normalizeHistory = (history) => {
     if (!Array.isArray(history)) return [];
     return history
-      .filter((message) => validRoles.has(message?.role) && String(message?.content || "").trim())
+      .filter((message) => validRoles.has(message?.role)
+        && (String(message?.content || "").trim() || message?.sticker || message?.stickers?.length))
       .map((message) => createMessage(message.role, message.content, message));
   };
 
@@ -55,8 +58,14 @@
     history = getConversationHistory(),
     { supportsImages = false, activeImageMessageId = null, activeFileMessageId = null } = {}
   ) => normalizeHistory(history)
-    .map(({ id, role, content, attachments, files, sticker }) => {
-      if (role !== "user") return { role, content };
+    .map(({ id, role, content, attachments, files, sticker, stickers }) => {
+      if (role !== "user") {
+        const assistantStickers = Array.isArray(stickers) ? stickers : [];
+        const stickerText = assistantStickers
+          .map(item => `[Sticker: ${item.description || item.label || "Sticker"}]`)
+          .join(" ");
+        return { role, content: content || stickerText };
+      }
       if (Array.isArray(files) && files.length) {
         if (activeFileMessageId && id === activeFileMessageId) return {
           role,

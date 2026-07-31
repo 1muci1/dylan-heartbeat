@@ -32,7 +32,9 @@
     const sticker = {
       id: String(value.id || ""),
       url: String(value.url || ""),
-      label: String(value.label || "")
+      label: String(value.label || ""),
+      description: String(value.description || ""),
+      tags: String(value.tags || "")
     };
     return sticker.id || sticker.url ? sticker : null;
   };
@@ -54,7 +56,11 @@
   const cleanMessage = value => {
     if (!value || !VALID_ROLES.has(value.role)) return null;
     const content = String(value.content || "").trim();
-    if (!content) return null;
+    const stickers = Array.isArray(value.stickers)
+      ? value.stickers.map(cleanSticker).filter(Boolean).slice(0, 2)
+      : [];
+    const legacySticker = cleanSticker(value.sticker);
+    if (!content && !legacySticker && !stickers.length) return null;
     const message = {
       id: String(value.id || ""),
       role: value.role,
@@ -70,8 +76,8 @@
     if (attachments.length) message.attachments = attachments;
     const files = Array.isArray(value.files) ? value.files.map(cleanFile).filter(Boolean) : [];
     if (files.length) message.files = files;
-    const sticker = cleanSticker(value.sticker);
-    if (sticker) message.sticker = sticker;
+    if (legacySticker) message.sticker = legacySticker;
+    if (stickers.length) message.stickers = stickers;
     return message;
   };
 

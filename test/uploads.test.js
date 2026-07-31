@@ -309,14 +309,29 @@ test("frontend file chips, removal and current-turn file protocol do not persist
   }]);
   assert.match(stickerMessages[0].content, /小白猫哭/);
   assert.doesNotMatch(JSON.stringify(stickerMessages), /private-sticker|image_url/);
+  const assistantSticker = window.MessageProtocol.createAssistantMessage("", {
+    stickers: [{
+      id: "assistant-sticker", label: "小白猫爱心", description: "小白猫爱心",
+      tags: "小白猫 爱心", url: "https://example.test/assistant.gif"
+    }]
+  });
+  const assistantProtocol = window.MessageProtocol.toOpenAIMessages([assistantSticker]);
+  assert.match(assistantProtocol[0].content, /小白猫爱心/);
+  assert.doesNotMatch(JSON.stringify(assistantProtocol), /assistant\.gif|https?:\/\//);
 });
 
 test("shared sticker normalization displays imported packs and filters description and tags", async () => {
   const source = fs.readFileSync(path.join(__dirname, "..", "frontend-p4b/assets/js/stickers.js"), "utf8");
   const imported = Array.from({ length: 35 }, (_, index) => ({
     id: `sticker-${index}`, imageUrl: `https://example.test/${index}.gif`,
-    description: index === 4 ? "小白猫无语" : `小白猫动作${index}`,
-    tags: index === 4 ? ["小猫", "无语"] : ["小猫"]
+    description: index === 1 ? "小白猫哭"
+      : index === 2 ? "小白猫爱心"
+        : index === 4 ? "小白猫无语"
+          : `小白猫动作${index}`,
+    tags: index === 1 ? ["小猫", "哭"]
+      : index === 2 ? ["小猫", "爱心"]
+        : index === 4 ? ["小猫", "无语"]
+          : ["小猫"]
   }));
   const fetch = async url => ({
     ok: true,
@@ -342,6 +357,45 @@ test("shared sticker normalization displays imported packs and filters descripti
     ...all,
     { ...all[0], id: "duplicate", url: `${all[0].url}#copy` }
   ]).length, 35);
+  const parsed = window.AppMedia.parseAssistantStickerDirectives(
+    "我陪着你。\n[[sticker:哭]]\n[[sticker:爱心]]\n[[sticker:无语]]"
+  );
+  assert.equal(parsed.text, "我陪着你。");
+  assert.deepEqual([...parsed.keywords], ["哭", "爱心"]);
+  assert.equal(window.AppMedia.matchStickerKeyword(all, "无语").id, "sticker-4");
+  assert.equal(window.AppMedia.matchStickerKeyword(all, "动作7").id, "sticker-7");
+  const resolved = window.AppMedia.resolveAssistantStickers("收到啦。\n[[sticker:哭]]", all);
+  assert.equal(resolved.text, "收到啦。");
+  assert.equal(resolved.stickers.length, 1);
+  assert.equal(resolved.stickers[0].id, "sticker-1");
+  const compatible = window.AppMedia.resolveAssistantStickers("别难过。\n[sticker:哭]", all);
+  assert.equal(compatible.text, "别难过。");
+  assert.equal(compatible.stickers.length, 1);
+  assert.equal(compatible.stickers[0].id, "sticker-1");
+  const descriptionMatch = window.AppMedia.resolveAssistantStickers("[sticker:趴着发呆]", [{
+    id: "resting", url: "https://example.test/resting.gif",
+    label: "小白猫休息", description: "小白猫趴着发呆", tags: "小猫 安静"
+  }]);
+  assert.equal(descriptionMatch.text, "");
+  assert.equal(descriptionMatch.stickers[0].id, "resting");
+  const capped = window.AppMedia.resolveAssistantStickers(
+    "[sticker:哭]\n[[sticker:爱心]]\n[sticker:无语]",
+    all
+  );
+  assert.equal(capped.stickers.length, 2);
+  assert.deepEqual([...capped.stickers.map(item => item.id)], ["sticker-2", "sticker-1"]);
+  assert.doesNotMatch(capped.text, /sticker:/i);
+  const missing = window.AppMedia.resolveAssistantStickers("[sticker:不存在]", all);
+  assert.equal(missing.stickers.length, 0);
+  for (const unsafe of [
+    "[sticker:<script>]",
+    "[sticker:https://example.test/x.gif]",
+    "[sticker:../../.env]"
+  ]) {
+    const unsafeResult = window.AppMedia.resolveAssistantStickers(unsafe, all);
+    assert.equal(unsafeResult.stickers.length, 0);
+    assert.equal(unsafeResult.text, unsafe);
+  }
 });
 
 test("chat sticker refresh, friendly empty/error states, click send and file status transitions are wired", () => {
@@ -364,8 +418,15 @@ test("chat sticker refresh, friendly empty/error states, click send and file sta
   assert.match(chat, /用户发送了一个表情：\[Sticker:/);
   assert.match(chat, /requestAssistantReply\(message, null, \{ timeoutMs: 60000 \}\)/);
   assert.match(chat, /if \(pendingRow\.isConnected\) pendingRow\.remove\(\)/);
+  assert.match(chat, /resolveAssistantStickerReply\(completeReply\)/);
+  assert.match(chat, /stickers: resolvedStickerReply\.stickers/);
+  assert.match(chat, /hydrateAssistantStickerMessages\(messages\)/);
+  assert.match(chat, /message\.stickers/);
   const stickerSend = chat.slice(chat.indexOf("const sendSticker"), chat.indexOf("const handleSend"));
   assert.doesNotMatch(stickerSend, /sticker\.url|image_url/);
+  const historySource = fs.readFileSync(path.join(__dirname, "..", "frontend-p4b/storage/chat-history-store.js"), "utf8");
+  assert.match(historySource, /value\.stickers/);
+  assert.match(historySource, /message\.stickers = stickers/);
   assert.match(chat, /uploadState === "uploading"/);
   assert.match(chat, /uploadState === "error"/);
   assert.match(chat, /retryDocumentUpload/);

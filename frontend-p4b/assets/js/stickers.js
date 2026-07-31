@@ -67,6 +67,55 @@
       return true;
     });
   };
+  const STANDARD_STICKER_DIRECTIVE_RE = /\[\[sticker:([^\]\r\n]{1,80})\]\]/giu;
+  const COMPAT_STICKER_DIRECTIVE_RE = /(^|[^\[])\[sticker:([^\]\r\n]{1,80})\](?!\])/giu;
+  const safeStickerKeyword = value => {
+    const keyword = String(value || "").trim();
+    return /^[\p{L}\p{N}\s]{1,24}$/u.test(keyword) ? keyword : "";
+  };
+  const parseAssistantStickerDirectives = content => {
+    const keywords = [];
+    const collectKeyword = (directive, value) => {
+      const keyword = safeStickerKeyword(value);
+      if (!keyword) return directive;
+      if (keywords.length < 2) keywords.push(keyword);
+      return "";
+    };
+    // 标准双中括号协议优先；第二轮只接纳未被双中括号包裹的兼容写法。
+    const text = String(content || "")
+      .replace(STANDARD_STICKER_DIRECTIVE_RE, collectKeyword)
+      .replace(COMPAT_STICKER_DIRECTIVE_RE, (directive, prefix, value) =>
+        `${prefix}${collectKeyword(directive.slice(prefix.length), value)}`)
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+    return { text, keywords };
+  };
+  const stickerTagTokens = item => String(item?.tags || "").split(/[\s,，|;；]+/).filter(Boolean);
+  const matchStickerKeyword = (items, keyword) => {
+    const term = safeStickerKeyword(keyword);
+    if (!term) return null;
+    const values = dedupeStickers(Array.isArray(items) ? items : []);
+    return values.find(item => stickerTagTokens(item).includes(term))
+      || values.find(item => {
+        const description = String(item.description || item.label || "").trim();
+        return description.includes(term) || term.includes(description);
+      })
+      || values.find(item => stickerTagTokens(item).some(tag => tag.includes(term) || term.includes(tag)))
+      || null;
+  };
+  const resolveAssistantStickers = (content, items) => {
+    const parsed = parseAssistantStickerDirectives(content);
+    const seen = new Set();
+    const stickers = parsed.keywords.map(keyword => matchStickerKeyword(items, keyword))
+      .filter(item => {
+        if (!item) return false;
+        const key = normalizeStickerUrl(item.url) || item.id;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).slice(0, 2);
+    return { ...parsed, stickers };
+  };
   const matchesSticker = (item, keyword) => {
     const term = String(keyword || "").trim().toLowerCase();
     return !term || `${item.description} ${item.label} ${item.tags}`.toLowerCase().includes(term);
@@ -122,6 +171,7 @@
     : URL.createObjectURL(await request(pathname));
   window.AppMedia = Object.freeze({
     list, listLocal, listImported, normalizeStickerItem, normalizeStickerPack, dedupeStickers,
+    parseAssistantStickerDirectives, matchStickerKeyword, resolveAssistantStickers,
     uploadSticker, update, remove, restore, uploadImages, uploadChatFile, uploadChatFiles,
     previewStickerImport, confirmStickerImport, blobUrl, request
   });

@@ -29,9 +29,26 @@ const {
   extractTimestampWithMemory,
   selectTimelineContextEvents,
   buildTimelineEventContext,
+  buildStickerInstructionContext,
   assertLastUserMessagePreserved
 } = require("../server");
 const auth = { authorization: "Bearer gateway-test-key" };
+
+test("Sticker system context teaches the safe directive protocol without exposing URLs", () => {
+  const context = buildStickerInstructionContext({
+    list: () => [{
+      label: "小白猫哭",
+      tags: "小白猫 哭 爱心",
+      url: "https://private.example/sticker.gif"
+    }]
+  });
+  assert.equal(context.role, "system");
+  assert.match(context.content, /\[\[sticker:关键词\]\]/);
+  assert.match(context.content, /小白猫/);
+  assert.match(context.content, /哭/);
+  assert.match(context.content, /不要说自己不能发图片或表情包/);
+  assert.doesNotMatch(context.content, /https?:\/\/|private\.example|sticker\.gif/);
+});
 
 test("chat runtime reserves a create-only internal Memory write hook", () => {
   assert.equal(typeof app.agentMemoryWriteHook?.create, "function");
@@ -202,7 +219,10 @@ test("empty Memory chat receives the Agent identity boundary without a provider 
   ), false);
   assert.deepEqual(forwarded.messages.map(message =>
     message === boundary ? "identity_boundary" : message.role
-  ), ["system", "identity_boundary", "user"]);
+  ), ["system", "identity_boundary", "system", "user"]);
+  assert.equal(forwarded.messages.some(message =>
+    message.role === "system" && message.content.includes("[[sticker:关键词]]")
+  ), true);
   assert.equal(forwarded.messages.some(message =>
     message.role === "system" && message.content.includes("不要解释系统实现、检索逻辑、注入策略")
   ), false);

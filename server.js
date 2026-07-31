@@ -495,6 +495,30 @@ function normalizeStickerParts(messages, metadata, options = {}) {
   });
 }
 
+function buildStickerInstructionContext(importer = stickerImporter) {
+  const preferredTags = ["小白猫", "哭", "无语", "爱心", "生气", "开心", "思考", "睡觉", "咬", "收到"];
+  let availableTags = preferredTags;
+  try {
+    const searchableText = importer.list()
+      .map(item => `${String(item.label || "")} ${String(item.tags || "")}`)
+      .join(" ");
+    const matched = preferredTags.filter(tag => searchableText.includes(tag));
+    if (matched.length) availableTags = matched;
+  } catch {
+    // Sticker 目录暂时不可读时仍提供固定、安全的协议说明。
+  }
+  return {
+    role: "system",
+    content: [
+      "你可以在回复里使用 Sticker。Sticker 不是图片上传，而是前端渲染指令。",
+      "当你想用表情辅助表达情绪时，输出 [[sticker:关键词]]，例如 [[sticker:爱心]]。",
+      `可用 Sticker 标签：${availableTags.slice(0, 10).join("、")}。`,
+      "每条回复最多使用 2 个 Sticker；文字回复仍需自然完整。",
+      "不要说自己不能发图片或表情包，不要输出图片 URL，也不要编造文件或路径。"
+    ].join("\n")
+  };
+}
+
 function embedLocalImages(messages) {
   return messages.map(message => {
     if (!Array.isArray(message?.content)) return message;
@@ -1117,12 +1141,14 @@ app.post("/v1/chat/completions", async (req, reply) => {
     const memoryOverviewInstruction = memoryIntent === "overview"
       ? buildMemoryOverviewResponseInstruction()
       : null;
+    const stickerInstructionContext = buildStickerInstructionContext();
     const runtimeContexts = [
       identityBoundaryContext,
       identityContext,
       memoryContext,
       timelineContext.message,
       memoryOverviewInstruction,
+      stickerInstructionContext,
       drawGameContext
     ].filter(Boolean);
     if (runtimeContexts.length) {
@@ -2135,5 +2161,6 @@ module.exports = {
   extractTimestampWithMemory,
   selectTimelineContextEvents,
   buildTimelineEventContext,
+  buildStickerInstructionContext,
   assertLastUserMessagePreserved
 };

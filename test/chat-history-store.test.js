@@ -113,6 +113,24 @@ test("ChatHistoryStore only persists message fields and excludes credentials", a
   assert.match(serialized, /safe content/);
 });
 
+test("ChatHistoryStore restores assistant sticker metadata and safe game links", async () => {
+  const store = new ChatHistoryStore({
+    indexedDB: fakeIndexedDB(),
+    createId: () => "assistant-presentation",
+    clock: () => new Date("2026-07-27T12:00:00Z")
+  });
+  const session = await store.createSession();
+  await store.saveMessages(session.id, [
+    message("1", "assistant", "来玩吧", {
+      stickers: [{ id: "happy", url: "/api/v1/stickers/happy", description: "开心" }],
+      gameLinks: ["/game/#gomoku", "javascript:alert(1)", "https://example.test/game/"]
+    })
+  ]);
+  const restored = (await store.loadSession(session.id)).messages[0];
+  assert.equal(restored.stickers[0].description, "开心");
+  assert.deepEqual(restored.gameLinks, ["/game/#gomoku"]);
+});
+
 test("chat page loads IndexedDB history before chat runtime and saves both sides", () => {
   const root = path.join(__dirname, "..", "frontend-p4b");
   const html = fs.readFileSync(path.join(root, "chat.html"), "utf8");

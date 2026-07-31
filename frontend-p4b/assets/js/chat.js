@@ -120,6 +120,27 @@ document.addEventListener("DOMContentLoaded", () => {
   updateStatusLine(`${ai.status} · ${ai.presence}`);
   setText(".conversation-note span", `这里是只属于${user.name}和${ai.name}的安静空间`);
 
+  const assistantPresentation = message => {
+    if (message?.role !== "assistant") {
+      return { content: String(message?.content || ""), gameLinks: [] };
+    }
+    const stickerParsed = media?.parseAssistantStickerDirectives?.(message.content)
+      || { text: String(message.content || "") };
+    const gameParsed = media?.parseAssistantGameLinks?.(stickerParsed.text)
+      || { text: stickerParsed.text, gameLinks: [] };
+    return {
+      content: gameParsed.text,
+      gameLinks: Array.isArray(message.gameLinks) && message.gameLinks.length
+        ? message.gameLinks.slice(0, 2)
+        : gameParsed.gameLinks
+    };
+  };
+  const gameLinkLabel = href => href.includes("#gomoku")
+    ? "去和沉下五子棋"
+    : href.includes("#draw")
+      ? "去玩你画我猜"
+      : "打开游戏";
+
   const createMessageElement = (message, isLast = false) => {
     const row = document.createElement("article");
     row.className = `message-row message-row--${message.role === "assistant" ? "ai" : "user"}`;
@@ -140,6 +161,7 @@ document.addEventListener("DOMContentLoaded", () => {
     group.className = "message-group";
     const bubble = document.createElement("div");
     bubble.className = "message-bubble";
+    const presentation = assistantPresentation(message);
     if (message.role === "assistant" && message.thinking) {
       const details = document.createElement("details"); details.className = "thinking-panel";
       const summary = document.createElement("summary"); summary.textContent = "思考过程";
@@ -159,6 +181,14 @@ document.addEventListener("DOMContentLoaded", () => {
       media?.blobUrl(sticker.url).then(value => { image.src = value; }).catch(() => { image.alt = "Sticker 加载失败"; });
       bubble.append(image);
     });
+    presentation.gameLinks.forEach(href => {
+      const link = document.createElement("a");
+      link.className = "message-game-link";
+      link.href = href;
+      link.textContent = gameLinkLabel(href);
+      link.setAttribute("aria-label", `${link.textContent}，站内游戏入口`);
+      bubble.append(link);
+    });
     if (message.attachments?.length) {
       const gallery = document.createElement("div"); gallery.className = "message-images";
       message.attachments.forEach(attachment => { const link = document.createElement("a"); link.target = "_blank"; link.rel = "noopener"; const image = document.createElement("img"); image.alt = "聊天图片"; media?.blobUrl(attachment.url).then(value => { image.src = value; link.href = value; }).catch(() => { image.alt = "图片加载失败"; }); link.append(image); gallery.append(link); });
@@ -173,7 +203,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
       bubble.append(files);
     }
-    String(message.content || "").split("\n").filter(line => line || (!message.sticker && !message.attachments?.length && !message.files?.length)).forEach((line) => {
+    presentation.content.split("\n").filter(line => line || (!message.sticker && !message.attachments?.length && !message.files?.length)).forEach((line) => {
       const paragraph = document.createElement("p");
       paragraph.textContent = line;
       bubble.append(paragraph);
@@ -205,7 +235,7 @@ document.addEventListener("DOMContentLoaded", () => {
     window.CompanionChatAvatars?.apply();
     window.CompanionChatPreferences?.apply();
     scrollToLatest();
-    hydrateAssistantStickerMessages(messages);
+    hydrateAssistantMessages(messages);
   };
 
   const sessionToggle = document.querySelector("#session-toggle");
@@ -597,12 +627,13 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       const activeProvider = window.AppConfig?.getProviderConfig() || data.PROVIDER_CONFIG;
-      const resolvedStickerReply = await resolveAssistantStickerReply(completeReply);
-      const reply = messageProtocol.createAssistantMessage(resolvedStickerReply.content, {
+      const normalizedReply = await normalizeAssistantMessage({ role: "assistant", content: completeReply });
+      const reply = messageProtocol.createAssistantMessage(normalizedReply.content, {
         provider: activeProvider.mode === "real" ? activeProvider.type : "mock",
         model: activeProvider.model || null,
         thinking: completeThinking || null,
-        stickers: resolvedStickerReply.stickers
+        stickers: normalizedReply.stickers,
+        gameLinks: normalizedReply.gameLinks
       });
 
       appendAndPersist(reply, (nextState) => {
@@ -768,32 +799,45 @@ document.addEventListener("DOMContentLoaded", () => {
       status.textContent = "表情包暂时没加载出来，稍后再试。";
     }
   };
-  const resolveAssistantStickerReply = async content => {
+  const normalizeAssistantMessage = async message => {
+    if (message?.role !== "assistant") return message;
+    const content = String(message.content || "");
     const parsed = media.parseAssistantStickerDirectives?.(content);
-    if (!parsed?.keywords?.length) return { content, stickers: [] };
+    const parsedGame = media.parseAssistantGameLinks?.(parsed?.text ?? content)
+      || { text: parsed?.text ?? content, gameLinks: [] };
+    if (!parsed?.keywords?.length) {
+      return { ...message, content: parsedGame.text, gameLinks: parsedGame.gameLinks };
+    }
     let available = stickerCache;
     try {
       available = await media.list("");
       stickerCache = media.dedupeStickers ? media.dedupeStickers(available) : available;
       available = stickerCache;
     } catch {
-      // 使用上一次成功加载的 Sticker；没有缓存时保留原始文本。
+      // 使用上一次成功加载的 Sticker；directive 仍会从可见文本中安全移除。
     }
     const resolved = media.resolveAssistantStickers?.(content, available);
-    if (!resolved?.stickers?.length) return { content, stickers: [] };
-    return { content: resolved.text, stickers: resolved.stickers };
+    const game = media.parseAssistantGameLinks?.(resolved?.text ?? parsed.text)
+      || { text: resolved?.text ?? parsed.text, gameLinks: [] };
+    const stickers = resolved?.stickers || [];
+    const normalizedContent = game.text || (stickers.length || game.gameLinks.length
+      ? ""
+      : parsed.keywords.join("、"));
+    return { ...message, content: normalizedContent, stickers, gameLinks: game.gameLinks };
   };
-  const hydrateAssistantStickerMessages = messages => {
+  const hydrateAssistantMessages = messages => {
     if (stickerHydrationPending || !Array.isArray(messages)
       || !messages.some(message => message.role === "assistant"
-        && media.parseAssistantStickerDirectives?.(message.content)?.keywords?.length)) return;
+        && (media.parseAssistantStickerDirectives?.(message.content)?.keywords?.length
+          || media.parseAssistantGameLinks?.(message.content)?.gameLinks?.length))) return;
     stickerHydrationPending = true;
     Promise.all(messages.map(async message => {
-      if (message.role !== "assistant") return message;
-      const resolved = await resolveAssistantStickerReply(message.content);
-      return resolved.stickers.length
-        ? { ...message, content: resolved.content, stickers: resolved.stickers }
-        : message;
+      const normalized = await normalizeAssistantMessage(message);
+      if (normalized === message) return message;
+      const changed = normalized.content !== message.content
+        || JSON.stringify(normalized.stickers || []) !== JSON.stringify(message.stickers || [])
+        || JSON.stringify(normalized.gameLinks || []) !== JSON.stringify(message.gameLinks || []);
+      return changed ? normalized : message;
     })).then(nextMessages => {
       const changed = nextMessages.some((message, index) => message !== messages[index]);
       if (!changed) return;

@@ -52,6 +52,12 @@
       extractedTextLength: Number(value.extractedTextLength) || 0
     };
   };
+  const cleanGameLink = value => {
+    const href = String(value || "").trim();
+    return /^\/game\/(?:#(?:gomoku|draw)(?:\?roundId=[\p{L}\p{N}._~-]{1,120})?)?$/u.test(href)
+      ? href
+      : null;
+  };
 
   const cleanMessage = value => {
     if (!value || !VALID_ROLES.has(value.role)) return null;
@@ -60,7 +66,10 @@
       ? value.stickers.map(cleanSticker).filter(Boolean).slice(0, 2)
       : [];
     const legacySticker = cleanSticker(value.sticker);
-    if (!content && !legacySticker && !stickers.length) return null;
+    const gameLinks = Array.isArray(value.gameLinks)
+      ? value.gameLinks.map(cleanGameLink).filter(Boolean).slice(0, 2)
+      : [];
+    if (!content && !legacySticker && !stickers.length && !gameLinks.length) return null;
     const message = {
       id: String(value.id || ""),
       role: value.role,
@@ -78,6 +87,7 @@
     if (files.length) message.files = files;
     if (legacySticker) message.sticker = legacySticker;
     if (stickers.length) message.stickers = stickers;
+    if (gameLinks.length) message.gameLinks = gameLinks;
     return message;
   };
 

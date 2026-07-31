@@ -299,6 +299,7 @@
 .message-images img, .message-sticker { display: block; max-width: 100%; border-radius: 12px; object-fit: cover; }
 .message-images img { width: 120px; height: 100px; }
 .message-sticker { width: min(140px, 42vw); max-height: 140px; object-fit: contain; }
+.message-game-link { display:block; margin:8px 0 4px; padding:11px 14px; border:1px solid rgba(103,78,119,.16); border-radius:13px; color:#fff; background:linear-gradient(145deg,#8a72a0,#654f76); font-size:12px; font-weight:700; text-align:center; text-decoration:none; }
 
 .message-group time {
   display: block;

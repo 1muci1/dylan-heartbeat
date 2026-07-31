@@ -387,6 +387,20 @@ test("shared sticker normalization displays imported packs and filters descripti
   assert.doesNotMatch(capped.text, /sticker:/i);
   const missing = window.AppMedia.resolveAssistantStickers("[sticker:不存在]", all);
   assert.equal(missing.stickers.length, 0);
+  const gameLinks = window.AppMedia.parseAssistantGameLinks(
+    "来下棋。\n/game/#gomoku\n再画画：\n/game/#draw?roundId=round-1"
+  );
+  assert.equal(gameLinks.text, "来下棋。\n\n再画画：");
+  assert.deepEqual([...gameLinks.gameLinks], ["/game/#gomoku", "/game/#draw?roundId=round-1"]);
+  for (const unsafeLink of [
+    "https://example.test/game/#gomoku",
+    "javascript:/game/#gomoku",
+    "data:/game/#draw"
+  ]) {
+    const unsafeGame = window.AppMedia.parseAssistantGameLinks(unsafeLink);
+    assert.equal(unsafeGame.gameLinks.length, 0);
+    assert.equal(unsafeGame.text, unsafeLink);
+  }
   for (const unsafe of [
     "[sticker:<script>]",
     "[sticker:https://example.test/x.gif]",
@@ -418,9 +432,13 @@ test("chat sticker refresh, friendly empty/error states, click send and file sta
   assert.match(chat, /用户发送了一个表情：\[Sticker:/);
   assert.match(chat, /requestAssistantReply\(message, null, \{ timeoutMs: 60000 \}\)/);
   assert.match(chat, /if \(pendingRow\.isConnected\) pendingRow\.remove\(\)/);
-  assert.match(chat, /resolveAssistantStickerReply\(completeReply\)/);
-  assert.match(chat, /stickers: resolvedStickerReply\.stickers/);
-  assert.match(chat, /hydrateAssistantStickerMessages\(messages\)/);
+  assert.match(chat, /normalizeAssistantMessage\(\{ role: "assistant", content: completeReply \}\)/);
+  assert.match(chat, /stickers: normalizedReply\.stickers/);
+  assert.match(chat, /hydrateAssistantMessages\(messages\)/);
+  assert.match(chat, /assistantPresentation\(message\)/);
+  assert.match(chat, /message-game-link/);
+  assert.match(chat, /去和沉下五子棋/);
+  assert.match(chat, /去玩你画我猜/);
   assert.match(chat, /message\.stickers/);
   const stickerSend = chat.slice(chat.indexOf("const sendSticker"), chat.indexOf("const handleSend"));
   assert.doesNotMatch(stickerSend, /sticker\.url|image_url/);

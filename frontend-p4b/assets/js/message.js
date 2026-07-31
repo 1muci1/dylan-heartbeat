@@ -19,7 +19,7 @@
   const createMessage = (role, content, metadata = {}) => {
     const normalizedContent = String(content || "").trim();
     if (!validRoles.has(role)) throw new TypeError(`不支持的消息角色：${role}`);
-    if (!normalizedContent && !metadata.sticker && !metadata.stickers?.length) {
+    if (!normalizedContent && !metadata.sticker && !metadata.stickers?.length && !metadata.gameLinks?.length) {
       throw new TypeError("消息内容不能为空");
     }
 
@@ -41,7 +41,8 @@
     if (!Array.isArray(history)) return [];
     return history
       .filter((message) => validRoles.has(message?.role)
-        && (String(message?.content || "").trim() || message?.sticker || message?.stickers?.length))
+        && (String(message?.content || "").trim() || message?.sticker
+          || message?.stickers?.length || message?.gameLinks?.length))
       .map((message) => createMessage(message.role, message.content, message));
   };
 
@@ -58,13 +59,14 @@
     history = getConversationHistory(),
     { supportsImages = false, activeImageMessageId = null, activeFileMessageId = null } = {}
   ) => normalizeHistory(history)
-    .map(({ id, role, content, attachments, files, sticker, stickers }) => {
+    .map(({ id, role, content, attachments, files, sticker, stickers, gameLinks }) => {
       if (role !== "user") {
         const assistantStickers = Array.isArray(stickers) ? stickers : [];
         const stickerText = assistantStickers
           .map(item => `[Sticker: ${item.description || item.label || "Sticker"}]`)
           .join(" ");
-        return { role, content: content || stickerText };
+        const gameText = Array.isArray(gameLinks) && gameLinks.length ? "[沉邀请用户进入站内游戏]" : "";
+        return { role, content: content || stickerText || gameText };
       }
       if (Array.isArray(files) && files.length) {
         if (activeFileMessageId && id === activeFileMessageId) return {

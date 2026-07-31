@@ -116,6 +116,15 @@
       }).slice(0, 2);
     return { ...parsed, stickers };
   };
+  const ASSISTANT_GAME_LINK_RE = /(^|[\s(（])((?:\/game\/)(?:#(?:gomoku|draw)(?:\?roundId=[\p{L}\p{N}._~-]{1,120})?)?)(?=$|[\s)）。，！？!?])/giu;
+  const parseAssistantGameLinks = content => {
+    const gameLinks = [];
+    const text = String(content || "").replace(ASSISTANT_GAME_LINK_RE, (match, prefix, href) => {
+      if (!gameLinks.includes(href) && gameLinks.length < 2) gameLinks.push(href);
+      return prefix;
+    }).replace(/\n{3,}/g, "\n\n").trim();
+    return { text, gameLinks };
+  };
   const matchesSticker = (item, keyword) => {
     const term = String(keyword || "").trim().toLowerCase();
     return !term || `${item.description} ${item.label} ${item.tags}`.toLowerCase().includes(term);
@@ -172,6 +181,7 @@
   window.AppMedia = Object.freeze({
     list, listLocal, listImported, normalizeStickerItem, normalizeStickerPack, dedupeStickers,
     parseAssistantStickerDirectives, matchStickerKeyword, resolveAssistantStickers,
+    parseAssistantGameLinks,
     uploadSticker, update, remove, restore, uploadImages, uploadChatFile, uploadChatFiles,
     previewStickerImport, confirmStickerImport, blobUrl, request
   });

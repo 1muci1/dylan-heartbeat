@@ -92,6 +92,9 @@ test("proposal sanitizer and approval intents are strict", () => {
   const suggestion = buildGameSuggestion({ ...game(), board: [[0]], moveHistory: [{ row: 1, col: 1 }], prompt: "hidden" });
   assert.doesNotMatch(JSON.stringify(suggestion), /board|moveHistory|prompt|hidden/i);
   assert.equal(isMemorySuggestionApproval("嗯记住"), true);
+  for (const phrase of ["那局记下来", "这局记下来", "把刚刚那局记下来", "记下来", "记住这个", "可以记", "对，这个要记", "加到记忆里"]) {
+    assert.equal(isMemorySuggestionApproval(phrase), true, phrase);
+  }
   assert.equal(isMemorySuggestionApproval("你还记得吗"), false);
   assert.equal(isMemorySuggestionRejection("删掉这条建议"), true);
 });

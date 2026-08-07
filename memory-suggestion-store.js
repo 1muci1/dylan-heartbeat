@@ -241,7 +241,8 @@ class MemorySuggestionStore {
 }
 
 function isMemorySuggestionApproval(value) {
-  return /^(?:好[的呀啊]?[,， ]*)?(?:记下来|记住(?:它|这个|这件事)?|可以记|嗯[,， ]*记住|对[,， ]*这个要记|以后要记得|加到记忆里)[。！! ]*$/u.test(String(value || "").trim());
+  const normalized = String(value || "").normalize("NFKC").trim();
+  return /^(?:好[的呀啊]?[,， ]*)?(?:(?:把)?(?:刚刚|刚才)?(?:那|这)?局记下来|记下来|记住(?:它|这个|这件事)?|可以记|嗯[,， ]*记住|对[,， ]*这个要记|以后要记得|加到记忆里)[。！! ]*$/u.test(normalized);
 }
 
 function isMemorySuggestionRejection(value) {

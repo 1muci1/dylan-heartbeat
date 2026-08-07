@@ -1174,13 +1174,13 @@ app.post("/v1/chat/completions", async (req, reply) => {
       try {
         memorySuggestionStore.approve(pendingSuggestion.id);
         return sendLocalAssistantCompletion({
-          reply, body, content: "好，我记下来了。",
+          reply, body, content: "好，我已经把这局写进长期记忆了。",
           sessionTurn, requestOrigin: req.headers.origin
         });
       } catch (error) {
         req.log.error({ errorCode: error.code, suggestionId: pendingSuggestion.id }, "memory suggestion approval failed");
         return sendLocalAssistantCompletion({
-          reply, body, content: "这条记忆刚刚没有写进去，我先保留建议，等会儿可以再试。",
+          reply, body, content: "我刚刚想写入长期记忆，但失败了，先没有记进去。",
           sessionTurn, requestOrigin: req.headers.origin
         });
       }

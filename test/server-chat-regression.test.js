@@ -811,11 +811,22 @@ test("upstream errors record error status instead of completed", async () => {
 });
 
 test("chat approves or rejects only the latest pending suggestion", async () => {
+  let upstreamCalled = 0;
+  global.fetch = async () => { upstreamCalled += 1; throw new Error("approval must not call upstream"); };
   const beforeApproval = (await app.inject({ method: "GET", url: "/api/v1/memories?limit=1", headers: auth })).json().meta.total;
   const approved = await app.inject({ method: "POST", url: "/v1/chat/completions",
-    payload: { stream: false, messages: [{ role: "user", content: "记下来" }] } });
-  assert.match(approved.json().choices[0].message.content, /记下来了/);
+    payload: { stream: false, messages: [{ role: "user", content: "那局记下来" }] } });
+  const approvedText = approved.json().choices[0].message.content;
+  assert.match(approvedText, /长期记忆/);
+  assert.doesNotMatch(approvedText, /只在当前轮对话有效|等接口|下次.*忘/);
   assert.equal((await app.inject({ method: "GET", url: "/api/v1/memories?limit=1", headers: auth })).json().meta.total, beforeApproval + 1);
+  assert.equal(upstreamCalled, 0);
+
+  const duplicate = await app.inject({ method: "POST", url: "/v1/chat/completions",
+    payload: { stream: false, messages: [{ role: "user", content: "记下来" }] } });
+  assert.match(duplicate.json().choices[0].message.content, /想让我记哪件事/);
+  assert.equal((await app.inject({ method: "GET", url: "/api/v1/memories?limit=1", headers: auth })).json().meta.total, beforeApproval + 1);
+  assert.equal(upstreamCalled, 0);
 
   const created = await app.inject({
     method: "POST", url: "/api/game/events", headers: auth,
@@ -826,6 +837,22 @@ test("chat approves or rejects only the latest pending suggestion", async () => 
     } }
   });
   assert.equal(created.statusCode, 201);
+  const beforeSecondApproval = (await app.inject({ method: "GET", url: "/api/v1/memories?limit=1", headers: auth })).json().meta.total;
+  const secondApproved = await app.inject({ method: "POST", url: "/v1/chat/completions",
+    payload: { stream: false, messages: [{ role: "user", content: "把刚刚那局记下来" }] } });
+  assert.match(secondApproved.json().choices[0].message.content, /长期记忆/);
+  assert.equal((await app.inject({ method: "GET", url: "/api/v1/memories?limit=1", headers: auth })).json().meta.total, beforeSecondApproval + 1);
+  assert.equal(upstreamCalled, 0);
+
+  const rejectedGame = await app.inject({
+    method: "POST", url: "/api/game/events", headers: auth,
+    payload: { eventType: "game_result", title: "五子棋结果", metadata: {
+      game: "gomoku", winner: "draw", moves: 31, chenMoveCount: 15,
+      chenSourceCount: 14, fallbackCount: 1, fallbackReasons: ["MODEL_TIMEOUT"],
+      endedAt: "2026-08-07T02:00:00.000Z", summary: "辞辞和沉下了一局五子棋，平局。"
+    } }
+  });
+  assert.equal(rejectedGame.statusCode, 201);
   const beforeRejection = (await app.inject({ method: "GET", url: "/api/v1/memories?limit=1", headers: auth })).json().meta.total;
   const rejected = await app.inject({ method: "POST", url: "/v1/chat/completions",
     payload: { stream: false, messages: [{ role: "user", content: "不用记" }] } });
@@ -835,4 +862,5 @@ test("chat approves or rejects only the latest pending suggestion", async () => 
     payload: { stream: false, messages: [{ role: "user", content: "记下来" }] } });
   assert.match(noPending.json().choices[0].message.content, /想让我记哪件事/);
   assert.equal((await app.inject({ method: "GET", url: "/api/v1/memories?limit=1", headers: auth })).json().meta.total, beforeRejection);
+  assert.equal(upstreamCalled, 0);
 });

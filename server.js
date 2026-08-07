@@ -41,6 +41,7 @@ const { registerGomokuChenRoutes } = require("./gomoku-chen-routes");
 const {
   GameTools,
   buildDrawGameChatContext,
+  buildDrawGameDirectResponse,
   detectDrawGameIntent,
   resolveActiveDrawGameTurn,
   resolveDrawGameIntentTool
@@ -237,26 +238,48 @@ const DEFAULT_RESTART_COMMAND = "pm2 restart gateway wake-up";
 
 async function requestGomokuChenModel({ messages, model, signal }) {
   const selectedModel = String(model || process.env.MODEL_NAME || "").trim();
-  if (!TARGET_API_URL || !process.env.TARGET_API_KEY || !selectedModel) {
-    throw Object.assign(new Error("gomoku model 未配置"), { code: "GOMOKU_MODEL_NOT_CONFIGURED" });
+  if (/^(?:disabled|none|off)$/i.test(selectedModel)) throw Object.assign(new Error("gomoku model disabled"), { code: "MODEL_DISABLED" });
+  if (!TARGET_API_URL) throw Object.assign(new Error("gomoku target URL missing"), { code: "TARGET_API_URL_MISSING" });
+  if (!process.env.TARGET_API_KEY) throw Object.assign(new Error("gomoku target key missing"), { code: "TARGET_API_KEY_MISSING" });
+  if (!selectedModel) throw Object.assign(new Error("gomoku model missing"), { code: "PROVIDER_CONFIG_MISSING" });
+  let response;
+  try {
+    response = await fetch(TARGET_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.TARGET_API_KEY}`
+      },
+      body: JSON.stringify({ model: selectedModel, stream: false, temperature: 0.4, messages }),
+      signal
+    });
+  } catch (error) {
+    throw Object.assign(new Error("gomoku model unavailable"), {
+      code: error?.name === "AbortError" ? "MODEL_TIMEOUT" : "MODEL_HTTP_FAILED"
+    });
   }
-  const response = await fetch(TARGET_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.TARGET_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: selectedModel,
-      stream: false,
-      temperature: 0.7,
-      messages
-    }),
-    signal
-  });
-  if (!response.ok) throw Object.assign(new Error("gomoku model 调用失败"), { code: "GOMOKU_MODEL_FAILED" });
-  const payload = await response.json();
-  return { content: payload?.choices?.[0]?.message?.content };
+  if (!response.ok) {
+    throw Object.assign(new Error("gomoku model HTTP failed"), {
+      code: "MODEL_HTTP_FAILED",
+      statusCode: response.status
+    });
+  }
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    throw Object.assign(new Error("gomoku model response invalid"), { code: "MODEL_JSON_PARSE_FAILED" });
+  }
+  const rawContent = payload?.choices?.[0]?.message?.content
+    ?? payload?.output_text
+    ?? payload?.response?.output_text;
+  const content = Array.isArray(rawContent)
+    ? rawContent.map(part => typeof part === "string" ? part : part?.text || part?.content || "").join("")
+    : rawContent;
+  if (!String(content || "").trim()) {
+    throw Object.assign(new Error("gomoku model response empty"), { code: "MODEL_EMPTY_RESPONSE" });
+  }
+  return { content };
 }
 
 async function invokeCollaborationChen({ messages }) {
@@ -1150,6 +1173,16 @@ app.post("/v1/chat/completions", async (req, reply) => {
       store: drawGameService.store,
       sessionId
     });
+    const directGameResponse = buildDrawGameDirectResponse(drawGameIntent, drawGameToolResult);
+    if (directGameResponse) {
+      return sendLocalAssistantCompletion({
+        reply,
+        body,
+        content: directGameResponse,
+        sessionTurn,
+        requestOrigin: req.headers.origin
+      });
+    }
     const drawGameContext = buildDrawGameChatContext(drawGameIntent, drawGameToolResult);
     const memoryQuery = memoryQueryOf(kelivoMessages) || latestUserContent;
     const memoryIntent = detectMemoryIntent(memoryQuery);

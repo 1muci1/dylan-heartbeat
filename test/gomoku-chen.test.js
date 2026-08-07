@@ -4,7 +4,11 @@ const assert = require("node:assert/strict");
 const Fastify = require("fastify");
 const { test } = require("node:test");
 const { emptyBoard } = require("../ai-companion-frontend/game/gomoku");
-const { GomokuChenError, GomokuChenService } = require("../gomoku-chen-service");
+const {
+  GomokuChenError,
+  GomokuChenService,
+  candidateMoves
+} = require("../gomoku-chen-service");
 const { registerGomokuChenRoutes } = require("../gomoku-chen-routes");
 
 const playingBoard = () => {
@@ -48,18 +52,23 @@ test("gomoku chen route requires Bearer auth and returns a model-selected legal 
   });
 });
 
-test("illegal or occupied model moves safely use the existing rule fallback", async () => {
-  for (const content of [
-    '{"row":99,"col":8,"message":"越界"}',
-    '{"row":7,"col":7,"message":"占用"}',
-    '{"row":"6","col":8,"message":"字符串坐标"}'
+test("invalid model moves use fallback with a safe precise reason", async () => {
+  for (const [content, reason] of [
+    ['{"row":99,"col":8,"message":"越界"}', "MODEL_MOVE_OUT_OF_RANGE"],
+    ['{"row":7,"col":7,"message":"占用"}', "MODEL_MOVE_OCCUPIED"],
+    ['{"row":"七","col":8}', "MODEL_MOVE_NOT_NUMERIC"],
+    ['{"message":"只有消息"}', "MODEL_MOVE_MISSING"],
+    ['不是 JSON', "MODEL_JSON_PARSE_FAILED"],
+    ['{"row":0,"col":0}', "MODEL_MOVE_NOT_IN_CANDIDATES"]
   ]) {
     const board = playingBoard();
     const service = new GomokuChenService({ generate: async () => ({ content }) });
     const result = await service.chenMove({ board, gameState: "playing" });
     assert.equal(result.ok, true);
     assert.equal(result.source, "fallback");
+    assert.equal(result.reason, reason);
     assert.equal(result.message, "沉想了一下，落在这里。");
+    assert.doesNotMatch(result.message, /本地\s*AI|Codex|算法/i);
     assert.equal(board[result.move.row][result.move.col], 0);
   }
 });
@@ -71,7 +80,7 @@ test("a finished board is rejected before asking Chen for another move", async (
   const service = new GomokuChenService({ generate: async () => { calls += 1; } });
   await assert.rejects(
     service.chenMove({ board, gameState: "playing" }),
-    error => error instanceof GomokuChenError && error.code === "GOMOKU_GAME_FINISHED"
+    error => error instanceof GomokuChenError && error.code === "GAME_ALREADY_OVER"
   );
   assert.equal(calls, 0);
 });
@@ -85,6 +94,27 @@ test("nested move JSON is accepted when the model uses the API response shape", 
   assert.deepEqual(result.move, { row: 6, col: 7 });
 });
 
+test("fenced, embedded and numeric-string JSON moves are accepted", async () => {
+  for (const content of [
+    '```json\n{"row":6,"col":7,"message":"我落这里。"}\n```',
+    '我选好了：{"row":6,"col":7,"message":"看这里。"} 就这样。',
+    '{"row":"6","col":"7","message":"这一步。"}'
+  ]) {
+    const service = new GomokuChenService({ generate: async () => ({ content }) });
+    const result = await service.chenMove({ board: playingBoard(), gameState: "playing" });
+    assert.equal(result.source, "chen");
+    assert.deepEqual(result.move, { row: 6, col: 7 });
+  }
+});
+
+test("candidate list is bounded, unique and contains only empty positions", () => {
+  const board = playingBoard();
+  const candidates = candidateMoves(board);
+  assert.ok(candidates.length >= 8 && candidates.length <= 20);
+  assert.equal(new Set(candidates.map(move => `${move.row}:${move.col}`)).size, candidates.length);
+  assert.ok(candidates.every(move => board[move.row][move.col] === 0));
+});
+
 test("model timeout falls back without failing the game request", async () => {
   const service = new GomokuChenService({
     timeoutMs: 5,
@@ -96,6 +126,8 @@ test("model timeout falls back without failing the game request", async () => {
   const result = await service.chenMove({ board, gameState: "playing" });
   assert.equal(result.ok, true);
   assert.equal(result.source, "fallback");
+  assert.equal(result.reason, "MODEL_TIMEOUT");
+  assert.equal(result.statusCode, 504);
   assert.equal(board[result.move.row][result.move.col], 0);
 });
 
@@ -109,8 +141,22 @@ test("gomoku model prompt asks Chen to choose a move without role scripting", as
   });
   await service.chenMove({ board: playingBoard(), gameState: "playing" });
   const system = messages[0].content;
-  assert.match(system, /你是沉，正在陪辞辞下五子棋/);
-  assert.match(system, /你能看到棋盘，请选择一个合法落子，并简短回应/);
+  assert.match(system, /你是沉，正在和辞辞下五子棋/);
+  assert.match(system, /只能从 candidates 中选择一个空位/);
   assert.match(system, /只返回 JSON/);
   assert.doesNotMatch(system, /必须说|固定回复|禁止词|minimax|Codex/);
+  const payload = JSON.parse(messages[1].content);
+  assert.equal(payload.lastMoves.length, 0);
+  assert.ok(payload.candidates.length <= 20);
+  assert.equal(payload.board.length, 15);
+});
+
+test("route logging is limited to safe operational metadata", () => {
+  const route = require("node:fs").readFileSync(require.resolve("../gomoku-chen-routes"), "utf8");
+  assert.match(route, /source: result\.source/);
+  assert.match(route, /reason: result\.reason/);
+  assert.match(route, /latencyMs/);
+  assert.match(route, /occupiedCount/);
+  assert.match(route, /moveHistoryLength/);
+  assert.doesNotMatch(route, /req\.log\.(?:info|warn|error)\([^\n]*(?:authorization|apiKey|messages|board:|prompt)/i);
 });

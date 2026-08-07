@@ -23,12 +23,27 @@ function registerGomokuChenRoutes(app, { service, apiKey = process.env.GATEWAY_A
     done();
   }
   app.post("/api/game/gomoku/chen-move", { preHandler: auth }, async (req, reply) => {
+    const startedAt = Date.now();
     try {
-      return reply.send(await service.chenMove(req.body));
+      const result = await service.chenMove(req.body);
+      req.log.info({
+        source: result.source,
+        reason: result.reason || null,
+        statusCode: result.statusCode || 200,
+        latencyMs: Date.now() - startedAt,
+        occupiedCount: Array.isArray(req.body?.board)
+          ? req.body.board.reduce((count, row) => count + (Array.isArray(row) ? row.filter(Boolean).length : 0), 0)
+          : 0,
+        moveHistoryLength: Array.isArray(req.body?.moveHistory) ? req.body.moveHistory.length : 0
+      }, "gomoku chen move completed");
+      return reply.send(result);
     } catch (error) {
-      if ((error.statusCode || 500) >= 500) {
-        req.log.error({ errorCode: error.code, errorName: error.name }, "gomoku chen move failed");
-      }
+      req.log.warn({
+        source: "error",
+        reason: error.code || "INTERNAL_ERROR",
+        statusCode: error.statusCode || 500,
+        latencyMs: Date.now() - startedAt
+      }, "gomoku chen move failed");
       return fail(
         reply,
         error.statusCode || 500,

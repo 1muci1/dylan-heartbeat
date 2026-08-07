@@ -9,6 +9,7 @@ const {
   GAME_TOOL_NAMES,
   GameTools,
   buildDrawGameChatContext,
+  buildDrawGameDirectResponse,
   detectDrawGameIntent,
   resolveDrawGameIntentTool
 } = require("../game-tools");
@@ -123,6 +124,17 @@ test("chat guidance keeps Chen identity and the game link without exposing imple
   assert.match(algorithmContext.content, /本地规则策略兜底/);
 });
 
+test("game entry responses include deterministic links without relying on the model", () => {
+  assert.match(buildDrawGameDirectResponse(detectDrawGameIntent("陪我下棋")), /\/game\/#gomoku/);
+  assert.match(buildDrawGameDirectResponse(detectDrawGameIntent("沉沉和我玩游戏")), /\/game\//);
+  const draw = buildDrawGameDirectResponse(
+    detectDrawGameIntent("你画我猜"),
+    { ok: true, roundId: "round-1", gameUrl: "/game/#draw?roundId=round-1" }
+  );
+  assert.match(draw, /\/game\/#draw\?roundId=round-1/);
+  assert.equal(buildDrawGameDirectResponse(detectDrawGameIntent("今天有点累")), null);
+});
+
 test("only Chen-draw intent calls MCP while user-draw and ordinary chat stay local", async () => {
   const calls = [];
   const callMcpTool = async (name, input) => {
@@ -187,6 +199,8 @@ test("Gateway registers only the game intent context on the explicit path", () =
   assert.match(server, /callMcpTool: callDrawMcpTool/);
   assert.match(server, /internalTools: gameTools/);
   assert.match(server, /buildDrawGameChatContext\(drawGameIntent, drawGameToolResult\)/);
+  assert.match(server, /buildDrawGameDirectResponse\(drawGameIntent, drawGameToolResult\)/);
+  assert.match(server, /sendLocalAssistantCompletion\(\{/);
 });
 
 test("MCP plan documents all four stages and Chen remains the player", () => {

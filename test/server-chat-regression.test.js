@@ -150,6 +150,22 @@ function streamUpstream({ done = true, status = 200, thinking = "" } = {}) {
   }), { status, headers: { "content-type": "text/event-stream" } });
 }
 
+test("gomoku chat intent returns its game link without relying on upstream wording", async () => {
+  let upstreamCalled = false;
+  global.fetch = async () => {
+    upstreamCalled = true;
+    throw new Error("upstream must not be called");
+  };
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/chat/completions",
+    payload: { model: "test", stream: false, messages: [{ role: "user", content: "陪我下棋" }] }
+  });
+  assert.equal(response.statusCode, 200);
+  assert.match(response.json().choices[0].message.content, /\/game\/#gomoku/);
+  assert.equal(upstreamCalled, false);
+});
+
 async function createSession(title) {
   const response = await app.inject({
     method: "POST", url: "/api/v1/chat/sessions", headers: auth, payload: { title }

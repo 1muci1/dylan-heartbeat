@@ -1,7 +1,7 @@
 "use strict";
 
 (() => {
-  window.XINBAN_GAME_BUILD = "game-v47-p4b";
+  window.XINBAN_GAME_BUILD = "game-v48-p4b";
   const { SIZE, emptyBoard, isWin, pointToCell, scheduleChenMove } = window.CompanionGomoku;
   const protocol = window.CompanionDrawingProtocol;
   const state = {
@@ -221,7 +221,7 @@
   async function requestChenMove(userMove, expectedTurn) {
     const controller = new AbortController();
     state.gomokuAbortController = controller;
-    const timeout = setTimeout(() => controller.abort(), 6500);
+    const timeout = setTimeout(() => controller.abort(), 18000);
     try {
       const result = await gameFetch("/api/game/gomoku/chen-move", {
         method: "POST",

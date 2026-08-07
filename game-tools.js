@@ -431,6 +431,16 @@ function buildDrawGameChatContext(intent, toolResult = null) {
   };
 }
 
+function buildDrawGameDirectResponse(intent, toolResult = null) {
+  if (intent?.type === "gomoku") return "来，我陪你下五子棋。你先手：/game/#gomoku";
+  if (intent?.type === "lobby") return "好呀，辞辞想玩哪个？五子棋或你画我猜都可以：/game/";
+  if (intent?.type === "user_draw") return "好，你画，我认真猜：/game/#draw";
+  if (intent?.type === "chen_draw" && toolResult?.ok) {
+    return `我画好啦，去游戏页猜猜看：${toolResult.gameUrl || `/game/#draw?roundId=${encodeURIComponent(String(toolResult.roundId || ""))}`}`;
+  }
+  return null;
+}
+
 async function resolveDrawGameIntentTool({
   intent,
   callMcpTool,
@@ -452,6 +462,7 @@ async function resolveDrawGameIntentTool({
 }
 
 module.exports = {
+  buildDrawGameDirectResponse,
   ACTIVE_DRAW_MODE,
   GAME_TOOL_DEFINITIONS,
   GAME_TOOL_NAMES,

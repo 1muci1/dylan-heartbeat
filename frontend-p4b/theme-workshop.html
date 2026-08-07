@@ -3,15 +3,16 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#09090d"><title>心伴 · 美化工坊</title>
-  <link rel="stylesheet" href="assets/css/common.css?v=v51-p4b">
-  <link rel="stylesheet" href="assets/css/theme.css?v=v51-p4b">
-  <link rel="stylesheet" href="assets/css/theme-workshop.css?v=v51-p4b">
-  <script src="assets/js/theme-store.js?v=v51-p4b"></script>
-  <script src="assets/js/common.js?v=v51-p4b"></script>
+  <link rel="stylesheet" href="assets/css/common.css?v=v52-p4b">
+  <link rel="stylesheet" href="assets/css/theme.css?v=v52-p4b">
+  <link rel="stylesheet" href="assets/css/theme-workshop.css?v=v52-p4b">
+  <script src="assets/js/theme-store.js?v=v52-p4b"></script>
+  <script src="assets/js/tavern-theme-adapter.js?v=v52-p4b"></script>
+  <script src="assets/js/common.js?v=v52-p4b"></script>
 </head>
 <body class="theme-workshop-page" data-page="settings">
 <main class="app-shell theme-workshop-shell">
-  <header class="theme-workshop-header"><a href="settings.html?returnTo=%2Ftheme-workshop.html#appearance" aria-label="返回设置">‹</a><div><p class="eyebrow">THEME STUDIO · V51</p><h1>美化工坊</h1></div></header>
+  <header class="theme-workshop-header"><a href="settings.html?returnTo=%2Ftheme-workshop.html#appearance" aria-label="返回设置">‹</a><div><p class="eyebrow">THEME STUDIO · V52</p><h1>美化工坊</h1></div></header>
   <section class="theme-panel theme-panel--presets"><h2>预设主题</h2><p>选择后先进入预览，点击应用才会保存。</p><div class="theme-presets" data-theme-presets></div></section>
   <section class="theme-panel theme-panel--editor"><h2>颜色与字体</h2><p>所有修改会立即出现在右侧小手机中。</p><div class="theme-grid">
     <label class="theme-field">主色<input type="color" data-theme-token="colorPrimary"></label>
@@ -59,8 +60,9 @@
   <section class="theme-panel theme-panel--preview"><h2>实时预览</h2><p data-theme-preview-name>当前草稿</p><div class="theme-phone" data-theme-preview><div class="theme-phone__screen"><div class="theme-phone__title">沉的小世界</div><div class="theme-phone__bubble theme-phone__bubble--user">陪我下棋</div><div class="theme-phone__bubble">好呀，我陪你。</div><div class="theme-phone__nav"></div></div></div></section>
   <section class="theme-panel theme-panel--actions"><h2>主题包</h2><p>第一版导入/导出 JSON；ZIP 主题资产包将在后续版本支持。</p><div class="theme-actions">
     <button type="button" data-theme-apply>应用主题</button><button type="button" data-theme-export>导出 JSON</button>
-    <label>导入 JSON<input type="file" accept=".json,application/json" data-theme-import></label>
-  </div><p class="theme-status" role="status" data-theme-status></p></section>
+    <label>导入小窝/酒馆 JSON<input type="file" accept=".json,application/json" data-theme-import></label>
+  </div><div class="theme-import-review" data-theme-import-review hidden><strong data-theme-import-format></strong><p data-theme-import-report></p><div class="theme-actions"><button type="button" data-theme-import-confirm>转换并加入主题库</button><button type="button" data-theme-import-cancel>取消</button></div></div><p class="theme-status" role="status" data-theme-status></p></section>
+  <section class="theme-panel theme-panel--actions"><h2>我想自己做酒馆风 JSON</h2><p>复制这个安全简化模板，改好后用上面的统一按钮导入。</p><pre class="theme-template" data-tavern-template></pre><div class="theme-actions"><button type="button" data-template-copy>复制模板</button><button type="button" data-template-download>下载模板 JSON</button></div></section>
 </main>
-<script src="assets/js/theme-workshop.js?v=v51-p4b"></script>
+<script src="assets/js/theme-workshop.js?v=v52-p4b"></script>
 </body></html>

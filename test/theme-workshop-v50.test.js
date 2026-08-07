@@ -23,7 +23,7 @@ function documentFixture() {
     getElementById: () => styleNode, createElement: () => styleNode } };
 }
 
-test("v51 ThemeStore loads and migrates the default theme without old localStorage", () => {
+test("v52 ThemeStore loads and migrates the default theme without old localStorage", () => {
   const storage = storageFixture(); const fixture = documentFixture();
   const store = new ThemeStore({ storage, documentRef: fixture.document });
   const active = store.applyActive();
@@ -101,7 +101,7 @@ test("theme workshop is linked, live-preview driven, and every main page loads t
   assert.match(script, /applyTheme/);
   for (const page of ["index.html", "chat.html", "dashboard.html", "settings.html", "memory.html", "stickers.html"]) {
     const html = fs.readFileSync(path.join(root, page), "utf8");
-    assert.match(html, /assets\/css\/theme\.css\?v=v51-p4b/, page);
-    assert.match(html, /assets\/js\/theme-store\.js\?v=v51-p4b/, page);
+    assert.match(html, /assets\/css\/theme\.css\?v=v52-p4b/, page);
+    assert.match(html, /assets\/js\/theme-store\.js\?v=v52-p4b/, page);
   }
 });

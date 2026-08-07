@@ -1,0 +1,29 @@
+:root {
+  --theme-primary:#8b6bb8; --theme-accent:#c7b2ff; --theme-bg:#09090d; --theme-text:#f5f3ff;
+  --theme-muted:rgba(245,243,255,.72); --theme-user-bubble:rgba(131,107,153,.96);
+  --theme-assistant-bubble:rgba(25,24,32,.88); --theme-bubble-text:#f5f3ff;
+  --theme-bottom-nav:rgba(16,15,21,.9); --theme-card:rgba(20,20,27,.92);
+  --theme-border:rgba(196,181,253,.12); --theme-shadow-soft:0 18px 45px rgba(0,0,0,.28);
+  --theme-blur:18px; --theme-radius-bubble:24px; --theme-radius-card:28px;
+  --theme-font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --theme-font-size:15px; --theme-chat-width:auto; --theme-bubble-max:78%; --theme-message-gap:14px;
+  --theme-nav-height:86px; --theme-glass:.72; --theme-background-dim:.18; --theme-bubble-opacity:.94;
+  --theme-nav-opacity:.9; --theme-radius-nav:24px; --theme-blur-nav:20px; --theme-blur-bubble:10px;
+  --theme-background-image:none;
+  --bg:var(--theme-bg); --surface:var(--theme-card); --surface-soft:color-mix(in srgb,var(--theme-card) 82%,var(--theme-bg));
+  --primary:var(--theme-primary); --primary-dark:var(--theme-accent); --primary-light:color-mix(in srgb,var(--theme-primary) 16%,transparent);
+  --text:var(--theme-text); --muted:var(--theme-muted); --line:var(--theme-border); --shadow:var(--theme-shadow-soft);
+  --radius-lg:var(--theme-radius-card); --nav-height:var(--theme-nav-height);
+  font-family:var(--theme-font-family); font-size:var(--theme-font-size);
+}
+body,.app-shell{color:var(--theme-text);background-color:var(--theme-bg);font-family:var(--theme-font-family)}
+.app-shell{background-image:linear-gradient(rgba(0,0,0,var(--theme-background-dim)),rgba(0,0,0,var(--theme-background-dim))),var(--theme-background-image);background-position:center;background-size:cover}
+.bottom-nav{min-height:var(--theme-nav-height);border-color:var(--theme-border);border-radius:var(--theme-radius-nav) var(--theme-radius-nav) 0 0;background:var(--theme-bottom-nav);box-shadow:var(--theme-shadow-soft);backdrop-filter:blur(var(--theme-blur-nav)) saturate(130%)}
+.card,.settings-zone section,.dashboard-card,.memory-card,.appearance-settings,.chat-background-settings,.avatar-settings,.preference-data-settings{border-color:var(--theme-border);border-radius:var(--theme-radius-card);background:var(--theme-card);box-shadow:var(--theme-shadow-soft)}
+.message-row{margin-bottom:var(--theme-message-gap)}
+.message-bubble{max-width:var(--theme-bubble-max);border-color:var(--theme-border);border-radius:var(--theme-radius-bubble);color:var(--theme-bubble-text);background:var(--theme-assistant-bubble);backdrop-filter:blur(var(--theme-blur-bubble));opacity:var(--theme-bubble-opacity)}
+.message-row--user .message-bubble{background:var(--theme-user-bubble)}
+.message-bubble p{color:var(--theme-bubble-text)!important}
+.composer__field,input,select,textarea,dialog{border-color:var(--theme-border);color:var(--theme-text);background:color-mix(in srgb,var(--theme-card) 88%,transparent)}
+button,.provider-button--primary,.message-game-link{border-radius:calc(var(--theme-radius-card) * .5)}
+@media(min-width:521px){.bottom-nav{border-radius:0 0 var(--theme-radius-card) var(--theme-radius-card)}}

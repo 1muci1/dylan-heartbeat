@@ -1,10 +1,10 @@
 "use strict";
 
 ((windowRef, documentRef, navigatorRef) => {
-  const APP_VERSION = "v46";
-  const SW_CACHE_NAME = "xinban-shell-v46-p4b";
-  const CONTROLLER_REFRESH_GUARD = "p4b-sw-controller-refresh-v46";
-  windowRef.XINBAN_BUILD = "v46-p4b";
+  const APP_VERSION = "v50";
+  const SW_CACHE_NAME = "xinban-shell-v50-p4b";
+  const CONTROLLER_REFRESH_GUARD = "p4b-sw-controller-refresh-v50";
+  windowRef.XINBAN_BUILD = "v50-p4b";
 
   const refreshOnceForController = () => {
     try {

@@ -26,13 +26,22 @@ test("SillyTavern fields map into a bounded, readable xinban theme and report", 
   const result = adapter.convertSillyTavernTheme(tavern());
   assert.equal(result.ok, true); assert.equal(result.theme.name, "蝶_雨露倾珠_PC端");
   assert.equal(result.theme.tokens.colorText, "rgba(52,43,69,1)");
-  assert.equal(result.theme.tokens.cardBg, "rgba(255,255,255,.82)");
+  assert.equal(result.theme.tokens.cardBg, "rgba(255,255,255,0.72)");
   assert.equal(result.theme.tokens.fontSizeBase, "15.6px");
   assert.equal(result.theme.layout.bubbleMaxWidth, "95%");
   assert.equal(result.theme.layout.blurNav, "24px");
   assert.equal(result.theme.layout.effectsMode, "balanced");
   assert.ok(themeApi.contrastRatio(result.theme.tokens.chatAssistantBubbleText, result.theme.tokens.chatAssistantBubbleBg, result.theme.tokens.colorBg) >= 4.5);
   assert.ok(result.report.counts.recognized >= 7);
+});
+
+test("Tavern page tint never replaces the global background and transparent tint is ignored", () => {
+  const transparent = adapter.convertSillyTavernTheme(tavern({ chat_tint_color: "rgba(200,180,90,0)" }));
+  assert.equal(transparent.theme.tokens.colorBg, themeApi.DEFAULT_THEME.tokens.colorBg);
+  assert.ok(transparent.report.ignored.some(item => item.includes("完全透明")));
+  const muddy = adapter.convertSillyTavernTheme(tavern({ blur_tint_color: "rgba(190,165,80,.9)" }));
+  assert.equal(muddy.theme.tokens.cardBg, "rgba(255,255,255,.66)");
+  assert.notEqual(muddy.theme.tokens.colorBg, "rgba(190,165,80,.9)");
 });
 
 test("fast_ui_mode selects performance and dangerous Tavern CSS is never emitted", () => {

@@ -28,6 +28,15 @@
     const text = typeof value === "string" ? value.trim() : "";
     return themeApi?.parseColor?.(text) ? text : null;
   };
+  const harmonizeGlassTint = (value, fallback = "rgba(255,255,255,.66)") => {
+    const parsed = themeApi?.parseColor?.(value); if (!parsed) return fallback;
+    const [red, green, blue] = parsed; const brightness = red * .299 + green * .587 + blue * .114;
+    const spread = Math.max(red, green, blue) - Math.min(red, green, blue);
+    const muddyWarm = brightness > 80 && brightness < 215 && red > blue + 24 && spread > 38;
+    if (muddyWarm) return fallback;
+    const alpha = Math.max(.58, Math.min(.72, parsed[3]));
+    return `rgba(${Math.round(red)},${Math.round(green)},${Math.round(blue)},${alpha.toFixed(2)})`;
+  };
   const safeName = (value, fallback = "导入的外部主题") => typeof value === "string" && value.trim() ? value.trim().slice(0, 80) : fallback;
   const createReport = format => ({ format, recognized: [], ignored: [], blocked: [], counts: { recognized: 0, ignored: 0, blocked: 0, externalImages: 0, scannedFields: 0 } });
   const note = (report, bucket, detail) => { report[bucket].push(detail); report.counts[bucket] += 1; };
@@ -86,9 +95,12 @@
     base.name = safeName(values.name || values.title || values.themeName, filename.replace(/\.json$/iu, "") || "导入的外部主题");
     const mapColor = (source, targets) => { const color = safeColor(values[source]); if (!color) return; for (const target of targets) base.tokens[target] = color; note(report, "recognized", `${source} → ${targets.join(", ")}`); };
     mapColor("main_text_color", ["colorText", "chatAssistantBubbleText", "cardText", "inputText", "previewText"]);
-    mapColor("italics_text_color", ["colorMuted"]); mapColor("blur_tint_color", ["cardBg", "chatAssistantBubbleBg"]);
-    mapColor("chat_tint_color", ["colorBg"]); mapColor("user_mes_blur_tint_color", ["chatUserBubbleBg"]);
-    mapColor("bot_mes_blur_tint_color", ["chatAssistantBubbleBg"]); mapColor("border_color", ["borderColor"]);
+    mapColor("italics_text_color", ["colorMuted"]);
+    if (safeColor(values.blur_tint_color)) { const tint = harmonizeGlassTint(values.blur_tint_color); base.tokens.cardBg = tint; base.tokens.chatAssistantBubbleBg = tint; note(report, "recognized", "blur_tint_color → glass tint"); }
+    if (safeColor(values.chat_tint_color)) note(report, "ignored", themeApi.parseColor(values.chat_tint_color)[3] === 0 ? "chat_tint_color 完全透明，已忽略" : "chat_tint_color 不作为整页背景，已保留柔和紫雾底色");
+    mapColor("user_mes_blur_tint_color", ["chatUserBubbleBg"]);
+    if (safeColor(values.bot_mes_blur_tint_color)) { base.tokens.chatAssistantBubbleBg = harmonizeGlassTint(values.bot_mes_blur_tint_color, base.tokens.chatAssistantBubbleBg); note(report, "recognized", "bot_mes_blur_tint_color → assistant glass tint"); }
+    mapColor("border_color", ["borderColor"]);
     if (values.font_scale !== undefined) { base.tokens.fontSizeBase = `${Math.round(safeNumber(values.font_scale, 1, .8, 1.5) * 15 * 10) / 10}px`; note(report, "recognized", "font_scale → fontSizeBase"); }
     if (values.chat_width !== undefined) { base.layout.bubbleMaxWidth = `${safeNumber(values.chat_width, 78, 50, 95)}%`; note(report, "recognized", "chat_width → bubbleMaxWidth"); }
     if (values.blur_strength !== undefined) { const blur = safeNumber(values.blur_strength, 0, 0, 24); base.layout.blurNav = `${blur}px`; base.layout.backgroundBlur = `${blur}px`; note(report, "recognized", "blur_strength → blur effects"); }
@@ -129,5 +141,5 @@
     return result;
   }
   const assertImportSize = size => { if (Number(size) > MAX_JSON_BYTES) throw new AdapterError("主题 JSON 不能超过 1MB", "THEME_FILE_TOO_LARGE"); return true; };
-  return { detectThemeFormat, convertSillyTavernTheme, convertExternalTheme, sanitizeExternalCustomCss, assertImportSize, MAX_JSON_BYTES, MAX_DEPTH, MAX_FIELDS, AdapterError };
+  return { detectThemeFormat, convertSillyTavernTheme, convertExternalTheme, sanitizeExternalCustomCss, harmonizeGlassTint, assertImportSize, MAX_JSON_BYTES, MAX_DEPTH, MAX_FIELDS, AdapterError };
 });

@@ -79,8 +79,12 @@ document.addEventListener("DOMContentLoaded", () => {
         draft = { ...editable(draft), assets: editable(api.DEFAULT_THEME.assets) };
       }
       draft = store.applyTheme(draft, { persist: true, applyBackground: true });
-      message("主题已应用到本设备；头像与原聊天背景配置保持不变。");
+      message("主题已应用，聊天页也会同步生效；头像与原聊天背景配置保持不变。");
     } catch (error) { message(error.message || "主题应用失败"); }
+  });
+  document.querySelector("[data-theme-reset-soft]")?.addEventListener("click", () => {
+    pendingImport = null; draft = editable(api.DEFAULT_THEME); draft = store.applyTheme(draft, { persist: true, applyBackground: false });
+    document.querySelector("[data-theme-import-review]").hidden = true; refreshForm(); render(); message("已恢复柔和紫雾默认，聊天页也会同步生效。");
   });
   document.querySelector("[data-theme-export]")?.addEventListener("click", () => {
     const blob = new Blob([`${JSON.stringify(store.exportTheme(draft), null, 2)}\n`], { type: "application/json" });

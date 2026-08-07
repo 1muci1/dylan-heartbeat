@@ -6,7 +6,9 @@
   if (root) {
     root.XinbanThemes = Object.freeze(api);
     root.XinbanThemeStore = new api.ThemeStore();
-    root.XinbanThemeStore.applyActive();
+    root.XinbanThemeStore.applyActiveTheme();
+    root.addEventListener?.("storage", event => { if (event.key === api.ACTIVE_KEY) root.XinbanThemeStore.applyActiveTheme(); });
+    root.addEventListener?.("pageshow", () => root.XinbanThemeStore.applyActiveTheme());
   }
 })(typeof window !== "undefined" ? window : null, () => {
   const ACTIVE_KEY = "xinban-theme-active-v1";
@@ -48,8 +50,8 @@
     id: "theme_default_purple_mist", name: "默认紫雾", version: 1, author: "心伴",
     createdAt: "2026-08-07T00:00:00.000Z", updatedAt: "2026-08-07T00:00:00.000Z",
     tokens: Object.freeze({
-      colorPrimary: "#8b6bb8", colorAccent: "#7997d8", colorBg: "#eee9f3",
-      colorText: "#342b45", colorMuted: "#6f647d",
+      colorPrimary: "#9a79c6", colorAccent: "#829bdd", colorBg: "#171326",
+      colorText: "#f5f0ff", colorMuted: "#c1b5d3",
       chatUserBubbleBg: "rgba(112,82,137,.94)", chatUserBubbleText: "#ffffff",
       chatAssistantBubbleBg: "rgba(255,255,255,.82)", chatAssistantBubbleText: "#342b45",
       chatBubbleText: "#342b45", cardText: "#342b45", cardMutedText: "#6f647d",
@@ -131,6 +133,12 @@
     const candidates = ["#241c30", "#ffffff"];
     return candidates.sort((a, b) => contrastRatio(b, background, pageBackground) - contrastRatio(a, background, pageBackground))[0];
   };
+  const needsHarmonyBackground = value => {
+    const parsed = parseColor(value); if (!parsed || parsed[3] < .2) return true;
+    const [red, green, blue] = parsed; const brightness = red * .299 + green * .587 + blue * .114;
+    const spread = Math.max(red, green, blue) - Math.min(red, green, blue);
+    return brightness > 72 && brightness < 224 && (red > blue + 16 || spread < 34);
+  };
   const guardReadability = theme => {
     const tokens = { ...theme.tokens }; const page = tokens.colorBg;
     tokens.chatUserBubbleText = readableText(tokens.chatUserBubbleBg, tokens.chatUserBubbleText, page);
@@ -167,10 +175,11 @@
     }
     if (!input.tokens?.chatUserBubbleText) tokens.chatUserBubbleText = safeColor(input.tokens?.chatBubbleText, tokens.chatUserBubbleText);
     if (!input.tokens?.chatAssistantBubbleText) tokens.chatAssistantBubbleText = safeColor(input.tokens?.chatBubbleText, tokens.chatAssistantBubbleText);
+    if (Number(input.harmonyVersion || 0) < 2 && needsHarmonyBackground(tokens.colorBg)) tokens.colorBg = DEFAULT_THEME.tokens.colorBg;
     const stamp = now.toISOString();
     let normalized = {
       id: safeText(input.id, `theme_${Math.random().toString(36).slice(2, 10)}`, 80),
-      name: safeText(input.name, "未命名主题", 80), version: THEME_VERSION,
+      name: safeText(input.name, "未命名主题", 80), version: THEME_VERSION, harmonyVersion: 2,
       author: safeText(input.author, "辞辞", 80),
       createdAt: /^\d{4}-\d{2}-\d{2}T/.test(input.createdAt || "") ? input.createdAt : stamp,
       updatedAt: stamp, tokens: Object.freeze(tokens), assets: Object.freeze(assets),
@@ -217,8 +226,8 @@
     getActive() {
       try {
         const stored = this.storage?.getItem(ACTIVE_KEY);
-        const theme = normalizeTheme(stored ? JSON.parse(stored) : DEFAULT_THEME);
-        if (!stored) this.storage?.setItem(ACTIVE_KEY, JSON.stringify(theme));
+        const parsed = stored ? JSON.parse(stored) : DEFAULT_THEME; const theme = normalizeTheme(parsed);
+        if (!stored || Number(parsed.harmonyVersion || 0) < 2) this.storage?.setItem(ACTIVE_KEY, JSON.stringify(theme));
         return theme;
       }
       catch { return normalizeTheme(DEFAULT_THEME); }
@@ -234,6 +243,11 @@
       for (const [key, value] of Object.entries(cssVariables(theme))) rootNode.style.setProperty(key, value);
       rootNode.dataset.xinbanTheme = theme.id;
       rootNode.dataset.themeEffects = theme.layout.effectsMode;
+      const effectClasses = ["theme-effects-pretty", "theme-effects-balanced", "theme-effects-performance"];
+      rootNode.classList?.add?.("has-xinban-theme"); rootNode.classList?.remove?.(...effectClasses); rootNode.classList?.add?.(`theme-effects-${theme.layout.effectsMode}`);
+      const applyBodyClasses = () => { const body = this.document?.body; if (!body?.classList) return; body.classList.add("has-xinban-theme"); body.classList.remove(...effectClasses); body.classList.add(`theme-effects-${theme.layout.effectsMode}`); };
+      applyBodyClasses();
+      if (!this.document?.body) this.document?.addEventListener?.("DOMContentLoaded", applyBodyClasses, { once: true });
       const background = theme.assets.chatBackgroundImage || theme.assets.backgroundImage || theme.assets.homeBackgroundImage;
       if (applyBackground && background) rootNode.style.setProperty("--theme-background-image", `url(${JSON.stringify(background)})`);
       else rootNode.style.removeProperty("--theme-background-image");
@@ -241,9 +255,12 @@
       if (this.document && !style) { style = this.document.createElement("style"); style.id = "xinban-theme-custom-css"; this.document.head.append(style); }
       if (style) style.textContent = theme.customCss;
       if (persist) this.storage?.setItem(ACTIVE_KEY, JSON.stringify(theme));
+      const view = this.document?.defaultView || (typeof window !== "undefined" ? window : null);
+      if (view?.dispatchEvent && typeof view.CustomEvent === "function") view.dispatchEvent(new view.CustomEvent("xinban:theme-applied", { detail: { id: theme.id, effectsMode: theme.layout.effectsMode } }));
       return theme;
     }
-    applyActive() { return this.applyTheme(this.getActive(), { persist: false, applyBackground: true }); }
+    applyActiveTheme() { return this.applyTheme(this.getActive(), { persist: false, applyBackground: true, target: this.document?.documentElement }); }
+    applyActive() { return this.applyActiveTheme(); }
     importTheme(pack) {
       if (!pack || pack.type !== "xinban-theme" || Number(pack.themeVersion) !== THEME_VERSION) throw new ThemeError("不是受支持的心伴主题包", "THEME_PACKAGE_INVALID");
       const theme = normalizeTheme(pack.theme); const names = new Set([...this.getLibrary(), ...PRESET_THEMES].map(item => item.name));
@@ -254,5 +271,5 @@
     exportTheme(input = this.getActive()) { return Object.freeze({ type: "xinban-theme", themeVersion: THEME_VERSION, theme: normalizeTheme(input) }); }
   }
   return { ACTIVE_KEY, LIBRARY_KEY, DEFAULT_THEME, PRESET_THEMES, ThemeError, ThemeStore,
-    normalizeTheme, safeAsset, safeCustomCss, cssVariables, parseColor, contrastRatio, readableText, guardReadability, THEME_VERSION };
+    normalizeTheme, safeAsset, safeCustomCss, cssVariables, parseColor, contrastRatio, readableText, guardReadability, needsHarmonyBackground, THEME_VERSION };
 });

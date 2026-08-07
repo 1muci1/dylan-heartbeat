@@ -39,6 +39,12 @@ const {
   isRecentGameQuestion
 } = require("./game-event-service");
 const { registerGameEventRoutes } = require("./game-event-routes");
+const {
+  MemorySuggestionStore,
+  isMemorySuggestionApproval,
+  isMemorySuggestionRejection
+} = require("./memory-suggestion-store");
+const { registerMemorySuggestionRoutes } = require("./memory-suggestion-routes");
 const { DrawGameService } = require("./draw-game-service");
 const { registerDrawGameRoutes } = require("./draw-game-routes");
 const { GomokuChenService } = require("./gomoku-chen-service");
@@ -142,6 +148,11 @@ const agentMemoryRetriever = new AgentMemoryRetriever({
 });
 const agentMemoryContextBuilder = new AgentMemoryContextBuilder({ maxItems: 12, maxCharacters: 5000 });
 const agentMemoryWriter = new AgentMemoryWriter({ store: structuredMemoryStore });
+const memorySuggestionStore = new MemorySuggestionStore({
+  filename: process.env.MEMORY_SUGGESTION_FILE || "./runtime-data/memory-suggestions.json",
+  writer: agentMemoryWriter,
+  eventStore
+});
 const agentMemoryWriteHook = Object.freeze({
   create: proposal => agentMemoryWriter.create(proposal)
 });
@@ -209,7 +220,8 @@ registerMediaRoutes(app, { store: mediaStore, sessionStore });
 registerUploadRoutes(app, { uploadStore, stickerImporter });
 registerAiRoutes(app, { store: aiMemoryStore, runner: aiTaskRunner, config: aiConfig, adapter: aiAdapter });
 registerEventRoutes(app, { store: eventStore });
-registerGameEventRoutes(app, { service: gameEventService });
+registerGameEventRoutes(app, { service: gameEventService, suggestionStore: memorySuggestionStore });
+registerMemorySuggestionRoutes(app, { store: memorySuggestionStore });
 registerDrawGameRoutes(app, { service: drawGameService });
 registerGomokuChenRoutes(app, { service: gomokuChenService });
 registerStateRoutes(app, { store: stateStore });
@@ -984,6 +996,7 @@ const auth = req.headers.authorization || "";
   if (req.url.startsWith("/api/v1/memories")) return done();
   if (req.url.startsWith("/api/v1/memory-candidates")) return done();
   if (req.url.startsWith("/api/v1/ai-")) return done();
+  if (req.url.startsWith("/api/memory/suggestions")) return done();
   // 游戏 API 使用各自路由的 Bearer 鉴权与 JSON 错误封装。
   if (req.url.startsWith("/api/game/")) return done();
 
@@ -1150,6 +1163,42 @@ app.post("/v1/chat/completions", async (req, reply) => {
     const identityBoundaryContext = agentIdentityBoundaryBuilder.build();
     const identityContext = agentIdentityContextBuilder.build();
     const latestUserContent = latestUserContentOf(kelivoMessages);
+    if (isMemorySuggestionApproval(latestUserContent)) {
+      const pendingSuggestion = memorySuggestionStore.latestPending();
+      if (!pendingSuggestion) {
+        return sendLocalAssistantCompletion({
+          reply, body, content: "你想让我记哪件事？你说清楚一点我再记。",
+          sessionTurn, requestOrigin: req.headers.origin
+        });
+      }
+      try {
+        memorySuggestionStore.approve(pendingSuggestion.id);
+        return sendLocalAssistantCompletion({
+          reply, body, content: "好，我记下来了。",
+          sessionTurn, requestOrigin: req.headers.origin
+        });
+      } catch (error) {
+        req.log.error({ errorCode: error.code, suggestionId: pendingSuggestion.id }, "memory suggestion approval failed");
+        return sendLocalAssistantCompletion({
+          reply, body, content: "这条记忆刚刚没有写进去，我先保留建议，等会儿可以再试。",
+          sessionTurn, requestOrigin: req.headers.origin
+        });
+      }
+    }
+    if (isMemorySuggestionRejection(latestUserContent)) {
+      const pendingSuggestion = memorySuggestionStore.latestPending();
+      if (!pendingSuggestion) {
+        return sendLocalAssistantCompletion({
+          reply, body, content: "现在没有等你确认的记忆建议。",
+          sessionTurn, requestOrigin: req.headers.origin
+        });
+      }
+      memorySuggestionStore.reject(pendingSuggestion.id);
+      return sendLocalAssistantCompletion({
+        reply, body, content: "好，这条我不记进长期记忆。",
+        sessionTurn, requestOrigin: req.headers.origin
+      });
+    }
     const recentGameQuestion = isRecentGameQuestion(latestUserContent);
     const returnedFromGame = originalMessages.some(message =>
       message?.role === "system" && normalizeContentToText(message.content).includes("用户刚从和沉玩的")
@@ -1158,10 +1207,14 @@ app.post("/v1/chat/completions", async (req, reply) => {
       ? gameEventService.recentResults(3)
       : [];
     if (recentGameQuestion) {
+      const suggestion = recentGameResults.length ? memorySuggestionStore.claimQuestion("game_result") : null;
+      const suggestionQuestion = suggestion
+        ? `\n\n这局我可以先记成一条长期记忆：『${suggestion.memoryText}』。要我记下来吗？`
+        : "";
       return sendLocalAssistantCompletion({
         reply,
         body,
-        content: answerRecentGameQuestion(recentGameResults),
+        content: `${answerRecentGameQuestion(recentGameResults)}${suggestionQuestion}`,
         sessionTurn,
         requestOrigin: req.headers.origin
       });

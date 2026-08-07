@@ -9,13 +9,14 @@ const { EventStore } = require("../event-store");
 const { registerGameEventRoutes } = require("../game-event-routes");
 const { GameEventService } = require("../game-event-service");
 
-function fixture(t) {
+function fixture(t, options = {}) {
   const database = new DatabaseSync(":memory:");
   applyMigrations(database);
   const eventStore = new EventStore({ database });
   const app = Fastify({ logger: false });
   registerGameEventRoutes(app, {
     service: new GameEventService({ eventStore }),
+    suggestionStore: options.suggestionStore || null,
     apiKey: "game-token"
   });
   t.after(async () => {
@@ -75,7 +76,13 @@ test("game Event API requires auth and cannot accept source or Memory writes", a
 });
 
 test("POST /api/game/events accepts only a safe game_result summary", async t => {
-  const { app, database } = fixture(t);
+  const suggestions = [];
+  const { app, database } = fixture(t, { suggestionStore: {
+    suggestGameResult(metadata) {
+      suggestions.push(metadata);
+      return { suggestion: { id: "suggestion-1", status: "pending", title: "辞辞和沉玩了一局五子棋" } };
+    }
+  } });
   const response = await app.inject({
     method: "POST",
     url: "/api/game/events",
@@ -93,6 +100,8 @@ test("POST /api/game/events accepts only a safe game_result summary", async t =>
   });
   assert.equal(response.statusCode, 201, response.body);
   assert.equal(response.json().event.eventType, "game_result");
+  assert.equal(response.json().memorySuggestion.status, "pending");
+  assert.equal(suggestions.length, 1);
   assert.equal(Number(database.prepare("SELECT COUNT(*) count FROM memory_items").get().count), 0);
   assert.doesNotMatch(JSON.stringify(response.json()), /board|moveHistory|prompt|rawResponse|apiKey|authorization/i);
 });

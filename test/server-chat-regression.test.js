@@ -19,6 +19,7 @@ process.env.DRAW_ROUND_STORE_FILE = path.join(dir, "draw-rounds.json");
 process.env.UPLOAD_STORE_DIR = path.join(dir, "uploads");
 process.env.UPLOAD_INDEX_FILE = path.join(dir, "upload-index.json");
 process.env.STICKER_PACK_FILE = path.join(dir, "sticker-packs.json");
+process.env.MEMORY_SUGGESTION_FILE = path.join(dir, "memory-suggestions.json");
 fs.writeFileSync(process.env.TIMELINE_FILE, "[]\n");
 fs.writeFileSync(process.env.TIMESTAMP_DB_FILE, "{}\n");
 
@@ -196,7 +197,15 @@ test("chat answers recent game questions from EventStore without calling the mod
   assert.match(content, /五子棋/);
   assert.match(content, /辞辞赢了/);
   assert.match(content, /23 步/);
+  assert.match(content, /要我记下来吗/);
   assert.equal(upstreamCalled, false);
+
+  const repeated = await app.inject({
+    method: "POST", url: "/v1/chat/completions",
+    payload: { stream: false, messages: [{ role: "user", content: "刚刚谁赢了" }] }
+  });
+  assert.doesNotMatch(repeated.json().choices[0].message.content, /要我记下来吗/);
+
 });
 
 async function createSession(title) {
@@ -799,4 +808,31 @@ test("upstream errors record error status instead of completed", async () => {
   assert.equal(response.statusCode, 502);
   const assistant = (await history(id)).at(-1);
   assert.equal(assistant.status, "error");
+});
+
+test("chat approves or rejects only the latest pending suggestion", async () => {
+  const beforeApproval = (await app.inject({ method: "GET", url: "/api/v1/memories?limit=1", headers: auth })).json().meta.total;
+  const approved = await app.inject({ method: "POST", url: "/v1/chat/completions",
+    payload: { stream: false, messages: [{ role: "user", content: "记下来" }] } });
+  assert.match(approved.json().choices[0].message.content, /记下来了/);
+  assert.equal((await app.inject({ method: "GET", url: "/api/v1/memories?limit=1", headers: auth })).json().meta.total, beforeApproval + 1);
+
+  const created = await app.inject({
+    method: "POST", url: "/api/game/events", headers: auth,
+    payload: { eventType: "game_result", title: "五子棋结果", metadata: {
+      game: "gomoku", winner: "chen", moves: 19, chenMoveCount: 10,
+      chenSourceCount: 10, fallbackCount: 0, fallbackReasons: [],
+      endedAt: "2026-08-07T01:00:00.000Z", summary: "辞辞和沉下了一局五子棋，沉赢了。"
+    } }
+  });
+  assert.equal(created.statusCode, 201);
+  const beforeRejection = (await app.inject({ method: "GET", url: "/api/v1/memories?limit=1", headers: auth })).json().meta.total;
+  const rejected = await app.inject({ method: "POST", url: "/v1/chat/completions",
+    payload: { stream: false, messages: [{ role: "user", content: "不用记" }] } });
+  assert.match(rejected.json().choices[0].message.content, /不记进长期记忆/);
+  assert.equal((await app.inject({ method: "GET", url: "/api/v1/memories?limit=1", headers: auth })).json().meta.total, beforeRejection);
+  const noPending = await app.inject({ method: "POST", url: "/v1/chat/completions",
+    payload: { stream: false, messages: [{ role: "user", content: "记下来" }] } });
+  assert.match(noPending.json().choices[0].message.content, /想让我记哪件事/);
+  assert.equal((await app.inject({ method: "GET", url: "/api/v1/memories?limit=1", headers: auth })).json().meta.total, beforeRejection);
 });

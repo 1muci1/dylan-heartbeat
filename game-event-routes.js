@@ -22,7 +22,7 @@ function sendError(req, reply, error) {
   });
 }
 
-function registerGameEventRoutes(app, { service, apiKey = process.env.GATEWAY_API_KEY } = {}) {
+function registerGameEventRoutes(app, { service, suggestionStore = null, apiKey = process.env.GATEWAY_API_KEY } = {}) {
   if (!service || typeof service.create !== "function") throw new TypeError("GameEventService 必填");
 
   function bearerAuth(req, reply, done) {
@@ -41,7 +41,24 @@ function registerGameEventRoutes(app, { service, apiKey = process.env.GATEWAY_AP
 
   app.post("/api/game/events", { preHandler: bearerAuth }, async (req, reply) => {
     try {
-      return reply.code(201).send({ event: service.create(req.body), error: null });
+      const event = service.create(req.body);
+      let memorySuggestion = null;
+      if (req.body?.eventType === "game_result" && suggestionStore) {
+        try {
+          memorySuggestion = suggestionStore.suggestGameResult(event.payload.metadata).suggestion;
+        } catch (error) {
+          req.log.error({ errorName: error.name, errorCode: error.code }, "game memory suggestion failed");
+        }
+      }
+      return reply.code(201).send({
+        event,
+        memorySuggestion: memorySuggestion ? {
+          id: memorySuggestion.id,
+          status: memorySuggestion.status,
+          title: memorySuggestion.title
+        } : null,
+        error: null
+      });
     } catch (error) {
       return sendError(req, reply, error);
     }

@@ -17,6 +17,7 @@ runtime-data/draw-rounds.json*
 runtime-data/uploads/
 runtime-data/upload-index.json*
 runtime-data/sticker-packs.json*
+runtime-data/memory-suggestions.json*
 
 # Database
 *.sqlite

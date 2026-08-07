@@ -88,6 +88,10 @@ test("draw-game intent distinguishes who draws and ignores ordinary chat", () =>
   assert.deepEqual(detectDrawGameIntent("陪我玩游戏"), { type: "lobby", toolName: null });
   assert.deepEqual(detectDrawGameIntent("陪我下棋"), { type: "gomoku", toolName: null });
   assert.deepEqual(detectDrawGameIntent("我们玩五子棋"), { type: "gomoku", toolName: null });
+  assert.deepEqual(detectDrawGameIntent("这是不是你和我下"), { type: "gomoku_truth", toolName: null });
+  assert.deepEqual(detectDrawGameIntent("刚才是不是你下的"), { type: "gomoku_truth", toolName: null });
+  assert.deepEqual(detectDrawGameIntent("为什么你刚才说不是你"), { type: "gomoku_truth", toolName: null });
+  assert.deepEqual(detectDrawGameIntent("这个算法怎么实现？"), { type: "gomoku_algorithm", toolName: null });
   assert.equal(detectDrawGameIntent("今天有点累，陪我聊聊"), null);
   assert.equal(detectDrawGameIntent("帮我看看这张图片"), null);
   assert.equal(detectDrawGameIntent("你记得我的专业吗"), null);
@@ -109,8 +113,14 @@ test("chat guidance keeps Chen identity and the game link without exposing imple
   assert.match(lobbyContext.content, /好呀，辞辞想玩哪个/);
   assert.match(lobbyContext.content, /\/game\//);
   const gomokuContext = buildDrawGameChatContext({ type: "gomoku", toolName: null });
-  assert.match(gomokuContext.content, /来，我陪你下五子棋。你先手/);
+  assert.match(gomokuContext.content, /沉会看到棋盘并根据局面选择自己的落子/);
   assert.match(gomokuContext.content, /\/game\/#gomoku/);
+  const truthContext = buildDrawGameChatContext({ type: "gomoku_truth", toolName: null });
+  assert.match(truthContext.content, /是我在陪你下/);
+  assert.match(truthContext.content, /走子是我根据局面选的/);
+  assert.match(truthContext.content, /系统才会兜底，避免游戏断掉/);
+  const algorithmContext = buildDrawGameChatContext({ type: "gomoku_algorithm", toolName: null });
+  assert.match(algorithmContext.content, /本地规则策略兜底/);
 });
 
 test("only Chen-draw intent calls MCP while user-draw and ordinary chat stay local", async () => {

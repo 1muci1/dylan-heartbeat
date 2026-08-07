@@ -36,6 +36,8 @@ const { GameEventService } = require("./game-event-service");
 const { registerGameEventRoutes } = require("./game-event-routes");
 const { DrawGameService } = require("./draw-game-service");
 const { registerDrawGameRoutes } = require("./draw-game-routes");
+const { GomokuChenService } = require("./gomoku-chen-service");
+const { registerGomokuChenRoutes } = require("./gomoku-chen-routes");
 const {
   GameTools,
   buildDrawGameChatContext,
@@ -123,6 +125,7 @@ const stateProjector = new StateProjector({ stateStore });
 const eventStore = new EventStore({ database: databaseConnection.db, stateProjector, logger: app.log });
 const gameEventService = new GameEventService({ eventStore });
 const drawGameService = new DrawGameService();
+const gomokuChenService = new GomokuChenService({ generate: requestGomokuChenModel });
 const gameTools = new GameTools({ service: drawGameService });
 const sessionStore = new SessionStore({ database: databaseConnection.db, filename: databaseConnection.filename });
 const structuredMemoryStore = new StructuredMemoryStore({ database: databaseConnection.db, filename: databaseConnection.filename, eventStore, logger: app.log });
@@ -202,6 +205,7 @@ registerAiRoutes(app, { store: aiMemoryStore, runner: aiTaskRunner, config: aiCo
 registerEventRoutes(app, { store: eventStore });
 registerGameEventRoutes(app, { service: gameEventService });
 registerDrawGameRoutes(app, { service: drawGameService });
+registerGomokuChenRoutes(app, { service: gomokuChenService });
 registerStateRoutes(app, { store: stateStore });
 registerRelationshipRoutes(app, { service: relationshipViewService });
 registerWakeDecisionRoutes(app, { gate: wakeDecisionGate, snapshotClient: wakeDecisionSnapshotClient });
@@ -230,6 +234,30 @@ const TARGET_API_URL = process.env.TARGET_API_URL;
 const TIMELINE_FILE = process.env.TIMELINE_FILE || "enhanced_messages.json";
 const TIMESTAMP_DB_FILE = process.env.TIMESTAMP_DB_FILE || "./message_timestamps.json";
 const DEFAULT_RESTART_COMMAND = "pm2 restart gateway wake-up";
+
+async function requestGomokuChenModel({ messages, model, signal }) {
+  const selectedModel = String(model || process.env.MODEL_NAME || "").trim();
+  if (!TARGET_API_URL || !process.env.TARGET_API_KEY || !selectedModel) {
+    throw Object.assign(new Error("gomoku model 未配置"), { code: "GOMOKU_MODEL_NOT_CONFIGURED" });
+  }
+  const response = await fetch(TARGET_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.TARGET_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: selectedModel,
+      stream: false,
+      temperature: 0.7,
+      messages
+    }),
+    signal
+  });
+  if (!response.ok) throw Object.assign(new Error("gomoku model 调用失败"), { code: "GOMOKU_MODEL_FAILED" });
+  const payload = await response.json();
+  return { content: payload?.choices?.[0]?.message?.content };
+}
 
 async function invokeCollaborationChen({ messages }) {
   const response = await app.inject({

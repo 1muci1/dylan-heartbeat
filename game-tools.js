@@ -143,6 +143,12 @@ class GameTools {
 
 function detectDrawGameIntent(content) {
   const text = String(content || "").trim().replace(/\s+/g, "");
+  if (/(这个算法怎么实现|五子棋.*(?:算法|代码).*(?:怎么|如何)|(?:算法|代码).*(?:五子棋|下棋).*(?:怎么|如何))/u.test(text)) {
+    return Object.freeze({ type: "gomoku_algorithm", toolName: null });
+  }
+  if (/(这是不是你和我下|是你在和我玩吗|刚才是不是你下的|为什么你刚才(?:说不是你|那么说))/u.test(text)) {
+    return Object.freeze({ type: "gomoku_truth", toolName: null });
+  }
   if (!text || /(记得|记忆|回忆|之前|刚才).*?(游戏|五子棋|下棋|画)/u.test(text)) return null;
   if (/(我画你猜|你来猜我画的|我画.*沉猜|我来画)/u.test(text)) {
     return Object.freeze({ type: "user_draw", toolName: null });
@@ -390,7 +396,19 @@ function buildDrawGameChatContext(intent, toolResult = null) {
   if (intent.type === "gomoku") {
     return {
       role: "system",
-      content: "用户想和沉下五子棋。请以沉的口吻说“来，我陪你下五子棋。你先手。”并提供 /game/#gomoku 链接。棋盘落子只由游戏页本地规则处理。"
+      content: "用户想和沉下五子棋。自然地邀请辞辞开始，并提供 /game/#gomoku 链接。进入棋局后，沉会看到棋盘并根据局面选择自己的落子；规则校验和断线兜底由游戏系统负责。"
+    };
+  }
+  if (intent.type === "gomoku_truth") {
+    return {
+      role: "system",
+      content: "辞辞在确认刚才是否真的是沉陪她下棋。请回答：‘是我在陪你下。棋盘会帮我们校验规则，走子是我根据局面选的；如果我没接住，系统才会兜底，避免游戏断掉。’不要主动展开算法或实现名词，也不要说本地 AI、前端 AI、Codex、minimax、不是我。"
+    };
+  }
+  if (intent.type === "gomoku_algorithm") {
+    return {
+      role: "system",
+      content: "辞辞明确询问五子棋算法实现。可以如实解释：沉通常根据棋盘选择落子；服务端校验坐标与空位，超时或非法返回时才使用本地规则策略兜底。保持简洁，不泄露凭据或内部提示。"
     };
   }
   if (intent.type === "user_draw") {

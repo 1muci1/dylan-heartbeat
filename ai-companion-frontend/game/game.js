@@ -1,7 +1,7 @@
 "use strict";
 
 (() => {
-  window.XINBAN_GAME_BUILD = "game-v46-p4b";
+  window.XINBAN_GAME_BUILD = "game-v47-p4b";
   const { SIZE, emptyBoard, isWin, pointToCell, scheduleChenMove } = window.CompanionGomoku;
   const protocol = window.CompanionDrawingProtocol;
   const state = {
@@ -9,6 +9,9 @@
     over: false,
     locked: false,
     thinkingTimer: null,
+    gomokuAbortController: null,
+    gomokuTurn: 0,
+    moveHistory: [],
     strokes: [],
     activeStroke: null,
     roundId: null,
@@ -191,16 +194,66 @@
   function setGomokuStatus(text) { $("[data-gomoku-status]").textContent = text; }
   function resetGomoku() {
     if (state.thinkingTimer) clearTimeout(state.thinkingTimer);
+    state.gomokuAbortController?.abort();
     state.board = emptyBoard();
     state.over = false;
     state.locked = false;
     state.thinkingTimer = null;
+    state.gomokuAbortController = null;
+    state.gomokuTurn += 1;
+    state.moveHistory = [];
     renderBoard();
     setGomokuStatus("当前回合：轮到你。");
     setChenStatus("沉在等你");
     $$('[data-game-chat-return][data-game-type="gomoku"]').forEach(link => { link.hidden = true; });
   }
-  $("[data-gomoku-board]").addEventListener("click", event => {
+  function fallbackChenMove() {
+    return new Promise(resolve => {
+      const scheduled = scheduleChenMove(state.board, {
+        onMove: move => {
+          state.thinkingTimer = null;
+          resolve(move ? { ...move, message: "沉想了一下，落在这里。", source: "fallback" } : null);
+        }
+      });
+      state.thinkingTimer = scheduled.timer;
+    });
+  }
+  async function requestChenMove(userMove, expectedTurn) {
+    const controller = new AbortController();
+    state.gomokuAbortController = controller;
+    const timeout = setTimeout(() => controller.abort(), 6500);
+    try {
+      const result = await gameFetch("/api/game/gomoku/chen-move", {
+        method: "POST",
+        signal: controller.signal,
+        body: JSON.stringify({
+          board: state.board,
+          userMove: { row: userMove.row, col: userMove.column },
+          moveHistory: state.moveHistory.slice(-20),
+          gameState: "playing",
+          model: provider().model
+        })
+      });
+      const row = Number(result?.move?.row);
+      const column = Number(result?.move?.col ?? result?.move?.column);
+      if (!result?.ok || !Number.isInteger(row) || !Number.isInteger(column)
+        || row < 0 || row >= SIZE || column < 0 || column >= SIZE
+        || state.board[row][column] !== 0) throw new Error("沉返回了无效落子");
+      return {
+        row,
+        column,
+        message: String(result.message || "我下这里。").trim().slice(0, 120),
+        source: result.source === "chen" ? "chen" : "fallback"
+      };
+    } catch {
+      if (expectedTurn !== state.gomokuTurn) return null;
+      return fallbackChenMove();
+    } finally {
+      clearTimeout(timeout);
+      if (state.gomokuAbortController === controller) state.gomokuAbortController = null;
+    }
+  }
+  $("[data-gomoku-board]").addEventListener("click", async event => {
     if (state.over || state.locked) return;
     const root = event.currentTarget;
     const clickedCell = event.target.closest("[data-row]");
@@ -210,6 +263,7 @@
     const { row, column } = point;
     if (state.board[row][column]) return;
     state.board[row][column] = 1;
+    state.moveHistory.push({ player: "user", row, col: column });
     if (isWin(state.board, row, column, 1)) {
       const message = "你赢啦……沉有点不服气，再来一局吗？";
       state.over = true; state.locked = false; renderBoard(); setGomokuStatus(message);
@@ -218,39 +272,34 @@
     }
     state.locked = true;
     renderBoard();
-    setGomokuStatus("当前回合：轮到沉，沉正在想……");
-    setChenStatus("沉正在想");
-    const scheduled = scheduleChenMove(state.board, { onMove: move => {
-      state.thinkingTimer = null;
-      if (state.over) return;
-      if (!move) {
-        state.over = true;
-        state.locked = false;
-        renderBoard();
-        const message = "这一局居然打平了。";
-        setGomokuStatus(message);
-        finishGame("gomoku", "draw", message, "沉认真看着棋盘");
-        return;
-      }
-      state.board[move.row][move.column] = 2;
+    setGomokuStatus("沉正在看棋盘……");
+    setChenStatus("沉正在看棋盘");
+    const turn = ++state.gomokuTurn;
+    const move = await requestChenMove({ row, column }, turn);
+    if (turn !== state.gomokuTurn || state.over) return;
+    if (!move) {
+      state.over = true;
       state.locked = false;
-      if (isWin(state.board, move.row, move.column, 2)) {
-        state.over = true;
-        const message = "沉赢了。沉认真记下这一局。";
-        setGomokuStatus(message);
-        finishGame("gomoku", "chen_win", message, "沉赢了");
-      } else {
-        const message = move.reason === "block"
-          ? "沉堵住了这一手。当前回合：轮到你。"
-          : move.reason === "attack-four" || move.reason === "attack-three"
-            ? "沉好像看到机会了。当前回合：轮到你。"
-            : "沉落子了。当前回合：轮到你。";
-        setGomokuStatus(message);
-        setChenStatus("沉落子了");
-      }
       renderBoard();
-    } });
-    state.thinkingTimer = scheduled.timer;
+      const message = "这一局居然打平了。";
+      setGomokuStatus(message);
+      finishGame("gomoku", "draw", message, "沉看着棋盘");
+      return;
+    }
+    state.board[move.row][move.column] = 2;
+    state.moveHistory.push({ player: "chen", row: move.row, col: move.column });
+    state.locked = false;
+    const reaction = move.message || "我下这里。";
+    if (isWin(state.board, move.row, move.column, 2)) {
+      state.over = true;
+      const message = `${reaction} 我赢啦。`;
+      setGomokuStatus(message);
+      finishGame("gomoku", "chen_win", message, "沉赢了");
+    } else {
+      setGomokuStatus(`${reaction} 轮到你。`);
+      setChenStatus("沉落子了");
+    }
+    renderBoard();
   });
   $("[data-gomoku-reset]").addEventListener("click", resetGomoku);
 
@@ -428,6 +477,7 @@
   });
 
   window.GameSpaceConfig = Object.freeze({
+    gomokuChenMove: "/api/game/gomoku/chen-move",
     drawStart: "/api/game/draw/start",
     drawStatus: "/api/game/draw/status/:roundId",
     drawGuess: "/api/game/draw/guess/:roundId",

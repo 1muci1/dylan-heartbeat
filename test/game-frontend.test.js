@@ -141,6 +141,23 @@ test("Chen move is delayed and does not appear before the thinking timer fires",
   assert.equal(board[move.row][move.column], 0);
 });
 
+test("gomoku asks Chen for a move and keeps the local engine only as fallback", () => {
+  const js = read("game.js");
+  const clickHandler = js.slice(
+    js.indexOf('$("[data-gomoku-board]").addEventListener'),
+    js.indexOf('$("[data-gomoku-reset]")')
+  );
+  assert.match(js, /gameFetch\("\/api\/game\/gomoku\/chen-move"/);
+  assert.match(js, /沉正在看棋盘……/);
+  assert.match(js, /result\?\.move\?\.row/);
+  assert.match(js, /state\.board\[move\.row\]\[move\.column\] = 2/);
+  assert.match(js, /function fallbackChenMove\(\)/);
+  assert.match(js, /scheduleChenMove\(state\.board/);
+  assert.match(js, /沉想了一下，落在这里/);
+  assert.ok(clickHandler.indexOf("isWin(state.board, row, column, 1)") < clickHandler.indexOf("requestChenMove"));
+  assert.match(clickHandler, /if \(isWin\(state\.board, row, column, 1\)\)[\s\S]*return;/);
+});
+
 test("drawing canvas supports pointer and touch input without bottom navigation overlap", () => {
   const html = read("index.html");
   const js = read("game.js");
@@ -276,12 +293,12 @@ test("all visible players are Chen and the game reuses both preference avatars",
   assert.match(html, /\/storage\/user-preference-store\.js/);
   assert.match(js, /getChenAvatarImage/);
   assert.match(js, /getUserAvatarImage/);
-  assert.match(js, /轮到沉，沉正在想/);
+  assert.match(js, /沉正在看棋盘/);
   assert.match(js, /沉落子了/);
   assert.match(js, /state\.locked/);
   assert.match(js, /if \(state\.over \|\| state\.locked\) return/);
   assert.match(js, /你赢啦……沉有点不服气，再来一局吗/);
-  assert.match(js, /沉赢了。沉认真记下这一局。/);
+  assert.match(js, /const reaction = move\.message/);
   assert.match(js, /沉正在看你的画/);
   assert.match(js, /你是沉，在和辞辞玩你画我猜/);
   assert.doesNotMatch(html, /规则 AI|电脑玩家|AI 落子|bot/i);
@@ -299,15 +316,14 @@ test("game companion layer exposes Chen presence, end links and a session-only s
   assert.match(js, /function buildChatUrlFromGame\(gameType\)/);
   assert.match(js, /`\/chat\.html\?fromGame=\$\{gameType\}`/);
   assert.match(js, /gameType === "gomoku" \|\| gameType === "draw"/);
-  assert.match(js, /window\.XINBAN_GAME_BUILD = "game-v46-p4b"/);
+  assert.match(js, /window\.XINBAN_GAME_BUILD = "game-v47-p4b"/);
   for (const asset of ["game.css", "identity.css", "gomoku-board.css", "gomoku.js", "game.js"]) {
-    assert.match(html, new RegExp(`${asset.replace(".", "\\.")}\\?v=game-v46-p4b`));
+    assert.match(html, new RegExp(`${asset.replace(".", "\\.")}\\?v=game-v47-p4b`));
   }
   assert.doesNotMatch(html + js, /\/frontend-p4b\/chat\.html|\.\.\/chat\.html|ai-companion-frontend\/chat\.html/);
   assert.match(js, /finishGame\("gomoku"/);
-  assert.match(js, /沉正在想/);
-  assert.match(js, /沉堵住了这一手/);
-  assert.match(js, /沉好像看到机会了/);
+  assert.match(js, /沉正在看棋盘/);
+  assert.match(js, /move\.message/);
   assert.match(js, /这一局居然打平了/);
   assert.match(js, /还不是哦，再看看/);
   assert.doesNotMatch(js, /Memory|\/api\/v1\/memories/);

@@ -78,3 +78,21 @@ test("JSON import size is capped and workshop stages conversion before library i
   assert.match(script, /store\.importTheme\(\{ type: "xinban-theme"/u);
   assert.match(script, /adapter\.assertImportSize\(file\.size\)/u);
 });
+
+test("Echoes CSS is detected, converted and external decorations are classified", () => {
+  const css = `.echoes-app-shell{background-image:url(https://img.test/bg.png);color:#332244}
+    .echoes-bubble-other::before{background:url("https://img.test/bot.webp");border-radius:22px}
+    .echoes-input-area{background-image:url(https://img.test/input.png)}`;
+  assert.equal(adapter.detectStyleTextFormat(css), "echoes-css");
+  const result = adapter.convertStyleText(css, "echoes.docx");
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.report.assets.map(item => item.kind), ["backgroundImage", "bubbleDecoration", "inputDecoration"]);
+  assert.doesNotMatch(JSON.stringify(result.theme), /https:\/\/img\.test/u);
+});
+
+test("style text extraction accepts fenced CSS and Tavern JSON reports localizable assets", () => {
+  assert.match(adapter.extractCssFromText("说明\n```css\n.x{color:#123456}\n```"), /^\.x/u);
+  const result = adapter.convertSillyTavernTheme(tavern({ custom_css: ".avatar{background-image:url(https://img.test/frame.png)}" }));
+  assert.equal(result.report.assets[0].kind, "avatarFrame");
+  assert.doesNotMatch(JSON.stringify(result.theme), /https:\/\//u);
+});

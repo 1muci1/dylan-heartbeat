@@ -9,9 +9,12 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!store || !api || !preview) return;
   let draft = store.getActive();
   let pendingImport = null;
+  let assetDecisionPending = false;
   let renderFrame = 0;
   const message = value => { if (status) status.textContent = value; };
   const editable = theme => JSON.parse(JSON.stringify(theme));
+  const gatewayHeaders = () => { const token = window.AppConfig?.getProviderConfig?.().auth?.token; return token ? { Authorization: `Bearer ${token}` } : {}; };
+  const gatewayRequest = async (url, options = {}) => { const response = await fetch(url, { ...options, headers: { ...gatewayHeaders(), ...(options.headers || {}) } }); const payload = await response.json().catch(() => ({})); if (!response.ok) throw new Error(payload.error?.message || `请求失败（${response.status}）`); return payload; };
   const hex = value => /^#[0-9a-f]{6}$/iu.test(value || "") ? value : "#8b6bb8";
   const refreshForm = () => {
     document.querySelectorAll("[data-theme-token]").forEach(input => {
@@ -83,7 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (error) { message(error.message || "主题应用失败"); }
   });
   document.querySelector("[data-theme-reset-soft]")?.addEventListener("click", () => {
-    pendingImport = null; draft = editable(api.DEFAULT_THEME); draft = store.applyTheme(draft, { persist: true, applyBackground: false });
+    pendingImport = null; assetDecisionPending = false; draft = editable(api.DEFAULT_THEME); draft = store.applyTheme(draft, { persist: true, applyBackground: false });
     document.querySelector("[data-theme-import-review]").hidden = true; refreshForm(); render(); message("已恢复柔和紫雾默认，聊天页也会同步生效。");
   });
   document.querySelector("[data-theme-export]")?.addEventListener("click", () => {
@@ -93,17 +96,29 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelector("[data-theme-import]")?.addEventListener("change", async event => {
     const file = event.target.files?.[0]; if (!file) return;
     try {
-      adapter.assertImportSize(file.size);
-      const json = JSON.parse(await file.text()); const format = adapter.detectThemeFormat(json);
+      adapter.assertImportSize(file.size); const extension = file.name.toLowerCase().match(/\.[^.]+$/u)?.[0] || "";
       let converted;
-      if (format === "xinban") converted = { ok: true, theme: api.normalizeTheme(json.theme), report: { format, recognized: ["小窝主题 v1"], ignored: [], blocked: [], counts: { recognized: 1, ignored: 0, blocked: 0, externalImages: 0 } } };
-      else if (format === "sillytavern") converted = adapter.convertSillyTavernTheme(json, { filename: file.name });
-      else converted = adapter.convertExternalTheme(json, file.name);
+      let format;
+      if (extension === ".json") {
+        const json = JSON.parse(await file.text()); format = adapter.detectThemeFormat(json);
+        if (format === "xinban") converted = { ok: true, theme: api.normalizeTheme(json.theme), report: { format, recognized: ["小窝主题 v1"], ignored: [], blocked: [], assets: [], counts: { recognized: 1, ignored: 0, blocked: 0, externalImages: 0 } } };
+        else if (format === "sillytavern") converted = adapter.convertSillyTavernTheme(json, { filename: file.name });
+        else converted = adapter.convertExternalTheme(json, file.name);
+      } else {
+        let text;
+        if (extension === ".docx") { const body = new FormData(); body.append("file", file); text = (await gatewayRequest("/api/theme/import/extract", { method: "POST", body })).data.text; }
+        else if ([".txt", ".css"].includes(extension)) text = await file.text();
+        else throw new Error("只支持 JSON、DOCX、TXT、CSS 美化文件");
+        converted = adapter.convertStyleText(text, file.name); format = converted.report.format;
+      }
       pendingImport = converted; draft = editable(converted.theme); refreshForm(); render();
-      const labels = { xinban: "小窝主题 JSON", sillytavern: "酒馆美化 JSON", external: "外部主题 JSON", unknown: "未知外部 JSON" };
+      const labels = { xinban: "小窝主题 JSON", sillytavern: "酒馆美化 JSON", external: "外部主题 JSON", unknown: "未知外部 JSON", "echoes-css": "Echoes 美化 CSS", css: "CSS/TXT 美化" };
       const review = document.querySelector("[data-theme-import-review]"); review.hidden = false;
       document.querySelector("[data-theme-import-format]").textContent = `检测到：${labels[converted.report.format] || labels[format]}`;
       const counts = converted.report.counts; document.querySelector("[data-theme-import-report]").textContent = `已识别 ${counts.recognized || 0} 项；已忽略 ${counts.ignored || 0} 项（外部图片 ${counts.externalImages || 0}）；已拦截 ${counts.blocked || 0} 项。当前只在预览，尚未加入主题库。`;
+      const assetPanel = document.querySelector("[data-theme-assets]"); const assetList = document.querySelector("[data-theme-asset-list]"); assetList.replaceChildren();
+      const assets = converted.report.assets || []; assetPanel.hidden = !assets.length; assetDecisionPending = Boolean(assets.length);
+      for (const asset of assets) { const label = document.createElement("label"); label.className = "theme-asset-item"; const checkbox = document.createElement("input"); checkbox.type = "checkbox"; checkbox.checked = true; checkbox.dataset.assetId = asset.id; const copy = document.createElement("span"); const title = document.createElement("strong"); title.textContent = asset.kind; let domain = "外部地址"; try { domain = new URL(asset.sourceUrl).hostname; } catch {} copy.append(title, document.createTextNode(`${domain} · ${asset.selector}`)); label.append(checkbox, copy); assetList.append(label); }
       message(`正在预览转换结果「${draft.name}」。`);
     }
     catch (error) { message(error.message || "主题包导入失败"); }
@@ -111,11 +126,23 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document.querySelector("[data-theme-import-confirm]")?.addEventListener("click", () => {
     if (!pendingImport) return;
-    draft = editable(store.importTheme({ type: "xinban-theme", themeVersion: 1, theme: pendingImport.theme })); pendingImport = null;
+    if (assetDecisionPending) { message("请先选择“本地化导入选中素材”或“跳过图片”。"); return; }
+    draft = editable(store.importTheme({ type: "xinban-theme", themeVersion: 1, theme: pendingImport.theme })); pendingImport = null; assetDecisionPending = false;
     document.querySelector("[data-theme-import-review]").hidden = true; refreshForm(); render(); message(`已转换并加入主题库「${draft.name}」，尚未应用。`);
   });
   document.querySelector("[data-theme-import-cancel]")?.addEventListener("click", () => {
-    pendingImport = null; draft = store.getActive(); document.querySelector("[data-theme-import-review]").hidden = true; refreshForm(); render(); message("已取消外部主题导入。");
+    pendingImport = null; assetDecisionPending = false; draft = store.getActive(); document.querySelector("[data-theme-import-review]").hidden = true; refreshForm(); render(); message("已取消外部主题导入。");
+  });
+  document.querySelector("[data-theme-assets-skip]")?.addEventListener("click", () => { if (!pendingImport) return; assetDecisionPending = false; document.querySelector("[data-theme-assets]").hidden = true; message("已跳过外部图片，只保留颜色与安全样式。"); });
+  document.querySelector("[data-theme-assets-localize]")?.addEventListener("click", async () => {
+    if (!pendingImport) return; const selected = new Set([...document.querySelectorAll("[data-asset-id]:checked")].map(input => input.dataset.assetId));
+    const assets = (pendingImport.report.assets || []).filter(asset => selected.has(asset.id)); if (!assets.length) { message("请至少选择一张素材，或点击跳过图片。"); return; }
+    try {
+      const payload = await gatewayRequest("/api/theme/assets/localize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assets: assets.map(({ id, sourceUrl, kind }) => ({ id, sourceUrl, kind })) }) });
+      const fields = { backgroundImage: "backgroundImage", bubbleDecoration: "bubbleTexture", decorativeAsset: "bubbleTexture", avatarFrame: "avatarFrame", inputDecoration: "inputDecoration", headerDecoration: "headerDecoration", navIcon: "bottomNavTexture" };
+      const next = editable(pendingImport.theme); for (const localized of payload.data.localized || []) { const field = fields[localized.kind]; if (field && !next.assets[field]) next.assets[field] = localized.localUrl; }
+      pendingImport.theme = api.normalizeTheme(next); draft = editable(pendingImport.theme); assetDecisionPending = false; document.querySelector("[data-theme-assets]").hidden = true; refreshForm(); render(); message(`已本地化 ${payload.data.localized?.length || 0} 张；失败 ${payload.data.failed?.length || 0} 张。失败素材不会应用。`);
+    } catch (error) { message(error.message || "素材本地化失败，颜色主题仍可跳过图片后导入。"); }
   });
   const tavernTemplate = { name: "我的酒馆美化", main_text_color: "rgba(52,43,69,1)", blur_tint_color: "rgba(255,255,255,0.72)", user_mes_blur_tint_color: "rgba(210,190,255,0.72)", bot_mes_blur_tint_color: "rgba(255,255,255,0.78)", shadow_color: "rgba(42,24,74,0.2)", shadow_width: 8, font_scale: 1, chat_width: 78, custom_css: "" };
   const templateText = `${JSON.stringify(tavernTemplate, null, 2)}\n`; const templateNode = document.querySelector("[data-tavern-template]"); if (templateNode) templateNode.textContent = templateText;

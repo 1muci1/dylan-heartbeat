@@ -24,6 +24,8 @@ const { registerMediaRoutes } = require("./media-routes");
 const { UploadStore } = require("./upload-store");
 const { StickerImporter } = require("./sticker-importer");
 const { registerUploadRoutes } = require("./upload-routes");
+const { ThemeAssetLocalizer, ThemeAssetStore } = require("./theme-asset-service");
+const { registerThemeAssetRoutes } = require("./theme-asset-routes");
 const { AiMemoryStore } = require("./ai-memory-store");
 const { DeliveryStore } = require("./delivery-store");
 const { ConversationSummaryService } = require("./conversation-summary-service");
@@ -181,6 +183,8 @@ const mediaStore = new MediaStore({
 });
 const uploadStore = new UploadStore();
 const stickerImporter = new StickerImporter({ uploadStore });
+const themeAssetStore = new ThemeAssetStore();
+const themeAssetLocalizer = new ThemeAssetLocalizer({ store: themeAssetStore });
 const aiConfig = readAiConfig();
 const aiMemoryStore = new AiMemoryStore({ database: databaseConnection.db, memoryStore: structuredMemoryStore, eventStore, logger: app.log });
 const deliveryStore = new DeliveryStore({ database: databaseConnection.db });
@@ -218,6 +222,7 @@ registerMemoryRoutes(app, {
 });
 registerMediaRoutes(app, { store: mediaStore, sessionStore });
 registerUploadRoutes(app, { uploadStore, stickerImporter });
+registerThemeAssetRoutes(app, { localizer: themeAssetLocalizer, store: themeAssetStore });
 registerAiRoutes(app, { store: aiMemoryStore, runner: aiTaskRunner, config: aiConfig, adapter: aiAdapter });
 registerEventRoutes(app, { store: eventStore });
 registerGameEventRoutes(app, { service: gameEventService, suggestionStore: memorySuggestionStore });
@@ -997,6 +1002,7 @@ const auth = req.headers.authorization || "";
   if (req.url.startsWith("/api/v1/memory-candidates")) return done();
   if (req.url.startsWith("/api/v1/ai-")) return done();
   if (req.url.startsWith("/api/memory/suggestions")) return done();
+  if (req.url.startsWith("/api/theme/")) return done();
   // 游戏 API 使用各自路由的 Bearer 鉴权与 JSON 错误封装。
   if (req.url.startsWith("/api/game/")) return done();
 

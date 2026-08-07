@@ -111,6 +111,7 @@
     const sanitized = sanitizeExternalCustomCss(values.custom_css || values.customCss || ""); base.customCss = sanitized.css;
     for (const bucket of ["recognized", "ignored", "blocked"]) { report[bucket].push(...sanitized.report[bucket]); report.counts[bucket] += sanitized.report.counts[bucket]; }
     report.counts.externalImages += sanitized.report.counts.externalImages;
+    report.assets = scanCssAssets(values.custom_css || values.customCss || "");
     return { ok: true, theme: themeApi.normalizeTheme(base), report };
   }
 
@@ -140,6 +141,61 @@
     if (!result.report.counts.recognized) note(result.report, "ignored", "没有识别到可转换的常见主题字段");
     return result;
   }
+  const extractCssFromText = input => {
+    const text = String(input || "").replace(/\0/gu, "").slice(0, MAX_CSS_INPUT);
+    const fenced = [...text.matchAll(/```(?:css)?\s*([\s\S]*?)```/giu)].map(match => match[1]);
+    return (fenced.length ? fenced.join("\n") : text).trim();
+  };
+  const classifyAssetKind = selector => {
+    const value = String(selector || "").toLowerCase();
+    if (/(?:bubble-user|bubble-other|\bmsg\b|\bmes\b)/u.test(value)) return "bubbleDecoration";
+    if (/avatar/u.test(value)) return "avatarFrame";
+    if (/(?:input|composer|send)/u.test(value)) return "inputDecoration";
+    if (/(?:header|top-bar)/u.test(value)) return "headerDecoration";
+    if (/(?:dock|nav|bottom)/u.test(value)) return "navIcon";
+    if (/(?:app|page|shell|background)/u.test(value)) return "backgroundImage";
+    return "decorativeAsset";
+  };
+  function scanCssAssets(input) {
+    const css = extractCssFromText(input), assets = []; let index = 0;
+    for (const rule of css.matchAll(/([.#:\w][^{}]{0,500})\{([^{}]{0,8000})\}/gu)) {
+      const selector = rule[1].trim();
+      for (const declaration of rule[2].matchAll(/(?:^|;)\s*(background(?:-image)?)\s*:\s*([^;]+)/giu)) {
+        for (const urlMatch of declaration[2].matchAll(/url\s*\(\s*["']?([^)'"\s]+)["']?\s*\)/giu)) {
+          if (!/^https?:\/\//iu.test(urlMatch[1])) continue;
+          assets.push({ id: `asset_${++index}`, sourceUrl: urlMatch[1], kind: classifyAssetKind(selector), selector: selector.slice(0, 160), property: declaration[1].toLowerCase(), status: "detected", willLocalize: false });
+        }
+      }
+    }
+    return assets.slice(0, 30);
+  }
+  const detectStyleTextFormat = input => {
+    const css = extractCssFromText(input);
+    return /\.echoes-(?:app-shell|chat-header|bubble-user|bubble-other|input-area)\b/iu.test(css) ? "echoes-css" : /[.#:\w][^{}]{0,500}\{[^{}]+\}/u.test(css) ? "css" : "unknown";
+  };
+  function convertStyleText(input, filename = "") {
+    const css = extractCssFromText(input); const format = detectStyleTextFormat(css); if (format === "unknown") throw new AdapterError("文件中没有识别到 CSS", "THEME_CSS_NOT_FOUND");
+    const base = JSON.parse(JSON.stringify(themeApi.DEFAULT_THEME)); base.id = `theme_style_${Math.random().toString(36).slice(2,10)}`; base.name = safeName(filename.replace(/\.(?:docx|txt|css)$/iu, ""), format === "echoes-css" ? "Echoes 美化" : "CSS 美化");
+    const report = createReport(format); report.assets = scanCssAssets(css); report.counts.externalImages = report.assets.length; if (report.assets.length) note(report, "ignored", `检测到外部装饰图片 ${report.assets.length} 张，等待用户确认本地化`);
+    for (const rule of css.matchAll(/([.#:\w][^{}]{0,500})\{([^{}]{0,8000})\}/gu)) {
+      const selector = rule[1].toLowerCase();
+      for (const raw of rule[2].split(";")) {
+        const separator = raw.indexOf(":"); if (separator < 1) continue; const property = raw.slice(0,separator).trim().toLowerCase(); const value = raw.slice(separator+1).trim();
+        if (["color","background-color","border-color"].includes(property) && safeColor(value)) {
+          if (/(?:bubble-user|user)/u.test(selector)) property === "color" ? base.tokens.chatUserBubbleText=value : base.tokens.chatUserBubbleBg=harmonizeGlassTint(value,base.tokens.chatUserBubbleBg);
+          else if (/(?:bubble-other|assistant|bot)/u.test(selector)) property === "color" ? base.tokens.chatAssistantBubbleText=value : base.tokens.chatAssistantBubbleBg=harmonizeGlassTint(value,base.tokens.chatAssistantBubbleBg);
+          else if (/(?:input|composer)/u.test(selector) && property === "color") base.tokens.inputText=value;
+          else if (property === "color") { base.tokens.cardText=value; base.tokens.colorText=value; }
+          else if (property === "border-color") base.tokens.borderColor=value;
+          else base.tokens.cardBg=harmonizeGlassTint(value);
+          note(report,"recognized",`${selector.slice(0,60)} ${property}`);
+        }
+        if (property === "border-radius" && /^\d+(?:\.\d+)?(?:px|rem|%)$/u.test(value)) { if (/bubble/u.test(selector)) base.tokens.radiusBubble=value; else base.tokens.radiusCard=value; note(report,"recognized",`${selector.slice(0,60)} border-radius`); }
+      }
+    }
+    const sanitized=sanitizeExternalCustomCss(css); base.customCss=sanitized.css; for(const bucket of ["recognized","ignored","blocked"]){report[bucket].push(...sanitized.report[bucket]);report.counts[bucket]+=sanitized.report.counts[bucket];} report.counts.externalImages=Math.max(report.counts.externalImages,sanitized.report.counts.externalImages);
+    return {ok:true,theme:themeApi.normalizeTheme(base),report};
+  }
   const assertImportSize = size => { if (Number(size) > MAX_JSON_BYTES) throw new AdapterError("主题 JSON 不能超过 1MB", "THEME_FILE_TOO_LARGE"); return true; };
-  return { detectThemeFormat, convertSillyTavernTheme, convertExternalTheme, sanitizeExternalCustomCss, harmonizeGlassTint, assertImportSize, MAX_JSON_BYTES, MAX_DEPTH, MAX_FIELDS, AdapterError };
+  return { detectThemeFormat, convertSillyTavernTheme, convertExternalTheme, convertStyleText, detectStyleTextFormat, extractCssFromText, scanCssAssets, classifyAssetKind, sanitizeExternalCustomCss, harmonizeGlassTint, assertImportSize, MAX_JSON_BYTES, MAX_DEPTH, MAX_FIELDS, AdapterError };
 });

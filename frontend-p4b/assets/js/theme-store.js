@@ -33,7 +33,7 @@
   ]);
   const ASSET_FIELDS = Object.freeze([
     "backgroundImage", "chatBackgroundImage", "homeBackgroundImage", "bubbleTexture",
-    "bottomNavTexture", "fontUrl"
+    "bottomNavTexture", "fontUrl", "avatarFrame", "inputDecoration", "headerDecoration"
   ]);
   const LAYOUT_FIELDS = Object.freeze([
     "chatWidth", "bubbleMaxWidth", "messageGap", "bottomNavHeight", "glassIntensity",
@@ -60,7 +60,7 @@
       shadowSoft: "0 12px 30px rgba(63,44,78,.12)", blur: "12px",
       radiusBubble: "24px", radiusCard: "28px", fontFamily: "system", fontSizeBase: "15px"
     }),
-    assets: Object.freeze({ backgroundImage: "", chatBackgroundImage: "", homeBackgroundImage: "", bubbleTexture: "", bottomNavTexture: "", fontUrl: "" }),
+    assets: Object.freeze({ backgroundImage: "", chatBackgroundImage: "", homeBackgroundImage: "", bubbleTexture: "", bottomNavTexture: "", fontUrl: "", avatarFrame: "", inputDecoration: "", headerDecoration: "" }),
     layout: Object.freeze({ chatWidth: "auto", bubbleMaxWidth: "78%", messageGap: "14px", bottomNavHeight: "86px", glassIntensity: .62, backgroundDim: .12, bubbleOpacity: .96, navOpacity: .92, cardOpacity: .82, radiusNav: "24px", blurNav: "12px", blurBubble: "0px", effectsMode: "balanced", shadowLevel: "soft", backgroundBlur: "0px", enableGlass: true, enableAnimations: true, readabilityGuard: true }),
     customCss: ""
   });
@@ -216,6 +216,11 @@
     "--theme-blur-nav": glass ? clampBlur(theme.layout.blurNav) : "0px", "--theme-blur-bubble": "0px",
     "--theme-background-blur": mode === "performance" ? "0px" : clampBlur(theme.layout.backgroundBlur),
     "--theme-animation-duration": theme.layout.enableAnimations && mode !== "performance" ? ".2s" : "0s"
+    ,"--theme-bubble-texture": theme.assets.bubbleTexture ? `url(${JSON.stringify(theme.assets.bubbleTexture)})` : "none"
+    ,"--theme-nav-texture": theme.assets.bottomNavTexture ? `url(${JSON.stringify(theme.assets.bottomNavTexture)})` : "none"
+    ,"--theme-input-decoration": theme.assets.inputDecoration ? `url(${JSON.stringify(theme.assets.inputDecoration)})` : "none"
+    ,"--theme-header-decoration": theme.assets.headerDecoration ? `url(${JSON.stringify(theme.assets.headerDecoration)})` : "none"
+    ,"--theme-avatar-frame": theme.assets.avatarFrame ? `url(${JSON.stringify(theme.assets.avatarFrame)})` : "none"
   }); };
   class ThemeStore {
     constructor({ storage = typeof localStorage !== "undefined" ? localStorage : null,

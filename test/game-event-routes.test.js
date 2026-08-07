@@ -73,3 +73,26 @@ test("game Event API requires auth and cannot accept source or Memory writes", a
   assert.equal(Number(database.prepare("SELECT COUNT(*) count FROM events").get().count), 0);
   assert.equal(Number(database.prepare("SELECT COUNT(*) count FROM memory_items").get().count), 0);
 });
+
+test("POST /api/game/events accepts only a safe game_result summary", async t => {
+  const { app, database } = fixture(t);
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/game/events",
+    headers: { authorization: "Bearer game-token" },
+    payload: {
+      eventType: "game_result",
+      title: "五子棋结果",
+      metadata: {
+        game: "gomoku", winner: "user", moves: 23, chenMoveCount: 11,
+        chenSourceCount: 8, fallbackCount: 3, fallbackReasons: ["MODEL_TIMEOUT"],
+        endedAt: "2026-08-07T00:00:00.000Z",
+        summary: "辞辞和沉下了一局五子棋，辞辞赢了。"
+      }
+    }
+  });
+  assert.equal(response.statusCode, 201, response.body);
+  assert.equal(response.json().event.eventType, "game_result");
+  assert.equal(Number(database.prepare("SELECT COUNT(*) count FROM memory_items").get().count), 0);
+  assert.doesNotMatch(JSON.stringify(response.json()), /board|moveHistory|prompt|rawResponse|apiKey|authorization/i);
+});

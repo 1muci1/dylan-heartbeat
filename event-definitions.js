@@ -85,6 +85,10 @@ const EVENT_DEFINITIONS = Object.freeze({
     category: "game",
     allowedSources: Object.freeze(["game-event-service"])
   }),
+  "game_result": Object.freeze({
+    category: "game",
+    allowedSources: Object.freeze(["game-event-service"])
+  }),
   "room_interaction": Object.freeze({
     category: "game",
     allowedSources: Object.freeze(["game-event-service"])

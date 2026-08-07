@@ -32,7 +32,12 @@ const { OpenAIJsonAdapter } = require("./model-adapter");
 const { registerAiRoutes } = require("./ai-routes");
 const { EventStore } = require("./event-store");
 const { registerEventRoutes } = require("./event-routes");
-const { GameEventService } = require("./game-event-service");
+const {
+  GameEventService,
+  answerRecentGameQuestion,
+  buildRecentGameContext,
+  isRecentGameQuestion
+} = require("./game-event-service");
 const { registerGameEventRoutes } = require("./game-event-routes");
 const { DrawGameService } = require("./draw-game-service");
 const { registerDrawGameRoutes } = require("./draw-game-routes");
@@ -1145,6 +1150,23 @@ app.post("/v1/chat/completions", async (req, reply) => {
     const identityBoundaryContext = agentIdentityBoundaryBuilder.build();
     const identityContext = agentIdentityContextBuilder.build();
     const latestUserContent = latestUserContentOf(kelivoMessages);
+    const recentGameQuestion = isRecentGameQuestion(latestUserContent);
+    const returnedFromGame = originalMessages.some(message =>
+      message?.role === "system" && normalizeContentToText(message.content).includes("用户刚从和沉玩的")
+    );
+    const recentGameResults = recentGameQuestion || returnedFromGame
+      ? gameEventService.recentResults(3)
+      : [];
+    if (recentGameQuestion) {
+      return sendLocalAssistantCompletion({
+        reply,
+        body,
+        content: answerRecentGameQuestion(recentGameResults),
+        sessionTurn,
+        requestOrigin: req.headers.origin
+      });
+    }
+    const recentGameContext = returnedFromGame ? buildRecentGameContext(recentGameResults) : null;
     const activeDrawTurn = await resolveActiveDrawGameTurn({
       content: latestUserContent,
       sessionId,
@@ -1210,6 +1232,7 @@ app.post("/v1/chat/completions", async (req, reply) => {
       timelineContext.message,
       memoryOverviewInstruction,
       stickerInstructionContext,
+      recentGameContext,
       drawGameContext
     ].filter(Boolean);
     if (runtimeContexts.length) {

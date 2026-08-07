@@ -151,13 +151,30 @@ test("gomoku asks Chen for a move and keeps the local engine only as fallback", 
   assert.match(js, /沉正在看棋盘……/);
   assert.match(js, /result\?\.move\?\.row/);
   assert.match(js, /state\.board\[move\.row\]\[move\.column\] = 2/);
-  assert.match(js, /function fallbackChenMove\(\)/);
+  assert.match(js, /function fallbackChenMove\(reason = "CLIENT_REQUEST_FAILED"\)/);
   assert.match(js, /scheduleChenMove\(state\.board/);
   assert.match(js, /沉想了一下，落在这里/);
   assert.match(js, /setTimeout\(\(\) => controller\.abort\(\), 18000\)/);
   assert.match(js, /message: String\(result\.message/);
   assert.ok(clickHandler.indexOf("isWin(state.board, row, column, 1)") < clickHandler.indexOf("requestChenMove"));
   assert.match(clickHandler, /if \(isWin\(state\.board, row, column, 1\)\)[\s\S]*return;/);
+});
+
+test("gomoku completion posts only a safe game_result summary without blocking the result UI", () => {
+  const js = read("game.js");
+  const payload = js.slice(js.indexOf("function gameResultPayload"), js.indexOf("function finishGame"));
+  const finish = js.slice(js.indexOf("function finishGame"), js.indexOf("function provider"));
+  assert.match(payload, /eventType: "game_result"/);
+  assert.match(payload, /moves/);
+  assert.match(payload, /chenSourceCount/);
+  assert.match(payload, /fallbackCount/);
+  assert.match(payload, /fallbackReasons/);
+  assert.doesNotMatch(payload, /\bboard\s*:|\bmoveHistory\s*:|\bprompt\s*:|\brawResponse\s*:|\bapiKey\s*:|\bauthorization\s*:/i);
+  assert.match(js, /gameFetch\("\/api\/game\/events"/);
+  assert.match(finish, /void submitGameResult\(result, message\)\.catch\(\(\) => \{\}\)/);
+  assert.match(js, /finishGame\("gomoku", "user_win"/);
+  assert.match(js, /finishGame\("gomoku", "chen_win"/);
+  assert.match(js, /finishGame\("gomoku", "draw"/);
 });
 
 test("drawing canvas supports pointer and touch input without bottom navigation overlap", () => {
@@ -318,9 +335,9 @@ test("game companion layer exposes Chen presence, end links and a session-only s
   assert.match(js, /function buildChatUrlFromGame\(gameType\)/);
   assert.match(js, /`\/chat\.html\?fromGame=\$\{gameType\}`/);
   assert.match(js, /gameType === "gomoku" \|\| gameType === "draw"/);
-  assert.match(js, /window\.XINBAN_GAME_BUILD = "game-v48-p4b"/);
+  assert.match(js, /window\.XINBAN_GAME_BUILD = "game-v49-p4b"/);
   for (const asset of ["game.css", "identity.css", "gomoku-board.css", "gomoku.js", "game.js"]) {
-    assert.match(html, new RegExp(`${asset.replace(".", "\\.")}\\?v=game-v48-p4b`));
+    assert.match(html, new RegExp(`${asset.replace(".", "\\.")}\\?v=game-v49-p4b`));
   }
   assert.doesNotMatch(html + js, /\/frontend-p4b\/chat\.html|\.\.\/chat\.html|ai-companion-frontend\/chat\.html/);
   assert.match(js, /finishGame\("gomoku"/);

@@ -1,7 +1,7 @@
 "use strict";
 
 (() => {
-  window.XINBAN_GAME_BUILD = "game-v48-p4b";
+  window.XINBAN_GAME_BUILD = "game-v49-p4b";
   const { SIZE, emptyBoard, isWin, pointToCell, scheduleChenMove } = window.CompanionGomoku;
   const protocol = window.CompanionDrawingProtocol;
   const state = {
@@ -12,6 +12,9 @@
     gomokuAbortController: null,
     gomokuTurn: 0,
     moveHistory: [],
+    chenSourceCount: 0,
+    fallbackCount: 0,
+    fallbackReasons: [],
     strokes: [],
     activeStroke: null,
     roundId: null,
@@ -71,8 +74,39 @@
     try { window.sessionStorage?.setItem(GAME_SUMMARY_KEY, JSON.stringify(summary)); } catch {}
     return summary;
   }
+  function gameResultPayload(result, message) {
+    const winner = result === "user_win" ? "user" : result === "chen_win" ? "chen" : "draw";
+    const moves = state.moveHistory.length;
+    const chenMoveCount = state.moveHistory.filter(move => move.player === "chen").length;
+    const winnerText = winner === "user" ? "辞辞赢了" : winner === "chen" ? "沉赢了" : "平局";
+    const fallbackText = state.fallbackCount
+      ? `${state.fallbackCount} 步由系统兜底`
+      : "没有使用系统兜底";
+    return {
+      eventType: "game_result",
+      title: "五子棋结果",
+      metadata: {
+        game: "gomoku",
+        winner,
+        moves,
+        chenMoveCount,
+        chenSourceCount: state.chenSourceCount,
+        fallbackCount: state.fallbackCount,
+        fallbackReasons: [...new Set(state.fallbackReasons)].slice(0, 10),
+        endedAt: new Date().toISOString(),
+        summary: `辞辞刚刚和沉下了一局五子棋，${winnerText}，共 ${moves} 步。沉有 ${state.chenSourceCount} 步根据棋盘选择，${fallbackText}。${String(message || "").trim()}`.slice(0, 500)
+      }
+    };
+  }
+  async function submitGameResult(result, message) {
+    await gameFetch("/api/game/events", {
+      method: "POST",
+      body: JSON.stringify(gameResultPayload(result, message))
+    });
+  }
   function finishGame(game, result, message, status) {
     saveGameSummary(game, result, message);
+    if (game === "gomoku") void submitGameResult(result, message).catch(() => {});
     setChenStatus(status);
     $$(`[data-game-chat-return][data-game-type="${game}"]`).forEach(link => { link.hidden = false; });
   }
@@ -202,17 +236,20 @@
     state.gomokuAbortController = null;
     state.gomokuTurn += 1;
     state.moveHistory = [];
+    state.chenSourceCount = 0;
+    state.fallbackCount = 0;
+    state.fallbackReasons = [];
     renderBoard();
     setGomokuStatus("当前回合：轮到你。");
     setChenStatus("沉在等你");
     $$('[data-game-chat-return][data-game-type="gomoku"]').forEach(link => { link.hidden = true; });
   }
-  function fallbackChenMove() {
+  function fallbackChenMove(reason = "CLIENT_REQUEST_FAILED") {
     return new Promise(resolve => {
       const scheduled = scheduleChenMove(state.board, {
         onMove: move => {
           state.thinkingTimer = null;
-          resolve(move ? { ...move, message: "沉想了一下，落在这里。", source: "fallback" } : null);
+          resolve(move ? { ...move, message: "沉想了一下，落在这里。", source: "fallback", reason } : null);
         }
       });
       state.thinkingTimer = scheduled.timer;
@@ -243,7 +280,8 @@
         row,
         column,
         message: String(result.message || "我下这里。").trim().slice(0, 120),
-        source: result.source === "chen" ? "chen" : "fallback"
+        source: result.source === "chen" ? "chen" : "fallback",
+        reason: result.source === "chen" ? null : String(result.reason || "INTERNAL_ERROR").slice(0, 80)
       };
     } catch {
       if (expectedTurn !== state.gomokuTurn) return null;
@@ -288,6 +326,11 @@
     }
     state.board[move.row][move.column] = 2;
     state.moveHistory.push({ player: "chen", row: move.row, col: move.column });
+    if (move.source === "chen") state.chenSourceCount += 1;
+    else {
+      state.fallbackCount += 1;
+      if (move.reason) state.fallbackReasons.push(move.reason);
+    }
     state.locked = false;
     const reaction = move.message || "我下这里。";
     if (isWin(state.board, move.row, move.column, 2)) {
@@ -486,6 +529,7 @@
     restoreSharedDrawRound,
     roundIdFromLocation,
     saveGameSummary,
+    gameResultPayload,
     buildChatUrlFromGame,
     validateUserDrawing
   });

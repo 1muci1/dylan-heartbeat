@@ -166,6 +166,39 @@ test("gomoku chat intent returns its game link without relying on upstream wordi
   assert.equal(upstreamCalled, false);
 });
 
+test("chat answers recent game questions from EventStore without calling the model", async () => {
+  const created = await app.inject({
+    method: "POST",
+    url: "/api/game/events",
+    headers: auth,
+    payload: {
+      eventType: "game_result",
+      title: "五子棋结果",
+      metadata: {
+        game: "gomoku", winner: "user", moves: 23, chenMoveCount: 11,
+        chenSourceCount: 8, fallbackCount: 3, fallbackReasons: ["MODEL_TIMEOUT"],
+        endedAt: "2026-08-07T00:00:00.000Z",
+        summary: "辞辞刚刚和沉下五子棋，辞辞赢了。"
+      }
+    }
+  });
+  assert.equal(created.statusCode, 201, created.body);
+  let upstreamCalled = false;
+  global.fetch = async () => { upstreamCalled = true; throw new Error("must not call upstream"); };
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/chat/completions",
+    payload: { stream: false, messages: [{ role: "user", content: "刚刚那局有记忆吗" }] }
+  });
+  assert.equal(response.statusCode, 200);
+  const content = response.json().choices[0].message.content;
+  assert.match(content, /记得/);
+  assert.match(content, /五子棋/);
+  assert.match(content, /辞辞赢了/);
+  assert.match(content, /23 步/);
+  assert.equal(upstreamCalled, false);
+});
+
 async function createSession(title) {
   const response = await app.inject({
     method: "POST", url: "/api/v1/chat/sessions", headers: auth, payload: { title }

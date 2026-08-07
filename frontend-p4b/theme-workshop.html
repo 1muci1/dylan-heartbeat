@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#09090d"><title>心伴 · 美化工坊</title>
-  <link rel="stylesheet" href="assets/css/common.css?v=v50-p4b">
-  <link rel="stylesheet" href="assets/css/theme.css?v=v50-p4b">
-  <link rel="stylesheet" href="assets/css/theme-workshop.css?v=v50-p4b">
-  <script src="assets/js/theme-store.js?v=v50-p4b"></script>
-  <script src="assets/js/common.js?v=v50-p4b"></script>
+  <link rel="stylesheet" href="assets/css/common.css?v=v51-p4b">
+  <link rel="stylesheet" href="assets/css/theme.css?v=v51-p4b">
+  <link rel="stylesheet" href="assets/css/theme-workshop.css?v=v51-p4b">
+  <script src="assets/js/theme-store.js?v=v51-p4b"></script>
+  <script src="assets/js/common.js?v=v51-p4b"></script>
 </head>
 <body class="theme-workshop-page" data-page="settings">
 <main class="app-shell theme-workshop-shell">
-  <header class="theme-workshop-header"><a href="settings.html?returnTo=%2Ftheme-workshop.html#appearance" aria-label="返回设置">‹</a><div><p class="eyebrow">THEME STUDIO · V50</p><h1>美化工坊</h1></div></header>
+  <header class="theme-workshop-header"><a href="settings.html?returnTo=%2Ftheme-workshop.html#appearance" aria-label="返回设置">‹</a><div><p class="eyebrow">THEME STUDIO · V51</p><h1>美化工坊</h1></div></header>
   <section class="theme-panel theme-panel--presets"><h2>预设主题</h2><p>选择后先进入预览，点击应用才会保存。</p><div class="theme-presets" data-theme-presets></div></section>
   <section class="theme-panel theme-panel--editor"><h2>颜色与字体</h2><p>所有修改会立即出现在右侧小手机中。</p><div class="theme-grid">
     <label class="theme-field">主色<input type="color" data-theme-token="colorPrimary"></label>
@@ -20,15 +20,26 @@
     <label class="theme-field">文字色<input type="color" data-theme-token="colorText"></label>
     <label class="theme-field">用户气泡<input type="color" data-theme-token="chatUserBubbleBg"></label>
     <label class="theme-field">沉气泡<input type="color" data-theme-token="chatAssistantBubbleBg"></label>
+    <label class="theme-field">我的气泡文字<input type="color" data-theme-token="chatUserBubbleText"></label>
+    <label class="theme-field">沉的气泡文字<input type="color" data-theme-token="chatAssistantBubbleText"></label>
     <label class="theme-field">卡片色<input type="color" data-theme-token="cardBg"></label>
     <label class="theme-field">底栏色<input type="color" data-theme-token="bottomNavBg"></label>
     <label class="theme-field">字体<select data-theme-token="fontFamily"><option value="system">系统默认</option><option value="rounded">圆体感</option><option value="serif">宋体感</option><option value="sans">黑体感</option><option value="custom">自定义</option></select></label>
     <label class="theme-field">自定义字体名<input type="text" maxlength="80" data-theme-custom-font placeholder="例如 LXGW WenKai"></label>
   </div></section>
+  <section class="theme-panel theme-panel--editor"><h2>清晰度与性能</h2><p>清晰度保护会在文字与背景对比不足时自动选择深色或浅色文字。</p><div class="theme-grid">
+    <label class="theme-field">效果模式<select data-theme-layout="effectsMode"><option value="pretty">质感优先</option><option value="balanced">平衡</option><option value="performance">流畅优先</option></select></label>
+    <label class="theme-field theme-field--toggle">文字清晰度保护<input type="checkbox" data-theme-layout="readabilityGuard"></label>
+    <label class="theme-field theme-field--toggle">玻璃效果<input type="checkbox" data-theme-layout="enableGlass"></label>
+    <label class="theme-field theme-field--toggle">界面动画<input type="checkbox" data-theme-layout="enableAnimations"></label>
+    <label class="theme-field">阴影强度<select data-theme-layout="shadowLevel"><option value="none">关闭</option><option value="soft">柔和</option><option value="medium">明显</option></select></label>
+    <label class="theme-field">设置卡片透明度<input type="range" min="45" max="100" data-theme-layout="cardOpacity" data-scale="100"></label>
+    <button class="theme-readability-fix theme-field--wide" type="button" data-theme-fix-readability>一键修复可读性</button>
+  </div></section>
   <section class="theme-panel theme-panel--editor"><h2>背景与玻璃</h2><p>只允许相对路径或 data:image；外部网址会被拒绝。</p><div class="theme-grid">
     <label class="theme-field theme-field--wide">背景资源<input type="text" data-theme-asset="backgroundImage" placeholder="/uploads/... 或 data:image/..."></label>
     <label class="theme-field theme-field--wide">选择本地背景图<input type="file" accept="image/png,image/jpeg,image/webp" data-theme-background-file><small>仅保存在当前浏览器主题中，最大 2 MB</small></label>
-    <label class="theme-field">背景模糊<input type="range" min="0" max="30" value="18" data-theme-range="blur" data-unit="px"></label>
+    <label class="theme-field">背景模糊<input type="range" min="0" max="24" value="0" data-theme-layout="backgroundBlur" data-unit="px"></label>
     <label class="theme-field">背景暗度<input type="range" min="0" max="80" value="18" data-theme-layout="backgroundDim" data-scale="100"></label>
     <label class="theme-field">玻璃强度<input type="range" min="0" max="100" value="72" data-theme-layout="glassIntensity" data-scale="100"></label>
   </div></section>
@@ -51,5 +62,5 @@
     <label>导入 JSON<input type="file" accept=".json,application/json" data-theme-import></label>
   </div><p class="theme-status" role="status" data-theme-status></p></section>
 </main>
-<script src="assets/js/theme-workshop.js?v=v50-p4b"></script>
+<script src="assets/js/theme-workshop.js?v=v51-p4b"></script>
 </body></html>

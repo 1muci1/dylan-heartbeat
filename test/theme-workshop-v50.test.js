@@ -6,7 +6,7 @@ const path = require("node:path");
 const { test } = require("node:test");
 const {
   ACTIVE_KEY, LIBRARY_KEY, DEFAULT_THEME, PRESET_THEMES, ThemeStore,
-  normalizeTheme, safeCustomCss
+  normalizeTheme, safeCustomCss, contrastRatio, cssVariables
 } = require("../frontend-p4b/assets/js/theme-store.js");
 
 function storageFixture(values = {}) {
@@ -23,7 +23,7 @@ function documentFixture() {
     getElementById: () => styleNode, createElement: () => styleNode } };
 }
 
-test("v50 ThemeStore loads and migrates the default theme without old localStorage", () => {
+test("v51 ThemeStore loads and migrates the default theme without old localStorage", () => {
   const storage = storageFixture(); const fixture = documentFixture();
   const store = new ThemeStore({ storage, documentRef: fixture.document });
   const active = store.applyActive();
@@ -31,6 +31,32 @@ test("v50 ThemeStore loads and migrates the default theme without old localStora
   assert.ok(storage.data.has(ACTIVE_KEY));
   assert.equal(fixture.values.get("--theme-primary"), DEFAULT_THEME.tokens.colorPrimary);
   assert.equal(PRESET_THEMES.length >= 5, true);
+});
+
+test("contrast guard separates user and assistant text and repairs white-on-white themes", () => {
+  const theme = normalizeTheme({ ...DEFAULT_THEME, tokens: { ...DEFAULT_THEME.tokens,
+    chatUserBubbleBg: "#111111", chatUserBubbleText: "#ffffff",
+    chatAssistantBubbleBg: "rgba(255,255,255,.9)", chatAssistantBubbleText: "#ffffff" } });
+  assert.equal(theme.tokens.chatUserBubbleText, "#ffffff");
+  assert.notEqual(theme.tokens.chatAssistantBubbleText, "#ffffff");
+  assert.ok(contrastRatio(theme.tokens.chatAssistantBubbleText, theme.tokens.chatAssistantBubbleBg, theme.tokens.colorBg) >= 4.5);
+  for (const preset of PRESET_THEMES.map(item => normalizeTheme(item))) {
+    assert.ok(contrastRatio(preset.tokens.chatUserBubbleText, preset.tokens.chatUserBubbleBg, preset.tokens.colorBg) >= 4.5, `${preset.name} user`);
+    assert.ok(contrastRatio(preset.tokens.chatAssistantBubbleText, preset.tokens.chatAssistantBubbleBg, preset.tokens.colorBg) >= 4.5, `${preset.name} assistant`);
+    assert.ok(contrastRatio(preset.tokens.cardText, preset.tokens.cardBg, preset.tokens.colorBg) >= 4.5, `${preset.name} card`);
+  }
+});
+
+test("performance mode clamps effects while draft normalization does not persist activeTheme", () => {
+  const storage = storageFixture(); const fixture = documentFixture(); const store = new ThemeStore({ storage, documentRef: fixture.document });
+  const draft = normalizeTheme({ ...DEFAULT_THEME, tokens: { ...DEFAULT_THEME.tokens, blur: "40px" }, layout: { ...DEFAULT_THEME.layout, effectsMode: "performance", blurNav: "36px", shadowLevel: "medium" } });
+  assert.equal(storage.data.has(ACTIVE_KEY), false);
+  const variables = cssVariables(draft);
+  assert.equal(variables["--theme-blur-nav"], "0px");
+  assert.equal(variables["--theme-shadow-soft"], "none");
+  assert.equal(variables["--theme-blur"], "2px");
+  store.applyTheme(draft);
+  assert.equal(storage.data.has(ACTIVE_KEY), true);
 });
 
 test("applyTheme writes visual CSS variables without touching unrelated preferences", () => {
@@ -69,10 +95,13 @@ test("theme workshop is linked, live-preview driven, and every main page loads t
   assert.match(workshop, /data-theme-import/);
   assert.match(workshop, /data-theme-export/);
   assert.match(script, /addEventListener\("input"/);
+  assert.match(script, /requestAnimationFrame/);
+  assert.match(workshop, /data-theme-fix-readability/);
+  assert.match(workshop, /data-theme-layout="effectsMode"/);
   assert.match(script, /applyTheme/);
   for (const page of ["index.html", "chat.html", "dashboard.html", "settings.html", "memory.html", "stickers.html"]) {
     const html = fs.readFileSync(path.join(root, page), "utf8");
-    assert.match(html, /assets\/css\/theme\.css\?v=v50-p4b/, page);
-    assert.match(html, /assets\/js\/theme-store\.js\?v=v50-p4b/, page);
+    assert.match(html, /assets\/css\/theme\.css\?v=v51-p4b/, page);
+    assert.match(html, /assets\/js\/theme-store\.js\?v=v51-p4b/, page);
   }
 });

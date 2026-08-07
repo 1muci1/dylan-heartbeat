@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const status = document.querySelector("[data-theme-status]");
   if (!store || !api || !preview) return;
   let draft = store.getActive();
+  let renderFrame = 0;
   const message = value => { if (status) status.textContent = value; };
   const editable = theme => JSON.parse(JSON.stringify(theme));
   const hex = value => /^#[0-9a-f]{6}$/iu.test(value || "") ? value : "#8b6bb8";
@@ -17,12 +18,16 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("[data-theme-asset]").forEach(input => { input.value = draft.assets[input.dataset.themeAsset] || ""; });
     document.querySelectorAll("[data-theme-range]").forEach(input => { input.value = parseFloat(draft.tokens[input.dataset.themeRange]) || 0; });
     document.querySelectorAll("[data-theme-layout]").forEach(input => {
-      const value = draft.layout[input.dataset.themeLayout]; input.value = input.dataset.scale ? Number(value) * Number(input.dataset.scale) : parseFloat(value);
+      const value = draft.layout[input.dataset.themeLayout];
+      if (input.type === "checkbox") input.checked = Boolean(value);
+      else if (input.tagName === "SELECT") input.value = value;
+      else input.value = input.dataset.scale ? Number(value) * Number(input.dataset.scale) : parseFloat(value);
     });
     const custom = document.querySelector("[data-theme-custom-css]"); if (custom) custom.value = draft.customCss || "";
     const customFont = document.querySelector("[data-theme-custom-font]"); if (customFont) customFont.value = ["system","rounded","serif","sans"].includes(draft.tokens.fontFamily) ? "" : draft.tokens.fontFamily;
   };
-  const render = () => {
+  const renderNow = () => {
+    renderFrame = 0;
     try {
       draft = api.normalizeTheme(draft);
       for (const [key, value] of Object.entries(api.cssVariables(draft))) preview.style.setProperty(key, value);
@@ -30,6 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.querySelector("[data-theme-preview-name]").textContent = draft.name;
     } catch (error) { message(error.message || "主题预览失败"); }
   };
+  const render = () => { if (!renderFrame) renderFrame = requestAnimationFrame(renderNow); };
   const update = mutator => { const next = editable(draft); mutator(next); draft = next; render(); };
   const presets = store.getPresets();
   const presetRoot = document.querySelector("[data-theme-presets]");
@@ -40,7 +46,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document.querySelectorAll("[data-theme-token]").forEach(input => input.addEventListener("input", () => update(next => { next.tokens[input.dataset.themeToken] = input.value; })));
   document.querySelectorAll("[data-theme-range]").forEach(input => input.addEventListener("input", () => update(next => { next.tokens[input.dataset.themeRange] = `${input.value}${input.dataset.unit || ""}`; })));
-  document.querySelectorAll("[data-theme-layout]").forEach(input => input.addEventListener("input", () => update(next => { next.layout[input.dataset.themeLayout] = input.dataset.scale ? Number(input.value) / Number(input.dataset.scale) : `${input.value}${input.dataset.unit || ""}`; })));
+  document.querySelectorAll("[data-theme-layout]").forEach(input => input.addEventListener("input", () => update(next => {
+    next.layout[input.dataset.themeLayout] = input.type === "checkbox" ? input.checked : input.tagName === "SELECT" ? input.value : input.dataset.scale ? Number(input.value) / Number(input.dataset.scale) : `${input.value}${input.dataset.unit || ""}`;
+  })));
   document.querySelectorAll("[data-theme-asset]").forEach(input => input.addEventListener("change", () => update(next => { next.assets[input.dataset.themeAsset] = input.value.trim(); })));
   document.querySelector("[data-theme-custom-font]")?.addEventListener("change", event => { if (event.target.value.trim()) update(next => { next.tokens.fontFamily = event.target.value.trim(); }); });
   document.querySelector("[data-theme-background-file]")?.addEventListener("change", event => {
@@ -57,6 +65,10 @@ document.addEventListener("DOMContentLoaded", () => {
     reader.readAsDataURL(file);
   });
   document.querySelector("[data-theme-custom-css]")?.addEventListener("change", event => update(next => { next.customCss = event.target.value; }));
+  document.querySelector("[data-theme-fix-readability]")?.addEventListener("click", () => {
+    draft = editable(api.guardReadability(api.normalizeTheme({ ...editable(draft), layout: { ...draft.layout, readabilityGuard: true } })));
+    refreshForm(); render(); message("已修复低对比颜色。");
+  });
   document.querySelector("[data-theme-apply]")?.addEventListener("click", () => {
     try {
       const hasBackground = Object.values(draft.assets).some(Boolean);

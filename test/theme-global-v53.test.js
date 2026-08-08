@@ -10,8 +10,8 @@ const read = file => fs.readFileSync(path.join(root, file), "utf8");
 
 test("chat loads the global theme after its legacy CSS and real chat selectors use tokens", () => {
   const html = read("chat.html"); const css = read("assets/css/theme.css");
-  assert.ok(html.indexOf("assets/css/chat.css?v=v62-p4b") < html.indexOf("assets/css/theme.css?v=v62-p4b"));
-  assert.match(html, /assets\/js\/theme-store\.js\?v=v62-p4b/u);
+  assert.ok(html.indexOf("assets/css/chat.css?v=v63-p4b") < html.indexOf("assets/css/theme.css?v=v63-p4b"));
+  assert.match(html, /assets\/js\/theme-store\.js\?v=v63-p4b/u);
   for (const selector of [".chat-shell", ".chat-header", ".message-row .message-bubble", ".message-row--user .message-bubble", ".composer", ".composer .composer__field", ".bottom-nav"]) assert.ok(css.includes(selector), selector);
   assert.match(css, /html\.has-xinban-theme \.message-row--user \.message-bubble/u);
   assert.match(css, /var\(--theme-user-bubble\)/u); assert.match(css, /var\(--theme-assistant-bubble\)/u);
@@ -42,9 +42,9 @@ test("workshop applies globally, offers recovery and keeps user background prefe
 
 test("all principal pages share one ThemeStore active key and v53 cache", () => {
   for (const page of ["chat.html", "settings.html", "theme-workshop.html", "index.html", "dashboard.html", "memory.html", "stickers.html"]) {
-    const html = read(page); assert.match(html, /assets\/js\/theme-store\.js\?v=v62-p4b/u, page); assert.match(html, /assets\/css\/theme\.css\?v=v62-p4b/u, page);
+    const html = read(page); assert.match(html, /assets\/js\/theme-store\.js\?v=v63-p4b/u, page); assert.match(html, /assets\/css\/theme\.css\?v=v63-p4b/u, page);
   }
-  assert.match(read("sw.js"), /xinban-shell-v62-p4b/u);
+  assert.match(read("sw.js"), /xinban-shell-v63-p4b/u);
   assert.equal(ACTIVE_KEY, "xinban-theme-active-v1");
   assert.equal(DEFAULT_THEME.tokens.colorBg, "#171326");
 });

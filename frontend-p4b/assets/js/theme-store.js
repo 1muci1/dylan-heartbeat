@@ -272,6 +272,15 @@
     "--theme-blur-nav": glass ? clampBlur(theme.layout.blurNav) : "0px", "--theme-blur-bubble": "0px",
     "--theme-background-blur": mode === "performance" ? "0px" : clampBlur(theme.layout.backgroundBlur),
     "--theme-animation-duration": theme.layout.enableAnimations && mode !== "performance" ? ".2s" : "0s"
+    ,"--theme-color-text": theme.tokens.colorText, "--theme-color-text-muted": theme.tokens.colorMuted
+    ,"--theme-color-primary": theme.tokens.colorPrimary, "--theme-color-primary-strong": theme.tokens.colorPrimary
+    ,"--theme-color-primary-bright": theme.tokens.colorAccent
+    ,"--theme-color-surface": theme.tokens.cardBg, "--theme-color-surface-soft": `color-mix(in srgb, ${theme.tokens.cardBg} 76%, ${theme.tokens.colorBg})`
+    ,"--theme-color-border": theme.tokens.borderColor, "--theme-color-focus": `color-mix(in srgb, ${theme.tokens.colorPrimary} 38%, transparent)`
+    ,"--theme-shadow": shadow, "--theme-background-overlay": "transparent"
+    ,"--theme-background": `linear-gradient(180deg, ${theme.tokens.colorBg}, color-mix(in srgb, ${theme.tokens.colorBg} 92%, ${theme.tokens.colorPrimary}))`
+    ,"--avatar-border-color": theme.tokens.colorPrimary, "--avatar-ring-color": `color-mix(in srgb, ${theme.tokens.colorPrimary} 24%, transparent)`
+    ,"--avatar-surface": `linear-gradient(145deg, ${theme.tokens.colorAccent}, ${theme.tokens.colorPrimary})`
     ,"--theme-bubble-texture": theme.assets.bubbleTexture ? `url(${JSON.stringify(theme.assets.bubbleTexture)})` : "none"
     ,"--theme-nav-texture": theme.assets.bottomNavTexture ? `url(${JSON.stringify(theme.assets.bottomNavTexture)})` : "none"
     ,"--theme-input-decoration": theme.assets.inputDecoration ? `url(${JSON.stringify(theme.assets.inputDecoration)})` : "none"

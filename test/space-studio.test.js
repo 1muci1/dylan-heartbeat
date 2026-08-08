@@ -63,7 +63,7 @@ test("Space Studio page loads the profile, active-theme adapter, and avatar modu
   assert.match(html, /空间工作室/);
   assert.match(html, /data-profile-name/);
   assert.match(html, /\.\.\/space-profile\.js/);
-  assert.match(html, /\.\.\/theme-adapter\.js\?v=v62-p4b/);
+  assert.match(html, /\.\.\/theme-adapter\.js\?v=v63-p4b/);
   assert.doesNotMatch(html, /theme\/theme-engine\.js/);
   assert.match(html, /\.\.\/\.\.\/avatar\/avatar-studio\.js/);
   assert.match(html, /<meta name="viewport"/);

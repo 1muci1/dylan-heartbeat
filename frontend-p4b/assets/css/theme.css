@@ -166,3 +166,17 @@ html.has-xinban-theme .bottom-nav .bottom-nav__chat svg{border-color:var(--xb-bu
 html.has-xinban-theme :is(.today-card__mark,.action-card__icon,.status-card__icon){color:var(--xb-color-accent);background:var(--xb-color-accent-soft)}
 html.has-xinban-theme .today-card__meter span:nth-child(-n+4){background:var(--xb-progress-fill)}
 html.has-xinban-theme .action-card--chat{color:var(--xb-button-text);background:var(--xb-color-accent)}
+
+/* v63 computed audit fixes. Bridge legacy companion variables without changing layout. */
+html.has-xinban-theme .collaboration-page{--ink:var(--xb-card-text);--muted:var(--xb-card-muted);--purple:var(--xb-color-accent);--purple-dark:var(--xb-color-accent);--lavender:var(--xb-color-accent-soft);--paper:var(--xb-card-bg);--line:var(--xb-card-border);--shadow:var(--xb-card-shadow)}
+html.has-xinban-theme .collaboration-page :is(.section-heading>span,.room-status,.empty-room,.summary-card>p){color:var(--xb-color-text-muted)}
+html.has-xinban-theme .collaboration-page :is(.agent-option:has(input:checked),.roundtable-mark,.room-context span){background:var(--xb-color-accent-soft)}
+html.has-xinban-theme .collaboration-page :is(.roundtable-mark i,.roundtable-mark span,.roundtable-mark span:last-child,.agent-avatar,.participant-avatar,.participant-avatar--chatgpt,.message__avatar){border-color:var(--xb-avatar-ring);color:var(--xb-button-text);background:var(--xb-color-accent)}
+html.has-xinban-theme .collaboration-page :is(.primary-button,.message-game-link){background:var(--xb-button-bg)}
+
+html.has-xinban-theme :is(.space-page,.space-studio-page){--theme-color-text:var(--xb-page-text);--theme-color-text-muted:var(--xb-color-text-muted);--theme-color-primary:var(--xb-color-accent);--theme-color-primary-strong:var(--xb-button-bg);--theme-color-primary-bright:var(--theme-accent);--theme-color-surface:var(--xb-card-bg);--theme-color-surface-soft:var(--xb-color-surface-soft);--theme-color-border:var(--xb-card-border);--theme-color-focus:var(--xb-color-accent-soft);--theme-shadow:var(--xb-card-shadow);--avatar-border-color:var(--xb-avatar-ring);--avatar-ring-color:var(--xb-color-accent-soft);--avatar-surface:linear-gradient(145deg,var(--theme-accent),var(--xb-color-accent))}
+html.has-xinban-theme :is(.space-page,.space-studio-page).companion-themed-page{background-color:var(--xb-page-bg);background-image:linear-gradient(180deg,var(--xb-page-bg),color-mix(in srgb,var(--xb-page-bg) 92%,var(--xb-color-accent)))}
+html.has-xinban-theme :is(.space-page,.space-studio-page) .preview-card::after,
+html.has-xinban-theme :is(.space-page,.space-studio-page) .studio-preview__background{background-image:linear-gradient(180deg,var(--xb-page-bg),color-mix(in srgb,var(--xb-page-bg) 92%,var(--xb-color-accent)))}
+
+html.has-xinban-theme :is(.chat-background-actions button:first-child,.avatar-settings__actions button,.avatar-editor__actions button:last-child,.session-new,.composer__send,.message-game-link){border-color:var(--xb-button-border);color:var(--xb-button-text);background:var(--xb-button-bg);box-shadow:var(--xb-card-shadow)}

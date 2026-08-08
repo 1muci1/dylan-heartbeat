@@ -154,7 +154,7 @@
     documentRef.querySelectorAll("[data-model-badge]").forEach(node => {
       node.addEventListener("click", () => {
         if (!windowRef?.location) return;
-        const currentRoute = `${windowRef.location.pathname || "/frontend-p4b/chat.html"}${windowRef.location.search || ""}${windowRef.location.hash || ""}`;
+        const currentRoute = `${windowRef.location.pathname || "/chat.html"}${windowRef.location.search || ""}${windowRef.location.hash || ""}`;
         windowRef.location.href = `settings.html?returnTo=${encodeURIComponent(currentRoute)}#model`;
       });
     });

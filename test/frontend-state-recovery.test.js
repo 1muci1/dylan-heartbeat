@@ -9,7 +9,7 @@ const { test } = require("node:test");
 const root = path.join(__dirname, "..");
 const read = relative => fs.readFileSync(path.join(root, relative), "utf8");
 
-test("Service Worker controller change refreshes only once per v56 tab session", async () => {
+test("Service Worker controller change refreshes only once per v61 tab session", async () => {
   const source = read("frontend-p4b/assets/js/common.js");
   const session = new Map();
   const listeners = {};
@@ -44,32 +44,15 @@ test("Service Worker controller change refreshes only once per v56 tab session",
   listeners.controllerchange();
   listeners.controllerchange();
   assert.equal(reloads, 1);
-  assert.equal(session.get("p4b-sw-controller-refresh-v56"), "1");
-  assert.equal(windowRef.XINBAN_BUILD, "v60-p4b");
+  assert.equal(session.get("p4b-sw-controller-refresh-v61"), "1");
+  assert.equal(windowRef.XINBAN_BUILD, "v61-p4b");
 });
 
-test("legacy nested chat path safely replaces to the formal root entry without looping", () => {
-  const html = read("frontend-p4b/chat.html");
-  const script = html.match(/<script>\s*([\s\S]*?)\s*<\/script>/)?.[1];
-  assert.ok(script);
-  const run = (pathname, search = "", hash = "") => {
-    const replacements = [];
-    vm.runInNewContext(script, {
-      URLSearchParams,
-      window: {
-        location: {
-          pathname,
-          search,
-          hash,
-          replace: value => replacements.push(value)
-        }
-      }
-    });
-    return replacements;
-  };
-  assert.deepEqual(run("/frontend-p4b/chat.html", "?fromGame=gomoku"), ["/chat.html?fromGame=gomoku"]);
-  assert.deepEqual(run("/frontend-p4b/chat.html", "?fromGame=unsafe", "#draw"), ["/chat.html#draw"]);
-  assert.deepEqual(run("/chat.html", "?fromGame=draw"), []);
+test("legacy nested chat file statically replaces to the formal root entry", () => {
+  const html = read("frontend-p4b/frontend-p4b/chat.html");
+  assert.match(html, /http-equiv="refresh" content="0;url=\/chat\.html"/);
+  assert.match(html, /location\.replace\("\/chat\.html"\)/);
+  assert.doesNotMatch(html, /assets\/(?:js|css)|Authorization|fetch\(/u);
 });
 
 test("chat recovery hooks reapply model badge, avatars, and background without rebuilding state", () => {
@@ -139,15 +122,14 @@ test("settings diagnostic is allowlisted and never includes secret or image payl
   assert.match(diagnostic, /tokenConfigured:\s*Boolean/);
 });
 
-test("P4B pages register early and home re-applies avatar preferences after Safari restore", () => {
+test("P4B pages register early and legacy home redirects without old runtime assets", () => {
   for (const page of ["frontend-p4b/chat.html", "frontend-p4b/settings.html"]) {
     const html = read(page);
     assert.ok(html.indexOf("assets/js/common.js") < html.indexOf("assets/js/data.js"));
   }
-  const home = read("ai-companion-frontend/home/home.js");
-  assert.match(home, /addEventListener\?\.\("pageshow"/);
-  assert.match(home, /reapplyPreferenceAvatars/);
-  assert.match(read("ai-companion-frontend/home/index.html"), /home\.js\?v=37/);
+  const home = read("ai-companion-frontend/home/index.html");
+  assert.match(home, /location\.replace\("\/index\.html"\)/);
+  assert.doesNotMatch(home, /home\.js\?v=37|theme-engine\.js/);
 });
 
 test("Provider quota failure preserves old config and emits no success event", () => {

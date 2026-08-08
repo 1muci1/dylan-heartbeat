@@ -75,68 +75,25 @@ function fakeDocument() {
   };
 }
 
-test("Space Home page loads the upgraded hero and navigation structure", () => {
+test("Space Home compatibility entry redirects without loading the legacy shell", () => {
   const html = fs.readFileSync(path.join(homeRoot, "index.html"), "utf8");
-  const css = fs.readFileSync(path.join(homeRoot, "home.css"), "utf8");
-  const js = fs.readFileSync(path.join(homeRoot, "home.js"), "utf8");
-  const picker = fs.readFileSync(path.join(appRoot, "avatar", "avatar-picker.js"), "utf8");
-  for (const token of [
-    "data-home-shell",
-    "data-home-hero",
-    "data-home-user-avatar",
-    "data-home-avatar",
-    "data-home-space-title",
-    "data-home-atmosphere",
-    "data-home-preset-name",
-    "data-home-moment",
-    "home-cards",
-    "共同记忆"
-  ]) {
-    assert.match(html, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  }
-  for (const source of [
-    "theme-engine.js",
-    "avatar-studio.js",
-    "space-profile.js",
-    "preset-manager.js",
-    "atmosphere-engine.js",
-    "home.js"
-  ]) {
-    assert.match(html, new RegExp(source.replace(".", "\\.")));
-  }
-  assert.match(css + js, /is-home-hero-animated/);
-  assert.match(css + js, /is-home-entering/);
-  assert.match(html, /data-home-user-avatar data-avatar-target="user"/);
-  assert.match(html, /storage\/user-preference-store\.js\?v=37/);
-  assert.match(html, /avatar\/avatar-picker\.js\?v=37/);
-  assert.match(html, /home\/home\.js\?v=37/);
-  assert.match(html, /type="button" data-home-user-avatar/);
-  assert.match(html, /type="button" data-home-avatar data-home-chen-avatar data-avatar-target="chen" aria-label="更改沉沉头像"/);
-  assert.match(js, /CompanionAvatarPicker\?\.mount/);
-  assert.match(js, /selector:\s*"\[data-home-user-avatar\], \[data-home-chen-avatar\]"/);
-  assert.match(js, /DOMContentLoaded/);
-  assert.match(js, /mountFallbackAvatarPicker/);
-  assert.match(js, /data-home-user-avatar-file/);
-  assert.match(js, /optimizeImageFile/);
-  assert.match(js, /saveAvatar\([\s\S]*target/);
-  assert.match(picker, /trigger\.addEventListener\("click"/);
-  assert.match(picker, /fileInput\.click\(\)/);
-  assert.match(picker, /readAsDataURL\(file\)/);
-  assert.match(picker, /store\.saveAvatar\([\s\S]*target/);
+  assert.match(html, /v61-p4b-nav-unify/);
+  assert.match(html, /location\.replace\("\/index\.html"\)/);
+  assert.doesNotMatch(html, /theme-engine\.js|home\.js\?v=37|data-home-shell|app-tab-bar/u);
 });
 
-test("Root entry redirects into Home while preserving AppConfig bootstrap", () => {
+test("Root entry redirects into the canonical Home while preserving AppConfig bootstrap", () => {
   const html = fs.readFileSync(path.join(appRoot, "index.html"), "utf8");
   assert.match(html, /landing-card/);
   assert.match(html, /loading__bars/);
   assert.match(html, /\/assets\/js\/data\.js/);
   assert.match(html, /window\.AppConfig/);
-  assert.match(html, /setTimeout\(\(\) => window\.location\.replace\("\/home\/"\), 720\)/);
-  assert.match(html, /location\.replace\("\/home\/"\)/);
+  assert.match(html, /setTimeout\(\(\) => window\.location\.replace\("\/index\.html"\), 720\)/);
+  assert.match(html, /location\.replace\("\/index\.html"\)/);
   assert.match(html, /正在进入沉的小世界/);
 });
 
-test("Home animation hooks exist for atmosphere, avatar, title, and cards", () => {
+test("Legacy Home implementation files remain testable but are not loaded by the compatibility entry", () => {
   const html = fs.readFileSync(path.join(homeRoot, "index.html"), "utf8");
   const css = fs.readFileSync(path.join(homeRoot, "home.css"), "utf8");
   const js = fs.readFileSync(path.join(homeRoot, "home.js"), "utf8");
@@ -149,8 +106,9 @@ test("Home animation hooks exist for atmosphere, avatar, title, and cards", () =
     "home-pop",
     "is-home-ready"
   ]) {
-    assert.match(html + css + js, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.match(css + js, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
+  assert.doesNotMatch(html, /home\.css|home\.js/);
 });
 
 test("Home exposes the current space, atmosphere, and moment without mutating profile state", () => {
@@ -206,19 +164,10 @@ test("Home helper functions resolve day, sunset, and night states deterministica
   assert.equal(describeAtmosphere({ animation: "slow-sunset" }), "暮色氛围");
 });
 
-test("Home contains all documented cards and no runtime backdoors", () => {
+test("Legacy Home compatibility entry contains no duplicate cards or runtime backdoors", () => {
   const html = fs.readFileSync(path.join(homeRoot, "index.html"), "utf8");
-  const entries = [
-    ['href="/chat.html"', "和沉聊天"],
-    ['href="/space/"', "空间设置"],
-    ['href="/collaboration/"', "和 AI 一起讨论"],
-    ['href="/game/"', "一起玩"],
-    ['href="/frontend-p4b/memory.html"', "共同记忆"]
-  ];
-  for (const [href, label] of entries) {
-    assert.match(html, new RegExp(href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-    assert.match(html, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  }
+  assert.match(html, /href="\/index\.html"/);
+  assert.doesNotMatch(html, /href="\/(?:chat\.html|space\/|collaboration\/|game\/|frontend-p4b\/memory\.html)"/u);
 });
 
 test("Space Home is frontend-only and cannot access protected runtimes", () => {

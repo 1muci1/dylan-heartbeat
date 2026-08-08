@@ -55,15 +55,15 @@ test("saving my avatar persists imageData and emits a preference change without 
 test("settings returnTo accepts same-origin chat and rejects open redirects", () => {
   const options = {
     origin: "https://chat.example",
-    settingsPath: "/frontend-p4b/settings.html"
+    settingsPath: "/settings.html"
   };
   assert.equal(
-    safeInternalPath("/frontend-p4b/chat.html", options),
-    "/frontend-p4b/chat.html"
+    safeInternalPath("/chat.html", options),
+    "/chat.html"
   );
   assert.equal(
-    resolveReturnTarget({ ...options, returnTo: "/frontend-p4b/chat.html" }),
-    "/frontend-p4b/chat.html"
+    resolveReturnTarget({ ...options, returnTo: "/chat.html" }),
+    "/chat.html"
   );
   assert.equal(safeInternalPath("https://evil.example/phish", options), null);
   assert.equal(safeInternalPath("//evil.example/phish", options), null);
@@ -72,13 +72,13 @@ test("settings returnTo accepts same-origin chat and rejects open redirects", ()
 test("settings return falls back to the internal referrer and finally home", () => {
   const options = {
     origin: "https://chat.example",
-    settingsPath: "/frontend-p4b/settings.html"
+    settingsPath: "/settings.html"
   };
   assert.equal(
     resolveReturnTarget({ ...options, referrer: "https://chat.example/game/" }),
     "/game/"
   );
-  assert.equal(resolveReturnTarget(options), "/home/");
+  assert.equal(resolveReturnTarget(options), "/index.html");
 });
 
 test("chat model settings navigation carries its current route", () => {

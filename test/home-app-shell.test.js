@@ -11,21 +11,16 @@ const settings = fs.readFileSync(path.join(__dirname, "..", "frontend-p4b", "set
 const css = fs.readFileSync(path.join(root, "home", "home.css"), "utf8");
 const navCss = fs.readFileSync(path.join(root, "theme", "app-nav.css"), "utf8");
 
-test("Home uses the App Shell navigation with chat as the primary action", () => {
-  assert.match(home, /class="app-tab-bar"/);
-  assert.match(home, /<span>小窝<\/span>/);
-  assert.match(home, /app-tab-bar__chat/);
-  assert.match(home, /<span>游戏<\/span>/);
-  assert.match(home, /<span>议事厅<\/span>/);
-  assert.match(home, /<span>设置<\/span>/);
+test("legacy Home is a minimal compatibility redirect without a second app navigation", () => {
+  assert.match(home, /location\.replace\("\/index\.html"\)/);
+  assert.match(home, /v61-p4b-nav-unify/);
+  assert.doesNotMatch(home, /class="app-tab-bar"|app-tab-bar__chat/);
   assert.match(navCss, /\.app-tab-bar__chat/);
 });
 
-test("Home is a relationship page with compact daily widgets", () => {
-  for (const token of ["home-pair", "DAYS TOGETHER", "home-relationship-strip", "日历", "待办", "天气", "当前心情", "纪念日"]) {
-    assert.match(home, new RegExp(token));
-  }
-  assert.doesNotMatch(home, /装扮小窝|主题、头像|当前 Preset/);
+test("legacy Home no longer loads the duplicate relationship UI", () => {
+  assert.doesNotMatch(home, /home-pair|DAYS TOGETHER|home-relationship-strip|home-card/);
+  assert.doesNotMatch(home, /theme-engine\.js|home\.js\?v=37/);
 });
 
 test("Beauty controls live in Settings instead of the Home visual hierarchy", () => {

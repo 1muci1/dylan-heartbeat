@@ -11,7 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
       referrer: document.referrer,
       origin: window.location.origin,
       settingsPath: window.location.pathname,
-      fallback: "/home/"
+      fallback: "/index.html"
     });
   }
   const appearance = window.CompanionAppearance;
@@ -194,7 +194,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const preferences = preferenceStore?.loadSync?.();
     return {
       appVersion: window.CompanionP4BShell?.APP_VERSION || "v44",
-      swCacheName: window.CompanionP4BShell?.SW_CACHE_NAME || "xinban-shell-v60-p4b",
+      swCacheName: window.CompanionP4BShell?.SW_CACHE_NAME || "xinban-shell-v61-p4b",
       providerConfigured: Boolean(config.type && config.baseUrl),
       modelConfigured: Boolean(config.model),
       displayNameConfigured: Boolean(config.displayName),

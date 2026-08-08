@@ -40,11 +40,11 @@ test("model and appearance shortcuts keep chat as return target and use separate
   );
   assert.equal(
     resolveReturnTarget({
-      returnTo: "/frontend-p4b/chat.html",
+      returnTo: "/chat.html",
       origin: "https://chat.example",
-      settingsPath: "/frontend-p4b/settings.html"
+      settingsPath: "/settings.html"
     }),
-    "/frontend-p4b/chat.html"
+    "/chat.html"
   );
 });
 
@@ -55,9 +55,9 @@ test("settings exposes native model and appearance anchors without changing defa
   assert.equal(
     resolveReturnTarget({
       origin: "https://chat.example",
-      settingsPath: "/frontend-p4b/settings.html"
+      settingsPath: "/settings.html"
     }),
-    "/home/"
+    "/index.html"
   );
 });
 

@@ -164,7 +164,9 @@
   };
   const classifyAssetKind = selector => {
     const value = String(selector || "").toLowerCase();
-    if (/(?:bubble-user|bubble-other|\bmsg\b|\bmes\b)/u.test(value)) return "bubbleDecoration";
+    if (/bubble-user/u.test(value)) return "bubbleUserDecoration";
+    if (/bubble-other/u.test(value)) return "bubbleAssistantDecoration";
+    if (/(?:\bmsg\b|\bmes\b)/u.test(value)) return "bubbleDecoration";
     if (/avatar/u.test(value)) return "avatarFrame";
     if (/(?:input|composer|send)/u.test(value)) return "inputDecoration";
     if (/(?:header|top-bar)/u.test(value)) return "headerDecoration";

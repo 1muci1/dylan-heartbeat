@@ -9,11 +9,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const status = document.querySelector("[data-theme-status]");
   if (!store || !api || !adapter || !gateway || !preview) return;
   let draft = store.getActive();
+  let selectedThemeId = draft.id;
   let pendingImport = null;
   let assetDecisionPending = false;
   let renderFrame = 0;
   const message = value => { if (status) status.textContent = value; };
   const editable = theme => JSON.parse(JSON.stringify(theme));
+  const updateThemeNames = () => { const previewName=document.querySelector("[data-theme-preview-name]"),activeName=document.querySelector("[data-theme-active-name]"); if(previewName)previewName.textContent=draft.name; if(activeName)activeName.textContent=store.getActive().name; };
   const gatewayHeaders = () => { const token = window.AppConfig?.getProviderConfig?.().auth?.token; return token ? { Authorization: `Bearer ${token}` } : {}; };
   const gatewayRequest = async (path, options = {}) => { const config = window.AppConfig?.getProviderConfig?.() || {}; const url = gateway.resolveGatewayUrl(path, { baseUrl: config.baseUrl, locationRef: window.location }); const response = await fetch(url, { ...options, headers: { ...gatewayHeaders(), ...(options.headers || {}) } }); const payload = await response.json().catch(() => ({})); if (!response.ok) throw new Error(payload.error?.message || `请求失败（${response.status}）`); return payload; };
   const hex = value => /^#[0-9a-f]{6}$/iu.test(value || "") ? value : "#8b6bb8";
@@ -38,10 +40,11 @@ document.addEventListener("DOMContentLoaded", () => {
       draft = api.normalizeTheme(draft);
       for (const [key, value] of Object.entries(api.cssVariables(draft))) preview.style.setProperty(key, value);
       const bg = draft.assets.backgroundImage; preview.style.setProperty("--theme-background-image", bg ? `url(${JSON.stringify(bg)})` : "none");
-      document.querySelector("[data-theme-preview-name]").textContent = draft.name;
+      updateThemeNames();
     } catch (error) { message(error.message || "主题预览失败"); }
   };
   const render = () => { if (!renderFrame) renderFrame = requestAnimationFrame(renderNow); };
+  const setCurrentWorkshopTheme = theme => { draft=editable(theme); selectedThemeId=draft.id; refreshForm(); render(); };
   const update = mutator => { const next = editable(draft); mutator(next); draft = next; render(); };
   const showImportDifference = converted => {
     const before = store.getActive(), after = converted.theme; const beforeSwatch = document.querySelector("[data-theme-before-swatch]"), afterSwatch = document.querySelector("[data-theme-after-swatch]");
@@ -54,7 +57,7 @@ document.addEventListener("DOMContentLoaded", () => {
   presets.forEach(theme => {
     const button = document.createElement("button"); button.type = "button"; button.className = "theme-preset";
     button.textContent = theme.name; button.style.setProperty("--preset-a", theme.tokens.colorPrimary); button.style.setProperty("--preset-b", theme.tokens.colorBg);
-    button.addEventListener("click", () => { draft = editable(theme); refreshForm(); render(); message(`正在预览「${theme.name}」`); }); presetRoot.append(button);
+    button.addEventListener("click", () => { setCurrentWorkshopTheme(theme); message(`正在预览「${theme.name}」`); }); presetRoot.append(button);
   });
   document.querySelectorAll("[data-theme-token]").forEach(input => input.addEventListener("input", () => update(next => { next.tokens[input.dataset.themeToken] = input.value; })));
   document.querySelectorAll("[data-theme-range]").forEach(input => input.addEventListener("input", () => update(next => { next.tokens[input.dataset.themeRange] = `${input.value}${input.dataset.unit || ""}`; })));
@@ -88,12 +91,15 @@ document.addEventListener("DOMContentLoaded", () => {
       if (hasBackground && !window.confirm("这个主题包含背景或纹理资源，要一起覆盖主题背景吗？")) {
         draft = { ...editable(draft), assets: editable(api.DEFAULT_THEME.assets) };
       }
-      draft = store.applyTheme(draft, { persist: true, applyBackground: true });
-      message("主题已应用，聊天页也会同步生效；头像与原聊天背景配置保持不变。");
+      const selected = selectedThemeId === draft.id ? draft : store.getThemeById(selectedThemeId); if (!selected) throw new Error("当前预览主题不存在，请重新选择");
+      draft = store.applyTheme(selected, { persist: true, applyBackground: true }); selectedThemeId=draft.id; updateThemeNames();
+      const active=store.getActive(),variables=api.cssVariables(active),rootStyle=document.documentElement.style;
+      const selfCheck=active.name===draft.name&&rootStyle.getPropertyValue("--xb-chat-assistant-bubble-bg")===variables["--xb-chat-assistant-bubble-bg"]&&rootStyle.getPropertyValue("--xb-chat-user-bubble-bg")===variables["--xb-chat-user-bubble-bg"];
+      message(selfCheck ? `已应用：${draft.name}。聊天页也会同步生效。` : "主题没有正确写入，请刷新重试。");
     } catch (error) { message(error.message || "主题应用失败"); }
   });
   document.querySelector("[data-theme-reset-soft]")?.addEventListener("click", () => {
-    pendingImport = null; assetDecisionPending = false; draft = editable(api.DEFAULT_THEME); draft = store.applyTheme(draft, { persist: true, applyBackground: false });
+    pendingImport = null; assetDecisionPending = false; draft = editable(api.DEFAULT_THEME); draft = store.applyTheme(draft, { persist: true, applyBackground: false }); selectedThemeId=draft.id;
     document.querySelector("[data-theme-import-review]").hidden = true; refreshForm(); render(); message("已恢复柔和紫雾默认，聊天页也会同步生效。");
   });
   document.querySelector("[data-theme-export]")?.addEventListener("click", () => {
@@ -118,7 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
         else throw new Error("只支持 JSON、DOCX、TXT、CSS 美化文件");
         converted = adapter.convertStyleText(text, file.name); format = converted.report.format;
       }
-      pendingImport = converted; draft = editable(converted.theme); refreshForm(); render();
+      pendingImport = converted; setCurrentWorkshopTheme(converted.theme);
       const labels = { xinban: "小窝主题 JSON", sillytavern: "酒馆美化 JSON", external: "外部主题 JSON", unknown: "未知外部 JSON", "echoes-css": "Echoes 美化 CSS", css: "CSS/TXT 美化" };
       const review = document.querySelector("[data-theme-import-review]"); review.hidden = false;
       document.querySelector("[data-theme-import-format]").textContent = `检测到：${labels[converted.report.format] || labels[format]}`;
@@ -135,11 +141,11 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelector("[data-theme-import-confirm]")?.addEventListener("click", () => {
     if (!pendingImport) return;
     if (assetDecisionPending) { message("请先选择“本地化导入选中素材”或“跳过图片”。"); return; }
-    draft = editable(store.importTheme({ type: "xinban-theme", themeVersion: 1, theme: pendingImport.theme })); pendingImport = null; assetDecisionPending = false;
-    document.querySelector("[data-theme-import-review]").hidden = true; refreshForm(); render(); message(`已转换并加入主题库「${draft.name}」，尚未应用。`);
+    const importedTheme=store.importTheme({ type: "xinban-theme", themeVersion: 1, theme: pendingImport.theme }); pendingImport = null; assetDecisionPending = false; setCurrentWorkshopTheme(importedTheme);
+    document.querySelector("[data-theme-import-review]").hidden = true; message(`已加入主题库，当前正在预览：${draft.name}`);
   });
   document.querySelector("[data-theme-import-cancel]")?.addEventListener("click", () => {
-    pendingImport = null; assetDecisionPending = false; draft = store.getActive(); document.querySelector("[data-theme-import-review]").hidden = true; refreshForm(); render(); message("已取消外部主题导入。");
+    pendingImport = null; assetDecisionPending = false; setCurrentWorkshopTheme(store.getActive()); document.querySelector("[data-theme-import-review]").hidden = true; message("已取消外部主题导入。");
   });
   document.querySelector("[data-theme-assets-skip]")?.addEventListener("click", () => { if (!pendingImport) return; assetDecisionPending = false; document.querySelector("[data-theme-assets]").hidden = true; message("已跳过外部图片，只保留颜色与安全样式。"); });
   document.querySelector("[data-theme-assets-localize]")?.addEventListener("click", async () => {
@@ -147,7 +153,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const assets = (pendingImport.report.assets || []).filter(asset => selected.has(asset.id)); if (!assets.length) { message("请至少选择一张素材，或点击跳过图片。"); return; }
     try {
       const payload = await gatewayRequest("/api/theme/assets/localize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assets: assets.map(({ id, sourceUrl, kind }) => ({ id, sourceUrl, kind })) }) });
-      const fields = { backgroundImage: "backgroundImage", bubbleDecoration: "bubbleTexture", decorativeAsset: "bubbleTexture", avatarFrame: "avatarFrame", inputDecoration: "inputDecoration", headerDecoration: "headerDecoration", navIcon: "bottomNavTexture" };
+      const fields = { backgroundImage: "backgroundImage", bubbleUserDecoration: "userBubbleDecoration", bubbleAssistantDecoration: "assistantBubbleDecoration", bubbleDecoration: "assistantBubbleDecoration", avatarFrame: "avatarFrame", inputDecoration: "inputDecoration", headerDecoration: "headerDecoration", decorativeAsset: "decorativeAsset", navIcon: "navIcon" };
       const next = editable(pendingImport.theme); for (const localized of payload.data.localized || []) { const field = fields[localized.kind]; if (field && !next.assets[field]) next.assets[field] = localized.localUrl; }
       pendingImport.theme = api.normalizeTheme(next); draft = editable(pendingImport.theme); assetDecisionPending = false; document.querySelector("[data-theme-assets]").hidden = true; refreshForm(); render(); message(`已本地化 ${payload.data.localized?.length || 0} 张；失败 ${payload.data.failed?.length || 0} 张。失败素材不会应用。`);
     } catch (error) { message(error.message || "素材本地化失败，颜色主题仍可跳过图片后导入。"); }

@@ -35,7 +35,8 @@
   ]);
   const ASSET_FIELDS = Object.freeze([
     "backgroundImage", "chatBackgroundImage", "homeBackgroundImage", "bubbleTexture",
-    "bottomNavTexture", "fontUrl", "avatarFrame", "inputDecoration", "headerDecoration"
+    "bottomNavTexture", "fontUrl", "avatarFrame", "inputDecoration", "headerDecoration",
+    "userBubbleDecoration", "assistantBubbleDecoration", "decorativeAsset", "navIcon"
   ]);
   const LAYOUT_FIELDS = Object.freeze([
     "chatWidth", "bubbleMaxWidth", "messageGap", "bottomNavHeight", "glassIntensity",
@@ -63,7 +64,7 @@
       shadowSoft: "0 12px 30px rgba(63,44,78,.12)", blur: "12px",
       radiusBubble: "24px", radiusCard: "28px", inputRadius: "18px", fontFamily: "system", fontSizeBase: "15px"
     }),
-    assets: Object.freeze({ backgroundImage: "", chatBackgroundImage: "", homeBackgroundImage: "", bubbleTexture: "", bottomNavTexture: "", fontUrl: "", avatarFrame: "", inputDecoration: "", headerDecoration: "" }),
+    assets: Object.freeze({ backgroundImage: "", chatBackgroundImage: "", homeBackgroundImage: "", bubbleTexture: "", bottomNavTexture: "", fontUrl: "", avatarFrame: "", inputDecoration: "", headerDecoration: "", userBubbleDecoration: "", assistantBubbleDecoration: "", decorativeAsset: "", navIcon: "" }),
     layout: Object.freeze({ chatWidth: "auto", bubbleMaxWidth: "78%", messageGap: "14px", bottomNavHeight: "86px", glassIntensity: .62, backgroundDim: .12, bubbleOpacity: .96, navOpacity: .92, cardOpacity: .82, radiusNav: "24px", blurNav: "12px", blurBubble: "0px", effectsMode: "balanced", shadowLevel: "soft", backgroundBlur: "0px", enableGlass: true, enableAnimations: true, readabilityGuard: true }),
     customCss: ""
   });
@@ -229,6 +230,19 @@
     ,"--theme-input-decoration": theme.assets.inputDecoration ? `url(${JSON.stringify(theme.assets.inputDecoration)})` : "none"
     ,"--theme-header-decoration": theme.assets.headerDecoration ? `url(${JSON.stringify(theme.assets.headerDecoration)})` : "none"
     ,"--theme-avatar-frame": theme.assets.avatarFrame ? `url(${JSON.stringify(theme.assets.avatarFrame)})` : "none"
+    ,"--xb-color-bg": theme.tokens.colorBg, "--xb-color-text": theme.tokens.colorText
+    ,"--xb-header-bg": theme.tokens.headerBg, "--xb-header-text": theme.tokens.headerText
+    ,"--xb-card-bg": theme.tokens.cardBg, "--xb-card-text": theme.tokens.cardText
+    ,"--xb-composer-bg": theme.tokens.composerBg, "--xb-input-bg": theme.tokens.inputBg, "--xb-input-text": theme.tokens.inputText
+    ,"--xb-bottom-nav-bg": theme.tokens.bottomNavBg, "--xb-nav-text": theme.tokens.navText
+    ,"--xb-chat-user-bubble-bg": theme.tokens.chatUserBubbleBg, "--xb-chat-user-bubble-text": theme.tokens.chatUserBubbleText
+    ,"--xb-chat-assistant-bubble-bg": theme.tokens.chatAssistantBubbleBg, "--xb-chat-assistant-bubble-text": theme.tokens.chatAssistantBubbleText
+    ,"--xb-border-color": theme.tokens.borderColor, "--xb-radius-bubble": theme.tokens.radiusBubble, "--xb-radius-card": theme.tokens.radiusCard
+    ,"--xb-bg-image": theme.assets.backgroundImage ? `url(${JSON.stringify(theme.assets.backgroundImage)})` : "none"
+    ,"--xb-user-bubble-decor": mode === "performance" || !theme.assets.userBubbleDecoration ? "none" : `url(${JSON.stringify(theme.assets.userBubbleDecoration)})`
+    ,"--xb-assistant-bubble-decor": mode === "performance" || !theme.assets.assistantBubbleDecoration ? "none" : `url(${JSON.stringify(theme.assets.assistantBubbleDecoration)})`
+    ,"--xb-avatar-frame": mode === "performance" || !theme.assets.avatarFrame ? "none" : `url(${JSON.stringify(theme.assets.avatarFrame)})`
+    ,"--xb-input-decor": mode === "performance" || !theme.assets.inputDecoration ? "none" : `url(${JSON.stringify(theme.assets.inputDecoration)})`
   }); };
   class ThemeStore {
     constructor({ storage = typeof localStorage !== "undefined" ? localStorage : null,
@@ -250,6 +264,7 @@
       catch { return []; }
     }
     saveLibrary(items) { this.storage?.setItem(LIBRARY_KEY, JSON.stringify(items.slice(-100))); return items; }
+    getThemeById(id) { return [...this.getLibrary(), ...this.getPresets()].find(theme => theme.id === id) || null; }
     applyTheme(input, { persist = true, applyBackground = false, target = null } = {}) {
       const theme = normalizeTheme(input); const rootNode = target || this.document?.documentElement;
       if (!rootNode?.style) return theme;

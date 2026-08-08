@@ -86,7 +86,7 @@ test("Echoes CSS is detected, converted and external decorations are classified"
   assert.equal(adapter.detectStyleTextFormat(css), "echoes-css");
   const result = adapter.convertStyleText(css, "echoes.docx");
   assert.equal(result.ok, true);
-  assert.deepEqual(result.report.assets.map(item => item.kind), ["backgroundImage", "bubbleDecoration", "inputDecoration"]);
+  assert.deepEqual(result.report.assets.map(item => item.kind), ["backgroundImage", "bubbleAssistantDecoration", "inputDecoration"]);
   assert.doesNotMatch(JSON.stringify(result.theme), /https:\/\/img\.test/u);
 });
 

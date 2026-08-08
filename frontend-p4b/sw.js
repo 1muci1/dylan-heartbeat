@@ -1,4 +1,5 @@
 const CACHE_NAME = "xinban-shell-v56-p4b";
+const BUILD_REVISION = "v56-p4b-theme-sync-1";
 const CACHE_PREFIX = "xinban-shell-";
 const APP_SHELL = [
   "./",

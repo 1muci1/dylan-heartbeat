@@ -4,9 +4,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const store = window.XinbanThemeStore;
   const api = window.XinbanThemes;
   const adapter = window.XinbanTavernThemes;
+  const gateway = window.XinbanThemeGateway;
   const preview = document.querySelector("[data-theme-preview]");
   const status = document.querySelector("[data-theme-status]");
-  if (!store || !api || !preview) return;
+  if (!store || !api || !adapter || !gateway || !preview) return;
   let draft = store.getActive();
   let pendingImport = null;
   let assetDecisionPending = false;
@@ -14,7 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const message = value => { if (status) status.textContent = value; };
   const editable = theme => JSON.parse(JSON.stringify(theme));
   const gatewayHeaders = () => { const token = window.AppConfig?.getProviderConfig?.().auth?.token; return token ? { Authorization: `Bearer ${token}` } : {}; };
-  const gatewayRequest = async (url, options = {}) => { const response = await fetch(url, { ...options, headers: { ...gatewayHeaders(), ...(options.headers || {}) } }); const payload = await response.json().catch(() => ({})); if (!response.ok) throw new Error(payload.error?.message || `请求失败（${response.status}）`); return payload; };
+  const gatewayRequest = async (path, options = {}) => { const config = window.AppConfig?.getProviderConfig?.() || {}; const url = gateway.resolveGatewayUrl(path, { baseUrl: config.baseUrl, locationRef: window.location }); const response = await fetch(url, { ...options, headers: { ...gatewayHeaders(), ...(options.headers || {}) } }); const payload = await response.json().catch(() => ({})); if (!response.ok) throw new Error(payload.error?.message || `请求失败（${response.status}）`); return payload; };
   const hex = value => /^#[0-9a-f]{6}$/iu.test(value || "") ? value : "#8b6bb8";
   const refreshForm = () => {
     document.querySelectorAll("[data-theme-token]").forEach(input => {

@@ -9,7 +9,7 @@ const { test } = require("node:test");
 const root = path.join(__dirname, "..");
 const read = relative => fs.readFileSync(path.join(root, relative), "utf8");
 
-test("Service Worker controller change refreshes only once per v55 tab session", async () => {
+test("Service Worker controller change refreshes only once per v56 tab session", async () => {
   const source = read("frontend-p4b/assets/js/common.js");
   const session = new Map();
   const listeners = {};
@@ -44,8 +44,8 @@ test("Service Worker controller change refreshes only once per v55 tab session",
   listeners.controllerchange();
   listeners.controllerchange();
   assert.equal(reloads, 1);
-  assert.equal(session.get("p4b-sw-controller-refresh-v55"), "1");
-  assert.equal(windowRef.XINBAN_BUILD, "v55-p4b");
+  assert.equal(session.get("p4b-sw-controller-refresh-v56"), "1");
+  assert.equal(windowRef.XINBAN_BUILD, "v56-p4b");
 });
 
 test("legacy nested chat path safely replaces to the formal root entry without looping", () => {

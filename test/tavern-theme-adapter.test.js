@@ -96,3 +96,38 @@ test("style text extraction accepts fenced CSS and Tavern JSON reports localizab
   assert.equal(result.report.assets[0].kind, "avatarFrame");
   assert.doesNotMatch(JSON.stringify(result.theme), /https:\/\//u);
 });
+
+test("Echoes TXT normalization handles BOM, NBSP, full-width spaces and copy marker", () => {
+  const text = `\uFEFF使用说明\r\n以下内容复制：\r\n.echoes-app-shell\u00a0{\u3000background-color:#182038; color:#f5f7ff; }`;
+  assert.equal(adapter.detectStyleTextFormat(text), "echoes-css");
+  const info=adapter.inspectStyleText(text); assert.equal(info.echoes,true); assert.equal(info.hasBraces,true); assert.equal(info.hasProperty,true);
+  const result=adapter.convertStyleText(text,"theme.txt"); assert.equal(result.theme.tokens.colorBg,"#182038"); assert.equal(result.theme.tokens.colorText,"#f5f7ff");
+});
+
+test("TXT is accepted by extension regardless of text/plain, empty or octet-stream MIME", () => {
+  assert.equal(adapter.detectImportFileKind("echoes.txt","text/plain"),"txt");
+  assert.equal(adapter.detectImportFileKind("echoes.txt",""),"txt");
+  assert.equal(adapter.detectImportFileKind("echoes.txt","application/octet-stream"),"txt");
+});
+
+test("Echoes modules map to distinct chat tokens and produce a meaningful report", () => {
+  const css=`
+    .echoes-app-shell,.echoes-chat-page{background:#10182d;color:#eef2ff}
+    .echoes-chat-header{background:#24345c;color:#ffffff;border-bottom:1px solid #7180aa}
+    .echoes-character-card{background:#202b49;color:#f4f5ff;border:1px solid #66749a;border-radius:20px;box-shadow:0px 8px 16px rgba(0,0,0,.2)}
+    .echoes-input-area,.echoes-chat-input,textarea{background:#17223d;color:#f8f9ff;border:1px solid #65749b;border-radius:18px}
+    .echoes-bubble-user{background:#6f55a7;color:#ffffff;border:1px solid #b7a3ec;border-radius:25px}
+    .echoes-bubble-other{background:#f6f3ff;color:#312d45;border:1px solid #d4cbea;border-radius:25px}`;
+  const result=adapter.convertStyleText(css,"echoes.txt"), tokens=result.theme.tokens;
+  assert.equal(tokens.chatUserBubbleBg,"#6f55a7"); assert.equal(tokens.chatUserBubbleText,"#ffffff");
+  assert.equal(tokens.chatAssistantBubbleBg,"#f6f3ff"); assert.equal(tokens.chatAssistantBubbleText,"#312d45");
+  assert.equal(tokens.headerBg,"#24345c"); assert.equal(tokens.headerText,"#ffffff");
+  assert.equal(tokens.inputBg,"#17223d"); assert.equal(tokens.composerBg,"#17223d"); assert.equal(tokens.bottomNavBg,"#17223d");
+  assert.ok(result.report.counts.changedTokens>=10); for(const name of ["页面背景","顶栏","卡片","输入栏","用户气泡","沉气泡","文字色"]) assert.ok(result.report.modules.includes(name),name);
+  const vars=themeApi.cssVariables(result.theme); assert.equal(vars["--theme-user-bubble"],"#6f55a7"); assert.equal(vars["--theme-input-bg"],"#17223d");
+});
+
+test("style diagnostics distinguish missing braces from missing properties", () => {
+  assert.throws(()=>adapter.convertStyleText("普通说明，没有样式","x.txt"),error=>error.code==="THEME_CSS_BRACES_MISSING");
+  assert.throws(()=>adapter.convertStyleText(".echoes-app-shell { 只是文字 }","x.txt"),error=>error.code==="THEME_CSS_PROPERTIES_MISSING");
+});

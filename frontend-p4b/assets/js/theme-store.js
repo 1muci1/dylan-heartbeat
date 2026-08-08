@@ -22,14 +22,16 @@
     "colorPrimary", "colorAccent", "colorBg", "colorText", "colorMuted",
     "chatUserBubbleBg", "chatUserBubbleText", "chatAssistantBubbleBg", "chatAssistantBubbleText",
     "chatBubbleText", "cardText", "cardMutedText", "inputText", "navText", "navActiveText",
-    "previewText", "bottomNavBg", "cardBg", "borderColor", "shadowSoft", "blur", "radiusBubble", "radiusCard",
+    "previewText", "bottomNavBg", "cardBg", "headerBg", "headerText", "inputBg", "composerBg",
+    "chatUserBubbleBorder", "chatAssistantBubbleBorder", "borderColor", "shadowSoft", "blur", "radiusBubble", "radiusCard", "inputRadius",
     "fontFamily", "fontSizeBase"
   ]);
   const COLOR_FIELDS = new Set([
     "colorPrimary", "colorAccent", "colorBg", "colorText", "colorMuted",
     "chatUserBubbleBg", "chatUserBubbleText", "chatAssistantBubbleBg", "chatAssistantBubbleText",
     "chatBubbleText", "cardText", "cardMutedText", "inputText", "navText", "navActiveText",
-    "previewText", "bottomNavBg", "cardBg", "borderColor"
+    "previewText", "bottomNavBg", "cardBg", "headerBg", "headerText", "inputBg", "composerBg",
+    "chatUserBubbleBorder", "chatAssistantBubbleBorder", "borderColor"
   ]);
   const ASSET_FIELDS = Object.freeze([
     "backgroundImage", "chatBackgroundImage", "homeBackgroundImage", "bubbleTexture",
@@ -56,9 +58,10 @@
       chatAssistantBubbleBg: "rgba(255,255,255,.82)", chatAssistantBubbleText: "#342b45",
       chatBubbleText: "#342b45", cardText: "#342b45", cardMutedText: "#6f647d",
       inputText: "#342b45", navText: "#62576f", navActiveText: "#5e3f7c", previewText: "#342b45",
-      bottomNavBg: "rgba(255,255,255,.74)", cardBg: "rgba(255,255,255,.62)", borderColor: "rgba(91,67,112,.14)",
+      bottomNavBg: "rgba(255,255,255,.74)", cardBg: "rgba(255,255,255,.62)", headerBg: "rgba(255,255,255,.68)", headerText: "#342b45",
+      inputBg: "rgba(255,255,255,.76)", composerBg: "rgba(255,255,255,.68)", chatUserBubbleBorder: "rgba(91,67,112,.14)", chatAssistantBubbleBorder: "rgba(91,67,112,.14)", borderColor: "rgba(91,67,112,.14)",
       shadowSoft: "0 12px 30px rgba(63,44,78,.12)", blur: "12px",
-      radiusBubble: "24px", radiusCard: "28px", fontFamily: "system", fontSizeBase: "15px"
+      radiusBubble: "24px", radiusCard: "28px", inputRadius: "18px", fontFamily: "system", fontSizeBase: "15px"
     }),
     assets: Object.freeze({ backgroundImage: "", chatBackgroundImage: "", homeBackgroundImage: "", bubbleTexture: "", bottomNavTexture: "", fontUrl: "", avatarFrame: "", inputDecoration: "", headerDecoration: "" }),
     layout: Object.freeze({ chatWidth: "auto", bubbleMaxWidth: "78%", messageGap: "14px", bottomNavHeight: "86px", glassIntensity: .62, backgroundDim: .12, bubbleOpacity: .96, navOpacity: .92, cardOpacity: .82, radiusNav: "24px", blurNav: "12px", blurBubble: "0px", effectsMode: "balanced", shadowLevel: "soft", backgroundBlur: "0px", enableGlass: true, enableAnimations: true, readabilityGuard: true }),
@@ -145,7 +148,8 @@
     tokens.chatAssistantBubbleText = readableText(tokens.chatAssistantBubbleBg, tokens.chatAssistantBubbleText, page);
     tokens.cardText = readableText(tokens.cardBg, tokens.cardText, page);
     tokens.cardMutedText = readableText(tokens.cardBg, tokens.cardMutedText, page);
-    tokens.inputText = readableText(tokens.cardBg, tokens.inputText, page);
+    tokens.inputText = readableText(tokens.inputBg, tokens.inputText, page);
+    tokens.headerText = readableText(tokens.headerBg, tokens.headerText, page);
     tokens.navText = readableText(tokens.bottomNavBg, tokens.navText, page);
     tokens.navActiveText = readableText(tokens.bottomNavBg, tokens.navActiveText, page);
     tokens.previewText = readableText(tokens.cardBg, tokens.previewText, page);
@@ -204,9 +208,13 @@
     "--theme-input-text": theme.tokens.inputText, "--theme-nav-text": theme.tokens.navText,
     "--theme-nav-active-text": theme.tokens.navActiveText, "--theme-preview-text": theme.tokens.previewText,
     "--theme-bottom-nav": theme.tokens.bottomNavBg, "--theme-card": theme.tokens.cardBg,
+    "--theme-header-bg": theme.tokens.headerBg, "--theme-header-text": theme.tokens.headerText,
+    "--theme-input-bg": theme.tokens.inputBg, "--theme-composer-bg": theme.tokens.composerBg,
+    "--theme-user-bubble-border": theme.tokens.chatUserBubbleBorder, "--theme-assistant-bubble-border": theme.tokens.chatAssistantBubbleBorder,
     "--theme-border": theme.tokens.borderColor, "--theme-shadow-soft": shadow,
     "--theme-blur": clampBlur(theme.tokens.blur), "--theme-radius-bubble": theme.tokens.radiusBubble,
     "--theme-radius-card": theme.tokens.radiusCard, "--theme-font-size": theme.tokens.fontSizeBase,
+    "--theme-input-radius": theme.tokens.inputRadius,
     "--theme-font-family": FONT_MAP[theme.tokens.fontFamily] || `${JSON.stringify(theme.tokens.fontFamily)}, ${FONT_MAP.system}`,
     "--theme-chat-width": theme.layout.chatWidth, "--theme-bubble-max": theme.layout.bubbleMaxWidth,
     "--theme-message-gap": theme.layout.messageGap, "--theme-nav-height": theme.layout.bottomNavHeight,

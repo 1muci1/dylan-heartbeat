@@ -141,10 +141,26 @@
     if (!result.report.counts.recognized) note(result.report, "ignored", "没有识别到可转换的常见主题字段");
     return result;
   }
+  const normalizeText = input => String(input || "").slice(0, MAX_CSS_INPUT)
+    .replace(/^\uFEFF/u, "").replace(/[\u00a0\u3000]/gu, " ").replace(/\r\n?/gu, "\n")
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu, "");
   const extractCssFromText = input => {
-    const text = String(input || "").replace(/\0/gu, "").slice(0, MAX_CSS_INPUT);
+    let text = normalizeText(input);
+    const marker = text.match(/以下内容复制\s*[:：]?/u); if (marker) text = text.slice(marker.index + marker[0].length);
     const fenced = [...text.matchAll(/```(?:css)?\s*([\s\S]*?)```/giu)].map(match => match[1]);
     return (fenced.length ? fenced.join("\n") : text).trim();
+  };
+  const inspectStyleText = input => {
+    const css = extractCssFromText(input); const echoes = /\.echoes-[\w-]+/iu.test(css);
+    const hasBraces = /\{[\s\S]*\}/u.test(css); const hasProperty = /(?:^|[;{])\s*(?:background(?:-color|-image)?|color|border(?:-color|-radius|-bottom)?|box-shadow|font-family)\s*:/imu.test(css);
+    const hasRule = /(?:^|[}\n])\s*(?:[.#][\w-]+|body|html|textarea|\[[^\]]+\])[^{}]{0,500}\{[^{}]*[\w-]+\s*:[^{}]+\}/imu.test(css);
+    return { css, textLength: css.length, echoes, hasBraces, hasProperty, hasRule };
+  };
+  const detectImportFileKind = (filename, mime = "") => {
+    const extension=String(filename||"").toLowerCase().match(/\.[^.]+$/u)?.[0]||"";
+    if ([".json",".docx",".txt",".css"].includes(extension)) return extension.slice(1);
+    if (mime === "text/plain") return "txt"; if (mime === "text/css") return "css"; if (mime === "application/json") return "json";
+    return "unknown";
   };
   const classifyAssetKind = selector => {
     const value = String(selector || "").toLowerCase();
@@ -169,33 +185,33 @@
     }
     return assets.slice(0, 30);
   }
-  const detectStyleTextFormat = input => {
-    const css = extractCssFromText(input);
-    return /\.echoes-(?:app-shell|chat-header|bubble-user|bubble-other|input-area)\b/iu.test(css) ? "echoes-css" : /[.#:\w][^{}]{0,500}\{[^{}]+\}/u.test(css) ? "css" : "unknown";
-  };
+  const detectStyleTextFormat = input => { const info = inspectStyleText(input); return info.echoes && info.hasBraces && info.hasProperty ? "echoes-css" : info.hasRule ? "css" : "unknown"; };
   function convertStyleText(input, filename = "") {
-    const css = extractCssFromText(input); const format = detectStyleTextFormat(css); if (format === "unknown") throw new AdapterError("文件中没有识别到 CSS", "THEME_CSS_NOT_FOUND");
-    const base = JSON.parse(JSON.stringify(themeApi.DEFAULT_THEME)); base.id = `theme_style_${Math.random().toString(36).slice(2,10)}`; base.name = safeName(filename.replace(/\.(?:docx|txt|css)$/iu, ""), format === "echoes-css" ? "Echoes 美化" : "CSS 美化");
-    const report = createReport(format); report.assets = scanCssAssets(css); report.counts.externalImages = report.assets.length; if (report.assets.length) note(report, "ignored", `检测到外部装饰图片 ${report.assets.length} 张，等待用户确认本地化`);
-    for (const rule of css.matchAll(/([.#:\w][^{}]{0,500})\{([^{}]{0,8000})\}/gu)) {
-      const selector = rule[1].toLowerCase();
-      for (const raw of rule[2].split(";")) {
-        const separator = raw.indexOf(":"); if (separator < 1) continue; const property = raw.slice(0,separator).trim().toLowerCase(); const value = raw.slice(separator+1).trim();
-        if (["color","background-color","border-color"].includes(property) && safeColor(value)) {
-          if (/(?:bubble-user|user)/u.test(selector)) property === "color" ? base.tokens.chatUserBubbleText=value : base.tokens.chatUserBubbleBg=harmonizeGlassTint(value,base.tokens.chatUserBubbleBg);
-          else if (/(?:bubble-other|assistant|bot)/u.test(selector)) property === "color" ? base.tokens.chatAssistantBubbleText=value : base.tokens.chatAssistantBubbleBg=harmonizeGlassTint(value,base.tokens.chatAssistantBubbleBg);
-          else if (/(?:input|composer)/u.test(selector) && property === "color") base.tokens.inputText=value;
-          else if (property === "color") { base.tokens.cardText=value; base.tokens.colorText=value; }
-          else if (property === "border-color") base.tokens.borderColor=value;
-          else base.tokens.cardBg=harmonizeGlassTint(value);
-          note(report,"recognized",`${selector.slice(0,60)} ${property}`);
-        }
-        if (property === "border-radius" && /^\d+(?:\.\d+)?(?:px|rem|%)$/u.test(value)) { if (/bubble/u.test(selector)) base.tokens.radiusBubble=value; else base.tokens.radiusCard=value; note(report,"recognized",`${selector.slice(0,60)} border-radius`); }
-      }
+    const info = inspectStyleText(input); const css = info.css; const format = detectStyleTextFormat(css);
+    if (format === "unknown") { const message = !info.hasBraces ? "没有检测到 CSS 大括号；文件可能不是纯文本，请重新另存为 UTF-8 txt" : !info.hasProperty ? "检测到文本但没有 CSS 属性；请确认文件包含 background/color/border 等声明" : "检测到 CSS 片段，但选择器结构无法识别；请重新另存为 UTF-8 txt"; throw new AdapterError(message, !info.hasBraces ? "THEME_CSS_BRACES_MISSING" : !info.hasProperty ? "THEME_CSS_PROPERTIES_MISSING" : "THEME_CSS_RULE_INVALID"); }
+    const base = JSON.parse(JSON.stringify(themeApi.DEFAULT_THEME)); base.harmonyVersion = 2; base.id = `theme_style_${Math.random().toString(36).slice(2,10)}`; base.name = safeName(filename.replace(/\.(?:docx|txt|css)$/iu, ""), format === "echoes-css" ? "Echoes 美化" : "CSS 美化");
+    const report = createReport(format); report.textLength = info.textLength; report.echoes = info.echoes; report.hasCssBlock = info.hasBraces; report.modules = []; report.changedTokens = [];
+    const modules = new Set(), changed = new Set(); const assign = (key,value,module) => { if (!value || !(key in base.tokens)) return; base.tokens[key]=value; changed.add(key); modules.add(module); };
+    const colorFrom = value => safeColor(value) || safeColor(String(value).match(/#[0-9a-f]{3,8}\b|rgba?\([^)]*\)/iu)?.[0]);
+    const radiusFrom = value => String(value).match(/\d+(?:\.\d+)?(?:px|rem|%)/u)?.[0] || null;
+    const borderColorFrom = value => colorFrom(value);
+    const shadowFrom = value => /^(?:none|(?:-?\d+(?:\.\d+)?px\s+){2,4}(?:rgba?\([^)]+\)|#[0-9a-f]{3,8}))$/iu.test(value) ? value : null;
+    report.assets = scanCssAssets(css); report.counts.externalImages = report.assets.length; if (report.assets.length) note(report, "ignored", `检测到外部装饰图片 ${report.assets.length} 张，等待用户确认本地化`);
+    for (const rule of css.matchAll(/([^{}]{1,500})\{([^{}]{1,8000})\}/gu)) {
+      const selector = rule[1].trim().toLowerCase(); const declarations = {};
+      for (const raw of rule[2].split(";")) { const separator=raw.indexOf(":"); if(separator>0) declarations[raw.slice(0,separator).trim().toLowerCase()]=raw.slice(separator+1).trim().replace(/\s*!important\s*$/iu,""); }
+      const bg=colorFrom(declarations["background-color"]||declarations.background); const color=colorFrom(declarations.color); const border=borderColorFrom(declarations["border-color"]||declarations.border||declarations["border-bottom"]); const radius=radiusFrom(declarations["border-radius"]); const shadow=shadowFrom(declarations["box-shadow"]||"");
+      if (/(?:echoes-app-shell|echoes-app(?:\b|,)|echoes-page|echoes-chat-page|\bbody\b)/u.test(selector)) { assign("colorBg",bg,"页面背景"); assign("colorText",color,"文字色"); assign("previewText",color,"文字色"); }
+      if (/(?:echoes-chat-header|echoes-page-header)/u.test(selector)) { assign("headerBg",bg,"顶栏"); assign("headerText",color,"顶栏"); assign("borderColor",border,"顶栏"); }
+      if (/(?:echoes-character-card|echoes-modal-container|echoes-toast-card|\bcard\b)/u.test(selector)) { assign("cardBg",bg,"卡片"); assign("cardText",color,"卡片"); assign("borderColor",border,"卡片"); assign("radiusCard",radius,"卡片"); assign("shadowSoft",shadow,"卡片"); }
+      if (/(?:echoes-input-area|echoes-chat-input|\btextarea\b|composer)/u.test(selector)) { assign("inputBg",bg,"输入栏"); assign("composerBg",bg,"输入栏"); assign("bottomNavBg",bg,"底栏"); assign("inputText",color,"输入栏"); assign("borderColor",border,"输入栏"); assign("inputRadius",radius,"输入栏"); assign("shadowSoft",shadow,"输入栏"); }
+      if (/echoes-bubble-user/u.test(selector)) { assign("chatUserBubbleBg",bg,"用户气泡"); assign("chatUserBubbleText",color,"用户气泡"); assign("chatUserBubbleBorder",border,"用户气泡"); assign("radiusBubble",radius,"用户气泡"); assign("shadowSoft",shadow,"用户气泡"); }
+      if (/echoes-bubble-other/u.test(selector)) { assign("chatAssistantBubbleBg",bg,"沉气泡"); assign("chatAssistantBubbleText",color,"沉气泡"); assign("chatAssistantBubbleBorder",border,"沉气泡"); assign("radiusBubble",radius,"沉气泡"); assign("shadowSoft",shadow,"沉气泡"); }
     }
+    report.modules=[...modules]; report.changedTokens=[...changed]; for(const module of report.modules) note(report,"recognized",`已转换：${module}`); report.counts.changedTokens=report.changedTokens.length; if(report.changedTokens.length<3) note(report,"ignored","转换较少，效果可能不明显");
     const sanitized=sanitizeExternalCustomCss(css); base.customCss=sanitized.css; for(const bucket of ["recognized","ignored","blocked"]){report[bucket].push(...sanitized.report[bucket]);report.counts[bucket]+=sanitized.report.counts[bucket];} report.counts.externalImages=Math.max(report.counts.externalImages,sanitized.report.counts.externalImages);
     return {ok:true,theme:themeApi.normalizeTheme(base),report};
   }
   const assertImportSize = size => { if (Number(size) > MAX_JSON_BYTES) throw new AdapterError("主题 JSON 不能超过 1MB", "THEME_FILE_TOO_LARGE"); return true; };
-  return { detectThemeFormat, convertSillyTavernTheme, convertExternalTheme, convertStyleText, detectStyleTextFormat, extractCssFromText, scanCssAssets, classifyAssetKind, sanitizeExternalCustomCss, harmonizeGlassTint, assertImportSize, MAX_JSON_BYTES, MAX_DEPTH, MAX_FIELDS, AdapterError };
+  return { detectThemeFormat, detectImportFileKind, convertSillyTavernTheme, convertExternalTheme, convertStyleText, detectStyleTextFormat, normalizeText, inspectStyleText, extractCssFromText, scanCssAssets, classifyAssetKind, sanitizeExternalCustomCss, harmonizeGlassTint, assertImportSize, MAX_JSON_BYTES, MAX_DEPTH, MAX_FIELDS, AdapterError };
 });

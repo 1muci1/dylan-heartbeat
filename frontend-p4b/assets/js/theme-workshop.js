@@ -42,6 +42,12 @@ document.addEventListener("DOMContentLoaded", () => {
   };
   const render = () => { if (!renderFrame) renderFrame = requestAnimationFrame(renderNow); };
   const update = mutator => { const next = editable(draft); mutator(next); draft = next; render(); };
+  const showImportDifference = converted => {
+    const before = store.getActive(), after = converted.theme; const beforeSwatch = document.querySelector("[data-theme-before-swatch]"), afterSwatch = document.querySelector("[data-theme-after-swatch]");
+    const paint = (node, theme) => { if (!node) return; node.style.setProperty("--diff-bg",theme.tokens.colorBg); node.style.setProperty("--diff-card",theme.tokens.cardBg); node.style.setProperty("--diff-user",theme.tokens.chatUserBubbleBg); node.style.setProperty("--diff-assistant",theme.tokens.chatAssistantBubbleBg); };
+    paint(beforeSwatch,before); paint(afterSwatch,after); const modules=converted.report.modules||[]; const count=converted.report.counts.changedTokens||0;
+    document.querySelector("[data-theme-import-changes]").textContent = modules.length ? `即将改变：${modules.join("、")}（${count} 个主题变量）${count < 3 ? "。可识别内容较少，应用后变化可能不明显。" : "。"}` : "可识别内容较少，应用后变化可能不明显。";
+  };
   const presets = store.getPresets();
   const presetRoot = document.querySelector("[data-theme-presets]");
   presets.forEach(theme => {
@@ -96,7 +102,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelector("[data-theme-import]")?.addEventListener("change", async event => {
     const file = event.target.files?.[0]; if (!file) return;
     try {
-      adapter.assertImportSize(file.size); const extension = file.name.toLowerCase().match(/\.[^.]+$/u)?.[0] || "";
+      adapter.assertImportSize(file.size); const kind = adapter.detectImportFileKind(file.name,file.type); const extension = kind === "unknown" ? "" : `.${kind}`;
       let converted;
       let format;
       if (extension === ".json") {
@@ -115,13 +121,14 @@ document.addEventListener("DOMContentLoaded", () => {
       const labels = { xinban: "小窝主题 JSON", sillytavern: "酒馆美化 JSON", external: "外部主题 JSON", unknown: "未知外部 JSON", "echoes-css": "Echoes 美化 CSS", css: "CSS/TXT 美化" };
       const review = document.querySelector("[data-theme-import-review]"); review.hidden = false;
       document.querySelector("[data-theme-import-format]").textContent = `检测到：${labels[converted.report.format] || labels[format]}`;
-      const counts = converted.report.counts; document.querySelector("[data-theme-import-report]").textContent = `已识别 ${counts.recognized || 0} 项；已忽略 ${counts.ignored || 0} 项（外部图片 ${counts.externalImages || 0}）；已拦截 ${counts.blocked || 0} 项。当前只在预览，尚未加入主题库。`;
+      const counts = converted.report.counts; document.querySelector("[data-theme-import-report]").textContent = `已识别 ${counts.recognized || 0} 项；已转换 ${counts.changedTokens || counts.recognized || 0} 个变量；已忽略 ${counts.ignored || 0} 项（外部图片 ${counts.externalImages || 0}）；已拦截 ${counts.blocked || 0} 项。当前只在预览，尚未加入主题库。`;
+      showImportDifference(converted);
       const assetPanel = document.querySelector("[data-theme-assets]"); const assetList = document.querySelector("[data-theme-asset-list]"); assetList.replaceChildren();
       const assets = converted.report.assets || []; assetPanel.hidden = !assets.length; assetDecisionPending = Boolean(assets.length);
       for (const asset of assets) { const label = document.createElement("label"); label.className = "theme-asset-item"; const checkbox = document.createElement("input"); checkbox.type = "checkbox"; checkbox.checked = true; checkbox.dataset.assetId = asset.id; const copy = document.createElement("span"); const title = document.createElement("strong"); title.textContent = asset.kind; let domain = "外部地址"; try { domain = new URL(asset.sourceUrl).hostname; } catch {} copy.append(title, document.createTextNode(`${domain} · ${asset.selector}`)); label.append(checkbox, copy); assetList.append(label); }
       message(`正在预览转换结果「${draft.name}」。`);
     }
-    catch (error) { message(error.message || "主题包导入失败"); }
+    catch (error) { const extension=file.name.toLowerCase().match(/\.[^.]+$/u)?.[0]||"未知"; let details=""; try { if([".txt",".css"].includes(extension)){const text=await file.text();const info=adapter.inspectStyleText(text);details=` 类型 ${extension}，读取 ${info.textLength} 字，Echoes=${info.echoes?"是":"否"}，CSS块=${info.hasBraces?"是":"否"}。`;}} catch {} message(`${error.message || "主题包导入失败"}。${details}`); }
     finally { event.target.value = ""; }
   });
   document.querySelector("[data-theme-import-confirm]")?.addEventListener("click", () => {

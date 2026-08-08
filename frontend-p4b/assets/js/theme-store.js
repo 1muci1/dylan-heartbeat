@@ -278,13 +278,22 @@
     ,"--theme-header-decoration": theme.assets.headerDecoration ? `url(${JSON.stringify(theme.assets.headerDecoration)})` : "none"
     ,"--theme-avatar-frame": theme.assets.avatarFrame ? `url(${JSON.stringify(theme.assets.avatarFrame)})` : "none"
     ,"--xb-color-bg": theme.tokens.colorBg, "--xb-color-text": theme.tokens.colorText
+    ,"--xb-color-surface": theme.tokens.cardBg, "--xb-color-surface-soft": `color-mix(in srgb, ${theme.tokens.cardBg} 76%, ${theme.tokens.colorBg})`
+    ,"--xb-color-text-muted": theme.tokens.colorMuted, "--xb-color-accent": theme.tokens.colorPrimary, "--xb-color-accent-soft": `color-mix(in srgb, ${theme.tokens.colorPrimary} 15%, ${theme.tokens.cardBg})`
+    ,"--xb-page-bg": theme.tokens.colorBg, "--xb-page-text": theme.tokens.colorText
     ,"--xb-header-bg": theme.tokens.headerBg, "--xb-header-text": theme.tokens.headerText
-    ,"--xb-card-bg": theme.tokens.cardBg, "--xb-card-text": theme.tokens.cardText
-    ,"--xb-composer-bg": theme.tokens.composerBg, "--xb-input-bg": theme.tokens.inputBg, "--xb-input-text": theme.tokens.inputText
-    ,"--xb-bottom-nav-bg": theme.tokens.bottomNavBg, "--xb-nav-text": theme.tokens.navText
+    ,"--xb-card-bg": theme.tokens.cardBg, "--xb-card-text": theme.tokens.cardText, "--xb-card-muted": theme.tokens.cardMutedText
+    ,"--xb-card-border": theme.tokens.borderColor, "--xb-card-shadow": shadow
+    ,"--xb-composer-bg": theme.tokens.composerBg, "--xb-input-bg": theme.tokens.inputBg, "--xb-input-text": theme.tokens.inputText, "--xb-input-border": theme.tokens.borderColor
+    ,"--xb-button-bg": theme.tokens.colorPrimary, "--xb-button-text": readableText(theme.tokens.colorPrimary, "#ffffff", theme.tokens.colorBg), "--xb-button-border": theme.tokens.borderColor
+    ,"--xb-bottom-nav-bg": theme.tokens.bottomNavBg, "--xb-nav-text": theme.tokens.navText, "--xb-nav-active-text": theme.tokens.navActiveText
+    ,"--xb-nav-active-bg": `color-mix(in srgb, ${theme.tokens.colorPrimary} 16%, ${theme.tokens.bottomNavBg})`
+    ,"--xb-status-bg": `color-mix(in srgb, ${theme.tokens.colorAccent} 14%, ${theme.tokens.cardBg})`, "--xb-status-text": theme.tokens.cardText
+    ,"--xb-badge-bg": `color-mix(in srgb, ${theme.tokens.colorPrimary} 13%, ${theme.tokens.cardBg})`, "--xb-badge-text": theme.tokens.cardText
+    ,"--xb-avatar-ring": theme.tokens.colorAccent, "--xb-progress-bg": `color-mix(in srgb, ${theme.tokens.cardMutedText} 18%, ${theme.tokens.cardBg})`, "--xb-progress-fill": theme.tokens.colorPrimary
     ,"--xb-chat-user-bubble-bg": theme.tokens.chatUserBubbleBg, "--xb-chat-user-bubble-text": theme.tokens.chatUserBubbleText
     ,"--xb-chat-assistant-bubble-bg": theme.tokens.chatAssistantBubbleBg, "--xb-chat-assistant-bubble-text": theme.tokens.chatAssistantBubbleText
-    ,"--xb-border-color": theme.tokens.borderColor, "--xb-radius-bubble": theme.tokens.radiusBubble, "--xb-radius-card": theme.tokens.radiusCard
+    ,"--xb-border-color": theme.tokens.borderColor, "--xb-radius-bubble": theme.tokens.radiusBubble, "--xb-radius-card": theme.tokens.radiusCard, "--xb-radius-button": `calc(${theme.tokens.radiusCard} * .48)`
     ,"--xb-bg-image": mode === "performance" || !theme.visualSlots.pageBackground.enabled || !theme.visualSlots.pageBackground.url ? "none" : `url(${JSON.stringify(theme.visualSlots.pageBackground.url)})`
     ,"--xb-bg-image-opacity": String(theme.visualSlots.pageBackground.opacity)
     ,"--xb-header-decor": mode === "performance" || !theme.visualSlots.chatHeaderDecor.enabled || !theme.visualSlots.chatHeaderDecor.url ? "none" : `url(${JSON.stringify(theme.visualSlots.chatHeaderDecor.url)})`

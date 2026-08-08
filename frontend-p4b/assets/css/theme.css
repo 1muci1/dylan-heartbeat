@@ -17,6 +17,12 @@
   --xb-card-bg:var(--theme-card);--xb-card-text:var(--theme-card-text);--xb-composer-bg:var(--theme-composer-bg);--xb-input-bg:var(--theme-input-bg);--xb-input-text:var(--theme-input-text);
   --xb-bottom-nav-bg:var(--theme-bottom-nav);--xb-nav-text:var(--theme-nav-text);--xb-chat-user-bubble-bg:var(--theme-user-bubble);--xb-chat-user-bubble-text:var(--theme-user-bubble-text);
   --xb-chat-assistant-bubble-bg:var(--theme-assistant-bubble);--xb-chat-assistant-bubble-text:var(--theme-assistant-bubble-text);--xb-border-color:var(--theme-border);--xb-radius-bubble:var(--theme-radius-bubble);--xb-radius-card:var(--theme-radius-card);
+  --xb-color-surface:var(--theme-card);--xb-color-surface-soft:color-mix(in srgb,var(--theme-card) 76%,var(--theme-bg));--xb-color-text-muted:var(--theme-muted);--xb-color-accent:var(--theme-primary);--xb-color-accent-soft:color-mix(in srgb,var(--theme-primary) 15%,var(--theme-card));
+  --xb-page-bg:var(--theme-bg);--xb-page-text:var(--theme-text);--xb-card-muted:var(--theme-card-muted);--xb-card-border:var(--theme-border);--xb-card-shadow:var(--theme-shadow-soft);
+  --xb-nav-active-bg:color-mix(in srgb,var(--theme-primary) 16%,var(--theme-bottom-nav));--xb-nav-active-text:var(--theme-nav-active-text);
+  --xb-button-bg:var(--theme-primary);--xb-button-text:#fff;--xb-button-border:var(--theme-border);--xb-input-border:var(--theme-border);
+  --xb-status-bg:color-mix(in srgb,var(--theme-accent) 14%,var(--theme-card));--xb-status-text:var(--theme-card-text);--xb-badge-bg:color-mix(in srgb,var(--theme-primary) 13%,var(--theme-card));--xb-badge-text:var(--theme-card-text);
+  --xb-avatar-ring:var(--theme-accent);--xb-progress-bg:color-mix(in srgb,var(--theme-card-muted) 18%,var(--theme-card));--xb-progress-fill:var(--theme-primary);--xb-radius-button:calc(var(--theme-radius-card) * .48);
   --xb-bg-image:none;--xb-bg-image-opacity:.35;--xb-header-decor:none;--xb-user-bubble-decor:none;--xb-assistant-bubble-decor:none;--xb-avatar-frame:none;--xb-input-decor:none;--xb-home-card-decor:none;--xb-nav-accent:none;
   --bg:var(--theme-bg);--surface:var(--theme-card);--surface-soft:color-mix(in srgb,var(--theme-card) 82%,var(--theme-bg));
   --primary:var(--theme-primary);--primary-dark:var(--theme-accent);--primary-light:color-mix(in srgb,var(--theme-primary) 16%,transparent);
@@ -79,3 +85,47 @@ html.has-xinban-theme .companion-hero::after,html.has-xinban-theme .today-card::
 html.has-xinban-theme .companion-portrait::after,html.has-xinban-theme .dashboard-avatar::after{position:absolute;z-index:0;inset:-5px;max-width:calc(100% + 10px);max-height:calc(100% + 10px);contain:paint;pointer-events:none;background:var(--xb-avatar-frame) center/contain no-repeat;content:""}
 @media(min-width:521px){.bottom-nav{border-radius:0 0 var(--theme-radius-card) var(--theme-radius-card)}}
 @media(prefers-reduced-motion:reduce){*{animation-duration:0s!important;transition-duration:0s!important}}
+
+/* v60 canonical coverage: color-only overrides. These rules intentionally do not alter chat layout geometry. */
+html.has-xinban-theme body{color:var(--xb-page-text);background-color:var(--xb-page-bg)}
+html.has-xinban-theme :is(.home-page,.dashboard-page,.settings-page,.theme-workshop-page,.review-page,.memory-page,.sticker-manager-page,.game-page){color:var(--xb-page-text);background-color:var(--xb-page-bg)}
+html.has-xinban-theme :is(.home-header__eyebrow,.dashboard-header__eyebrow,.settings-header p,.home-section-heading p,.home-section-heading>span,.dashboard-section-heading p,.dashboard-section-heading>span,.review-header small){color:var(--xb-color-text-muted,var(--theme-muted))}
+html.has-xinban-theme :is(.home-header h1,.dashboard-header h1,.settings-header h1,.theme-workshop-header h1,.review-header h1){color:var(--xb-page-text)}
+html.has-xinban-theme :is(.quiet-button,.dashboard-header__button,.settings-header__back,.review-header>a){border-color:var(--xb-button-border);color:var(--xb-nav-active-text);background-color:var(--xb-header-bg);box-shadow:var(--xb-card-shadow)}
+
+html.has-xinban-theme :is(.companion-hero,.companion-profile){border-color:var(--xb-card-border);color:var(--xb-card-text);background:linear-gradient(145deg,color-mix(in srgb,var(--xb-color-accent) 72%,var(--xb-card-bg)),color-mix(in srgb,var(--theme-accent) 54%,var(--xb-page-bg)));box-shadow:var(--xb-card-shadow)}
+html.has-xinban-theme :is(.companion-portrait,.dashboard-avatar){border-color:var(--xb-avatar-ring);background-color:color-mix(in srgb,var(--xb-card-bg) 12%,transparent);box-shadow:0 0 0 3px color-mix(in srgb,var(--xb-avatar-ring) 18%,transparent)}
+html.has-xinban-theme :is(.companion-portrait__orbit,.companion-profile__chat){border-color:color-mix(in srgb,var(--xb-avatar-ring) 48%,transparent)}
+html.has-xinban-theme .companion-portrait__moon::after,html.has-xinban-theme .dashboard-avatar__moon::after{background:color-mix(in srgb,var(--xb-color-accent) 72%,var(--xb-page-bg))}
+html.has-xinban-theme :is(.online-pill,.online-label,.status-card__tag){border-color:var(--xb-card-border);color:var(--xb-status-text);background:var(--xb-status-bg)}
+html.has-xinban-theme :is(.online-pill span,.online-label span,.status-card__tag i){background:var(--xb-progress-fill);box-shadow:0 0 0 4px color-mix(in srgb,var(--xb-progress-fill) 15%,transparent)}
+
+html.has-xinban-theme :is(.today-card,.action-card,.status-card,.activity-timeline,.memory-card,.explanation-card,.review-notice,.review-status,.candidate-card,.review-card,.sticker-upload,.sticker-import,.single-sticker,.manager-card){border-color:var(--xb-card-border);border-radius:var(--xb-radius-card);color:var(--xb-card-text);background:var(--xb-card-bg);box-shadow:var(--xb-card-shadow)}
+html.has-xinban-theme :is(.today-card__copy span,.today-card__copy p,.today-card__meter small,.action-card__copy small,.action-card__arrow,.status-card__label,.status-card__detail span,.status-card__detail strong,.memory-count span,.activity-entry time,.activity-entry p,.candidate-meta,.review-source){color:var(--xb-card-muted)}
+html.has-xinban-theme :is(.today-card__mark,.action-card__icon,.status-card__icon,.activity-entry__marker){color:var(--xb-color-accent);background:var(--xb-color-accent-soft)}
+html.has-xinban-theme .today-card__meter span{background:var(--xb-progress-bg)}
+html.has-xinban-theme .today-card__meter span:nth-child(-n+4){background:var(--xb-progress-fill)}
+html.has-xinban-theme :is(.status-card__detail,.activity-entry__body){border-color:var(--xb-card-border)}
+html.has-xinban-theme .action-card--chat{color:var(--xb-button-text);background:linear-gradient(135deg,var(--xb-button-bg),color-mix(in srgb,var(--xb-button-bg) 72%,var(--xb-page-bg)));box-shadow:var(--xb-card-shadow)}
+
+html.has-xinban-theme :is(.settings-intro,.provider-button--primary,.theme-actions button[data-theme-apply],.candidate-actions button,.review-actions button,.review-more){border-color:var(--xb-button-border);color:var(--xb-button-text);background:var(--xb-button-bg);box-shadow:var(--xb-card-shadow)}
+html.has-xinban-theme :is(.provider-form,.provider-panel,.appearance-settings,.preference-data-settings,.chat-background-settings,.avatar-settings,.theme-panel,.theme-import-review,.theme-asset-card,.theme-asset-preview-dialog){border-color:var(--xb-card-border);color:var(--xb-card-text);background:var(--xb-card-bg);box-shadow:var(--xb-card-shadow)}
+html.has-xinban-theme :is(.settings-header__mode,.provider-endpoint,.provider-mode,.theme-readability-fix,.theme-actions button,.theme-actions label,.theme-chat-link){border-color:var(--xb-badge-bg);color:var(--xb-badge-text);background:var(--xb-badge-bg)}
+html.has-xinban-theme :is(input,select,textarea,.provider-field input,.review-filters input,.review-filters select,.review-editor input,.review-editor select,.review-editor textarea){border-color:var(--xb-input-border);color:var(--xb-input-text);background:var(--xb-input-bg)}
+html.has-xinban-theme :is(button,.provider-button,.theme-actions button,.review-more){border-radius:var(--xb-radius-button)}
+
+html.has-xinban-theme :is(.bottom-nav,.game-nav){border-color:var(--xb-card-border);color:var(--xb-nav-text);background:var(--xb-bottom-nav-bg);box-shadow:var(--xb-card-shadow)}
+html.has-xinban-theme :is(.bottom-nav,.game-nav) a{color:var(--xb-nav-text)}
+html.has-xinban-theme :is(.bottom-nav,.game-nav) a:is(.is-active,[aria-current=page]){border-radius:var(--xb-radius-button);color:var(--xb-nav-active-text);background:var(--xb-nav-active-bg)}
+
+/* Game shell coverage; board intersections, stones and drawing canvases retain functional colors. */
+html.has-xinban-theme body.game-page{color:var(--xb-page-text);background:var(--xb-page-bg)}
+html.has-xinban-theme .game-header{color:var(--xb-header-text)}
+html.has-xinban-theme .game-header p,html.has-xinban-theme .panel-heading p{color:var(--xb-color-text-muted,var(--theme-muted))}
+html.has-xinban-theme .game-header a,html.has-xinban-theme .panel-heading>button{color:var(--xb-color-accent)}
+html.has-xinban-theme .hero-card{border-color:var(--xb-card-border);color:var(--xb-card-text);background:linear-gradient(145deg,color-mix(in srgb,var(--xb-color-accent) 72%,var(--xb-card-bg)),color-mix(in srgb,var(--theme-accent) 48%,var(--xb-page-bg)));box-shadow:var(--xb-card-shadow)}
+html.has-xinban-theme :is(.lobby-card,.game-panel,.guess-result,.preset-drawing){border-color:var(--xb-card-border);color:var(--xb-card-text);background:var(--xb-card-bg);box-shadow:var(--xb-card-shadow)}
+html.has-xinban-theme :is(.lobby-card p,.game-status,.answer-field){color:var(--xb-card-muted)}
+html.has-xinban-theme :is(.lobby-icon,.status,.mode-tabs button,.drawing-tools button,.guess-result button){border-color:var(--xb-button-border);color:var(--xb-badge-text);background:var(--xb-badge-bg)}
+html.has-xinban-theme :is(.lobby-card button,.primary-button,.secondary-button,.guess-form button,.mode-tabs .is-active){border-color:var(--xb-button-border);color:var(--xb-button-text);background:var(--xb-button-bg)}
+html.has-xinban-theme :is(.answer-field input,.guess-form input){border-color:var(--xb-input-border);color:var(--xb-input-text);background:var(--xb-input-bg)}

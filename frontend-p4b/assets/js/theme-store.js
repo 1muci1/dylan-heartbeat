@@ -38,6 +38,11 @@
     "bottomNavTexture", "fontUrl", "avatarFrame", "inputDecoration", "headerDecoration",
     "userBubbleDecoration", "assistantBubbleDecoration", "decorativeAsset", "navIcon"
   ]);
+  const VISUAL_SLOT_FIELDS = Object.freeze([
+    "pageBackground", "chatHeaderDecor", "userBubbleDecor", "assistantBubbleDecor",
+    "avatarFrame", "inputDecor", "homeCardDecor", "navAccent"
+  ]);
+  const LOCAL_THEME_ASSET = /^\/api\/theme\/assets\/[a-z0-9-]{8,80}$/iu;
   const LAYOUT_FIELDS = Object.freeze([
     "chatWidth", "bubbleMaxWidth", "messageGap", "bottomNavHeight", "glassIntensity",
     "backgroundDim", "bubbleOpacity", "navOpacity", "cardOpacity", "radiusNav", "blurNav", "blurBubble",
@@ -65,12 +70,24 @@
       radiusBubble: "24px", radiusCard: "28px", inputRadius: "18px", fontFamily: "system", fontSizeBase: "15px"
     }),
     assets: Object.freeze({ backgroundImage: "", chatBackgroundImage: "", homeBackgroundImage: "", bubbleTexture: "", bottomNavTexture: "", fontUrl: "", avatarFrame: "", inputDecoration: "", headerDecoration: "", userBubbleDecoration: "", assistantBubbleDecoration: "", decorativeAsset: "", navIcon: "" }),
+    assetLibrary: Object.freeze([]),
+    visualSlots: Object.freeze({
+      pageBackground: Object.freeze({ url: "", enabled: true, opacity: .35, position: "center", size: "cover" }),
+      chatHeaderDecor: Object.freeze({ url: "", enabled: true, opacity: .72, position: "right", size: "contain" }),
+      userBubbleDecor: Object.freeze({ url: "", enabled: true, opacity: .9, position: "top-right", size: "small" }),
+      assistantBubbleDecor: Object.freeze({ url: "", enabled: true, opacity: .9, position: "top-left", size: "small" }),
+      avatarFrame: Object.freeze({ url: "", enabled: true, opacity: 1, position: "center", size: "small" }),
+      inputDecor: Object.freeze({ url: "", enabled: true, opacity: .8, position: "right", size: "small" }),
+      homeCardDecor: Object.freeze({ url: "", enabled: true, opacity: .48, position: "corner", size: "medium" }),
+      navAccent: Object.freeze({ url: "", enabled: true, opacity: .32, position: "center", size: "small" })
+    }),
     layout: Object.freeze({ chatWidth: "auto", bubbleMaxWidth: "78%", messageGap: "14px", bottomNavHeight: "86px", glassIntensity: .62, backgroundDim: .12, bubbleOpacity: .96, navOpacity: .92, cardOpacity: .82, radiusNav: "24px", blurNav: "12px", blurBubble: "0px", effectsMode: "balanced", shadowLevel: "soft", backgroundBlur: "0px", enableGlass: true, enableAnimations: true, readabilityGuard: true }),
     customCss: ""
   });
   const preset = (id, name, values) => Object.freeze({ ...DEFAULT_THEME, id, name, ...values,
     tokens: Object.freeze({ ...DEFAULT_THEME.tokens, ...(values.tokens || {}) }),
-    assets: DEFAULT_THEME.assets, layout: Object.freeze({ ...DEFAULT_THEME.layout, ...(values.layout || {}) }) });
+    assets: DEFAULT_THEME.assets, assetLibrary: DEFAULT_THEME.assetLibrary, visualSlots: DEFAULT_THEME.visualSlots,
+    layout: Object.freeze({ ...DEFAULT_THEME.layout, ...(values.layout || {}) }) });
   const PRESET_THEMES = Object.freeze([
     DEFAULT_THEME,
     preset("theme_milk_glass", "奶白玻璃", { tokens: { colorPrimary: "#8f789e", colorAccent: "#b9a5c5", colorBg: "#f6f1ec", colorText: "#403943", colorMuted: "#756b75", chatUserBubbleBg: "rgba(218,195,225,.94)", chatUserBubbleText: "#392e3d", chatAssistantBubbleBg: "rgba(255,255,255,.86)", chatAssistantBubbleText: "#403943", cardText: "#403943", cardMutedText: "#756b75", inputText: "#403943", navText: "#6d626f", navActiveText: "#6f527b", previewText: "#403943", bottomNavBg: "rgba(255,255,255,.78)", cardBg: "rgba(255,255,255,.68)", borderColor: "rgba(98,77,108,.14)", shadowSoft: "0 10px 26px rgba(78,58,82,.10)" } }),
@@ -96,6 +113,30 @@
     if (!text) return "";
     if (text.length > 2_800_000 || !SAFE_ASSET.test(text)) throw new ThemeError("主题资源 URL 不安全", "THEME_ASSET_FORBIDDEN");
     return text;
+  };
+  const safeVisualAsset = value => {
+    const text = typeof value === "string" ? value.trim() : "";
+    return LOCAL_THEME_ASSET.test(text) ? text : "";
+  };
+  const normalizeVisualSlots = (input = {}, assets = {}) => {
+    const legacy = {
+      pageBackground: assets.backgroundImage, chatHeaderDecor: assets.headerDecoration,
+      userBubbleDecor: assets.userBubbleDecoration, assistantBubbleDecor: assets.assistantBubbleDecoration,
+      avatarFrame: assets.avatarFrame, inputDecor: assets.inputDecoration,
+      homeCardDecor: assets.decorativeAsset, navAccent: assets.navIcon
+    };
+    const slots = {};
+    for (const key of VISUAL_SLOT_FIELDS) {
+      const fallback = DEFAULT_THEME.visualSlots[key]; const candidate = input?.[key] || {};
+      slots[key] = Object.freeze({
+        url: safeVisualAsset(candidate.url || legacy[key]),
+        enabled: typeof candidate.enabled === "boolean" ? candidate.enabled : fallback.enabled,
+        opacity: Number.isFinite(Number(candidate.opacity)) ? Math.max(0, Math.min(1, Number(candidate.opacity))) : fallback.opacity,
+        position: ["center", "right", "left", "top-right", "top-left", "corner"].includes(candidate.position) ? candidate.position : fallback.position,
+        size: ["cover", "contain", "small", "medium"].includes(candidate.size) ? candidate.size : fallback.size
+      });
+    }
+    return Object.freeze(slots);
   };
   const safeCustomCss = value => {
     const css = typeof value === "string" ? value.trim() : "";
@@ -188,6 +229,10 @@
       author: safeText(input.author, "辞辞", 80),
       createdAt: /^\d{4}-\d{2}-\d{2}T/.test(input.createdAt || "") ? input.createdAt : stamp,
       updatedAt: stamp, tokens: Object.freeze(tokens), assets: Object.freeze(assets),
+      assetLibrary: Object.freeze((Array.isArray(input.assetLibrary) ? input.assetLibrary : []).slice(0, 30).map((item, index) => Object.freeze({
+        id: safeText(item?.id, `asset_${index + 1}`, 80), kind: safeText(item?.kind, "decorativeAsset", 40), url: safeVisualAsset(item?.url)
+      })).filter(item => item.url)),
+      visualSlots: normalizeVisualSlots(input.visualSlots, assets),
       layout, customCss: safeCustomCss(input.customCss)
     };
     if (layout.readabilityGuard) normalized = guardReadability(normalized);
@@ -238,11 +283,15 @@
     ,"--xb-chat-user-bubble-bg": theme.tokens.chatUserBubbleBg, "--xb-chat-user-bubble-text": theme.tokens.chatUserBubbleText
     ,"--xb-chat-assistant-bubble-bg": theme.tokens.chatAssistantBubbleBg, "--xb-chat-assistant-bubble-text": theme.tokens.chatAssistantBubbleText
     ,"--xb-border-color": theme.tokens.borderColor, "--xb-radius-bubble": theme.tokens.radiusBubble, "--xb-radius-card": theme.tokens.radiusCard
-    ,"--xb-bg-image": theme.assets.backgroundImage ? `url(${JSON.stringify(theme.assets.backgroundImage)})` : "none"
-    ,"--xb-user-bubble-decor": mode === "performance" || !theme.assets.userBubbleDecoration ? "none" : `url(${JSON.stringify(theme.assets.userBubbleDecoration)})`
-    ,"--xb-assistant-bubble-decor": mode === "performance" || !theme.assets.assistantBubbleDecoration ? "none" : `url(${JSON.stringify(theme.assets.assistantBubbleDecoration)})`
-    ,"--xb-avatar-frame": mode === "performance" || !theme.assets.avatarFrame ? "none" : `url(${JSON.stringify(theme.assets.avatarFrame)})`
-    ,"--xb-input-decor": mode === "performance" || !theme.assets.inputDecoration ? "none" : `url(${JSON.stringify(theme.assets.inputDecoration)})`
+    ,"--xb-bg-image": mode === "performance" || !theme.visualSlots.pageBackground.enabled || !theme.visualSlots.pageBackground.url ? "none" : `url(${JSON.stringify(theme.visualSlots.pageBackground.url)})`
+    ,"--xb-bg-image-opacity": String(theme.visualSlots.pageBackground.opacity)
+    ,"--xb-header-decor": mode === "performance" || !theme.visualSlots.chatHeaderDecor.enabled || !theme.visualSlots.chatHeaderDecor.url ? "none" : `url(${JSON.stringify(theme.visualSlots.chatHeaderDecor.url)})`
+    ,"--xb-user-bubble-decor": mode === "performance" || !theme.visualSlots.userBubbleDecor.enabled || !theme.visualSlots.userBubbleDecor.url ? "none" : `url(${JSON.stringify(theme.visualSlots.userBubbleDecor.url)})`
+    ,"--xb-assistant-bubble-decor": mode === "performance" || !theme.visualSlots.assistantBubbleDecor.enabled || !theme.visualSlots.assistantBubbleDecor.url ? "none" : `url(${JSON.stringify(theme.visualSlots.assistantBubbleDecor.url)})`
+    ,"--xb-avatar-frame": mode === "performance" || !theme.visualSlots.avatarFrame.enabled || !theme.visualSlots.avatarFrame.url ? "none" : `url(${JSON.stringify(theme.visualSlots.avatarFrame.url)})`
+    ,"--xb-input-decor": mode === "performance" || !theme.visualSlots.inputDecor.enabled || !theme.visualSlots.inputDecor.url ? "none" : `url(${JSON.stringify(theme.visualSlots.inputDecor.url)})`
+    ,"--xb-home-card-decor": mode === "performance" || !theme.visualSlots.homeCardDecor.enabled || !theme.visualSlots.homeCardDecor.url ? "none" : `url(${JSON.stringify(theme.visualSlots.homeCardDecor.url)})`
+    ,"--xb-nav-accent": mode === "performance" || !theme.visualSlots.navAccent.enabled || !theme.visualSlots.navAccent.url ? "none" : `url(${JSON.stringify(theme.visualSlots.navAccent.url)})`
   }); };
   class ThemeStore {
     constructor({ storage = typeof localStorage !== "undefined" ? localStorage : null,
@@ -299,5 +348,5 @@
     exportTheme(input = this.getActive()) { return Object.freeze({ type: "xinban-theme", themeVersion: THEME_VERSION, theme: normalizeTheme(input) }); }
   }
   return { ACTIVE_KEY, LIBRARY_KEY, DEFAULT_THEME, PRESET_THEMES, ThemeError, ThemeStore,
-    normalizeTheme, safeAsset, safeCustomCss, cssVariables, parseColor, contrastRatio, readableText, guardReadability, needsHarmonyBackground, THEME_VERSION };
+    normalizeTheme, normalizeVisualSlots, safeAsset, safeVisualAsset, safeCustomCss, cssVariables, parseColor, contrastRatio, readableText, guardReadability, needsHarmonyBackground, THEME_VERSION };
 });

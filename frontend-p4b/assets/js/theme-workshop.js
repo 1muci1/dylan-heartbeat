@@ -19,6 +19,23 @@ document.addEventListener("DOMContentLoaded", () => {
   const gatewayHeaders = () => { const token = window.AppConfig?.getProviderConfig?.().auth?.token; return token ? { Authorization: `Bearer ${token}` } : {}; };
   const gatewayRequest = async (path, options = {}) => { const config = window.AppConfig?.getProviderConfig?.() || {}; const url = gateway.resolveGatewayUrl(path, { baseUrl: config.baseUrl, locationRef: window.location }); const response = await fetch(url, { ...options, headers: { ...gatewayHeaders(), ...(options.headers || {}) } }); const payload = await response.json().catch(() => ({})); if (!response.ok) throw new Error(payload.error?.message || `请求失败（${response.status}）`); return payload; };
   const hex = value => /^#[0-9a-f]{6}$/iu.test(value || "") ? value : "#8b6bb8";
+  const slotLabels = Object.freeze({ pageBackground: "页面背景", chatHeaderDecor: "聊天顶栏装饰", userBubbleDecor: "用户气泡装饰", assistantBubbleDecor: "沉气泡装饰", avatarFrame: "头像框", inputDecor: "输入栏装饰", homeCardDecor: "首页卡片装饰", navAccent: "底栏点缀" });
+  const renderSlotEditor = () => {
+    const root = document.querySelector("[data-theme-slot-editor]"); if (!root) return;
+    root.replaceChildren(); const assets = draft.assetLibrary || [];
+    for (const [key, labelText] of Object.entries(slotLabels)) {
+      const slot = draft.visualSlots?.[key] || {}; const row = document.createElement("div"); row.className = "theme-slot-row";
+      const toggle = document.createElement("input"); toggle.type = "checkbox"; toggle.checked = slot.enabled !== false; toggle.setAttribute("aria-label", `${labelText}显示`);
+      const label = document.createElement("span"); label.textContent = labelText;
+      const select = document.createElement("select"); const empty = document.createElement("option"); empty.value = ""; empty.textContent = "未选择"; select.append(empty);
+      for (const asset of assets) { const option = document.createElement("option"); option.value = asset.url; option.textContent = asset.kind; option.selected = asset.url === slot.url; select.append(option); }
+      const clear = document.createElement("button"); clear.type = "button"; clear.textContent = "清除";
+      toggle.addEventListener("change", () => update(next => { next.visualSlots[key].enabled = toggle.checked; }));
+      select.addEventListener("change", () => update(next => { next.visualSlots[key].url = select.value; }));
+      clear.addEventListener("click", () => update(next => { next.visualSlots[key].url = ""; }));
+      row.append(toggle, label, select, clear); root.append(row);
+    }
+  };
   const refreshForm = () => {
     document.querySelectorAll("[data-theme-token]").forEach(input => {
       const value = draft.tokens[input.dataset.themeToken]; input.value = input.type === "color" ? hex(value) : value;
@@ -33,6 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     const custom = document.querySelector("[data-theme-custom-css]"); if (custom) custom.value = draft.customCss || "";
     const customFont = document.querySelector("[data-theme-custom-font]"); if (customFont) customFont.value = ["system","rounded","serif","sans"].includes(draft.tokens.fontFamily) ? "" : draft.tokens.fontFamily;
+    renderSlotEditor();
   };
   const renderNow = () => {
     renderFrame = 0;
@@ -41,6 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
       for (const [key, value] of Object.entries(api.cssVariables(draft))) preview.style.setProperty(key, value);
       const bg = draft.assets.backgroundImage; preview.style.setProperty("--theme-background-image", bg ? `url(${JSON.stringify(bg)})` : "none");
       updateThemeNames();
+      renderSlotEditor();
     } catch (error) { message(error.message || "主题预览失败"); }
   };
   const render = () => { if (!renderFrame) renderFrame = requestAnimationFrame(renderNow); };
@@ -87,15 +106,17 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelector("[data-theme-apply]")?.addEventListener("click", () => {
     try {
       if (pendingImport) { message("请先确认“转换并加入主题库”，再应用这个外部主题。"); return; }
-      const hasBackground = Object.values(draft.assets).some(Boolean);
-      if (hasBackground && !window.confirm("这个主题包含背景或纹理资源，要一起覆盖主题背景吗？")) {
-        draft = { ...editable(draft), assets: editable(api.DEFAULT_THEME.assets) };
+      const directBackground = draft.assets.backgroundImage || draft.assets.chatBackgroundImage || draft.assets.homeBackgroundImage;
+      const needsBackgroundConfirmation = directBackground && !/^\/api\/theme\/assets\//u.test(directBackground);
+      if (needsBackgroundConfirmation && !window.confirm("这个主题包含背景资源，要一起覆盖原背景吗？")) {
+        const next=editable(draft); next.assets.backgroundImage=""; next.assets.chatBackgroundImage=""; next.assets.homeBackgroundImage=""; next.visualSlots.pageBackground.url=""; draft=next;
       }
       const selected = selectedThemeId === draft.id ? draft : store.getThemeById(selectedThemeId); if (!selected) throw new Error("当前预览主题不存在，请重新选择");
       draft = store.applyTheme(selected, { persist: true, applyBackground: true }); selectedThemeId=draft.id; updateThemeNames();
       const active=store.getActive(),variables=api.cssVariables(active),rootStyle=document.documentElement.style;
       const selfCheck=active.name===draft.name&&rootStyle.getPropertyValue("--xb-chat-assistant-bubble-bg")===variables["--xb-chat-assistant-bubble-bg"]&&rootStyle.getPropertyValue("--xb-chat-user-bubble-bg")===variables["--xb-chat-user-bubble-bg"];
-      message(selfCheck ? `已应用：${draft.name}。聊天页也会同步生效。` : "主题没有正确写入，请刷新重试。");
+      const slotCount=Object.values(draft.visualSlots||{}).filter(slot=>slot.enabled&&slot.url).length;
+      message(selfCheck ? `已应用：${draft.name}（${slotCount} 个装饰槽位）。聊天页和首页会同步生效。` : "主题没有正确写入，请刷新重试。");
     } catch (error) { message(error.message || "主题应用失败"); }
   });
   document.querySelector("[data-theme-reset-soft]")?.addEventListener("click", () => {
@@ -154,8 +175,17 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const payload = await gatewayRequest("/api/theme/assets/localize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assets: assets.map(({ id, sourceUrl, kind }) => ({ id, sourceUrl, kind })) }) });
       const fields = { backgroundImage: "backgroundImage", bubbleUserDecoration: "userBubbleDecoration", bubbleAssistantDecoration: "assistantBubbleDecoration", bubbleDecoration: "assistantBubbleDecoration", avatarFrame: "avatarFrame", inputDecoration: "inputDecoration", headerDecoration: "headerDecoration", decorativeAsset: "decorativeAsset", navIcon: "navIcon" };
-      const next = editable(pendingImport.theme); for (const localized of payload.data.localized || []) { const field = fields[localized.kind]; if (field && !next.assets[field]) next.assets[field] = localized.localUrl; }
-      pendingImport.theme = api.normalizeTheme(next); draft = editable(pendingImport.theme); assetDecisionPending = false; document.querySelector("[data-theme-assets]").hidden = true; refreshForm(); render(); message(`已本地化 ${payload.data.localized?.length || 0} 张；失败 ${payload.data.failed?.length || 0} 张。失败素材不会应用。`);
+      const slots = { backgroundImage: "pageBackground", bubbleUserDecoration: "userBubbleDecor", bubbleAssistantDecoration: "assistantBubbleDecor", bubbleDecoration: "assistantBubbleDecor", avatarFrame: "avatarFrame", inputDecoration: "inputDecor", headerDecoration: "chatHeaderDecor", decorativeAsset: "homeCardDecor", navIcon: "navAccent" };
+      const next = editable(pendingImport.theme); next.assetLibrary = Array.isArray(next.assetLibrary) ? next.assetLibrary : []; next.visualSlots = next.visualSlots || editable(api.DEFAULT_THEME.visualSlots);
+      const applied = new Set();
+      for (const localized of payload.data.localized || []) {
+        const field = fields[localized.kind]; if (field && !next.assets[field]) next.assets[field] = localized.localUrl;
+        next.assetLibrary.push({ id: localized.id, kind: localized.kind, url: localized.localUrl });
+        const slot = slots[localized.kind]; if (slot && !next.visualSlots[slot].url) { next.visualSlots[slot].url = localized.localUrl; applied.add(slot); }
+      }
+      pendingImport.theme = api.normalizeTheme(next); pendingImport.report.appliedSlots = [...applied]; draft = editable(pendingImport.theme); assetDecisionPending = false; document.querySelector("[data-theme-assets]").hidden = true; refreshForm(); render();
+      const names=[...applied].map(key=>slotLabels[key]).join("、")||"无"; const savedOnly=Math.max(0,(payload.data.localized?.length||0)-applied.size);
+      message(`已本地化 ${payload.data.localized?.length || 0} 张；已应用到视觉槽位：${names}；另有 ${savedOnly} 张只保存到素材库。失败 ${payload.data.failed?.length || 0} 张。`);
     } catch (error) { message(error.message || "素材本地化失败，颜色主题仍可跳过图片后导入。"); }
   });
   const tavernTemplate = { name: "我的酒馆美化", main_text_color: "rgba(52,43,69,1)", blur_tint_color: "rgba(255,255,255,0.72)", user_mes_blur_tint_color: "rgba(210,190,255,0.72)", bot_mes_blur_tint_color: "rgba(255,255,255,0.78)", shadow_color: "rgba(42,24,74,0.2)", shadow_width: 8, font_scale: 1, chat_width: 78, custom_css: "" };

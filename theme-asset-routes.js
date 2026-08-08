@@ -18,7 +18,15 @@ function registerThemeAssetRoutes(app, { localizer, store, previewService, previ
     const text = extension === ".docx" ? extractDocxText(buffer) : buffer.toString("utf8").replace(/\0/gu,"").slice(0,200*1024);
     return {ok:true,data:{filename:path.basename(part.filename).slice(0,180),format:extension.slice(1),text}};
   }));
-  app.get("/api/theme/assets/preview/:id", run((req,reply)=>{const file=previewStore.resolve(req.params.id);return reply.header("Cache-Control","private, max-age=3600").header("X-Content-Type-Options","nosniff").type(file.mimeType).send(fs.createReadStream(file.filename));}));
+  app.get("/api/theme/assets/preview/:id", run((req,reply)=>{
+    let file;
+    try { file=previewStore.resolve(req.params.id); }
+    catch (error) {
+      if (error instanceof ThemeAssetError && ["THEME_ASSET_ID_INVALID","THEME_ASSET_NOT_FOUND"].includes(error.code)) throw new ThemeAssetError("预览不存在",404,"THEME_ASSET_NOT_FOUND");
+      throw error;
+    }
+    return reply.header("Cache-Control","private, max-age=3600").header("X-Content-Type-Options","nosniff").type(file.mimeType).send(fs.createReadStream(file.filename));
+  }));
   app.get("/api/theme/assets/:id", run((req,reply)=>{const file=store.resolve(req.params.id);return reply.header("Cache-Control","public, max-age=31536000, immutable").header("X-Content-Type-Options","nosniff").type(file.mimeType).send(fs.createReadStream(file.filename));}));
 }
 module.exports = { registerThemeAssetRoutes };

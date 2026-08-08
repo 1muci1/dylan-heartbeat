@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#09090d"><title>心伴 · 美化工坊</title>
-  <link rel="stylesheet" href="assets/css/common.css?v=v57-p4b">
-  <link rel="stylesheet" href="assets/css/theme.css?v=v57-p4b">
-  <link rel="stylesheet" href="assets/css/theme-workshop.css?v=v57-p4b">
-  <script src="assets/js/theme-store.js?v=v57-p4b"></script>
-  <script src="assets/js/tavern-theme-adapter.js?v=v57-p4b"></script>
-  <script src="assets/js/theme-gateway.js?v=v57-p4b"></script>
-  <script src="assets/js/common.js?v=v57-p4b"></script>
+  <link rel="stylesheet" href="assets/css/common.css?v=v58-p4b">
+  <link rel="stylesheet" href="assets/css/theme.css?v=v58-p4b">
+  <link rel="stylesheet" href="assets/css/theme-workshop.css?v=v58-p4b">
+  <script src="assets/js/theme-store.js?v=v58-p4b"></script>
+  <script src="assets/js/tavern-theme-adapter.js?v=v58-p4b"></script>
+  <script src="assets/js/theme-gateway.js?v=v58-p4b"></script>
+  <script src="assets/js/common.js?v=v58-p4b"></script>
   <script src="assets/js/data.js"></script>
 </head>
 <body class="theme-workshop-page" data-page="settings">
@@ -59,7 +59,7 @@
     <label class="theme-field theme-field--wide">柔和阴影<input type="text" data-theme-token="shadowSoft" maxlength="120"></label>
     <label class="theme-field theme-field--wide">安全 customCss<textarea maxlength="8000" data-theme-custom-css placeholder="可选。禁止脚本、@import、外部 url 与全屏 fixed。"></textarea></label>
   </div></section>
-  <section class="theme-panel theme-panel--editor"><h2>装饰槽位设置</h2><p>管理已导入素材。外部 CSS 不会原样执行；这里只把本地安全图片放进受控位置。</p><div class="theme-slot-editor" data-theme-slot-editor></div><p class="theme-slot-note">复杂布局和整套图标替换不会自动应用；可在这里显示、隐藏、选择或清除素材。</p></section>
+  <section class="theme-panel theme-panel--editor"><h2>装饰槽位设置</h2><p>图片导入后默认关闭。外部 CSS 不会原样执行；只有你手动开启的本地安全图片会显示。</p><div class="theme-actions"><button type="button" data-theme-disable-slots>只保留颜色，关闭装饰</button></div><div class="theme-slot-editor" data-theme-slot-editor></div><p class="theme-slot-note">复杂布局和整套图标替换不会自动应用；可在这里显示、隐藏、选择或清除素材。</p></section>
   <section class="theme-panel theme-panel--preview"><h2>实时预览</h2><p>当前预览主题：<strong data-theme-preview-name>当前草稿</strong></p><p>当前已应用主题：<strong data-theme-active-name></strong></p><div class="theme-phone" data-theme-preview><div class="theme-phone__screen"><div class="theme-phone__title">沉的小世界</div><div class="theme-phone__bubble theme-phone__bubble--user">陪我下棋</div><div class="theme-phone__bubble">好呀，我陪你。</div><div class="theme-phone__nav"></div></div></div></section>
   <section class="theme-panel theme-panel--actions"><h2>主题包</h2><p>第一版导入/导出 JSON；ZIP 主题资产包将在后续版本支持。</p><div class="theme-actions">
     <button type="button" data-theme-apply>应用主题</button><button type="button" data-theme-reset-soft>恢复柔和紫雾默认</button><a href="/chat.html" class="theme-chat-link">去聊天查看效果</a><button type="button" data-theme-export>导出 JSON</button>
@@ -67,5 +67,5 @@
   </div><p>支持酒馆 JSON、Echoes DOCX/TXT/CSS；图片装饰需本地化后才会生效。</p><div class="theme-import-review" data-theme-import-review hidden><strong data-theme-import-format></strong><p data-theme-import-report></p><p>为了安全，不会原样执行 Echoes CSS；已转换颜色、字体与圆角，并将本地素材放入受控装饰槽位。复杂布局和整套图标替换需在素材编辑器里手动选择。</p><div class="theme-import-diff"><div><small>原主题</small><span data-theme-before-swatch></span></div><div><small>转换后主题</small><span data-theme-after-swatch></span></div></div><p data-theme-import-changes></p><div data-theme-assets hidden><h3>检测到外部装饰图片</h3><div class="theme-asset-list" data-theme-asset-list></div><div class="theme-actions"><button type="button" data-theme-assets-localize>本地化导入选中素材</button><button type="button" data-theme-assets-skip>跳过图片，只导入颜色</button></div></div><div class="theme-actions"><button type="button" data-theme-import-confirm>转换并加入主题库</button><button type="button" data-theme-import-cancel>取消</button></div></div><p class="theme-status" role="status" data-theme-status></p></section>
   <section class="theme-panel theme-panel--actions"><h2>我想自己做酒馆风 JSON</h2><p>复制这个安全简化模板，改好后用上面的统一按钮导入。</p><pre class="theme-template" data-tavern-template></pre><div class="theme-actions"><button type="button" data-template-copy>复制模板</button><button type="button" data-template-download>下载模板 JSON</button></div></section>
 </main>
-<script src="assets/js/theme-workshop.js?v=v57-p4b"></script>
+<script src="assets/js/theme-workshop.js?v=v58-p4b"></script>
 </body></html>

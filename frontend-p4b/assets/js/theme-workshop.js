@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const select = document.createElement("select"); const empty = document.createElement("option"); empty.value = ""; empty.textContent = "未选择"; select.append(empty);
       for (const asset of assets) { const option = document.createElement("option"); option.value = asset.url; option.textContent = asset.kind; option.selected = asset.url === slot.url; select.append(option); }
       const clear = document.createElement("button"); clear.type = "button"; clear.textContent = "清除";
-      toggle.addEventListener("change", () => update(next => { next.visualSlots[key].enabled = toggle.checked; }));
+      toggle.addEventListener("change", () => update(next => { next.visualSlots.enabledByUser = true; next.visualSlots[key].enabled = toggle.checked; next.migratedVisualSlotsSafe = true; }));
       select.addEventListener("change", () => update(next => { next.visualSlots[key].url = select.value; }));
       clear.addEventListener("click", () => update(next => { next.visualSlots[key].url = ""; }));
       row.append(toggle, label, select, clear); root.append(row);
@@ -123,6 +123,11 @@ document.addEventListener("DOMContentLoaded", () => {
     pendingImport = null; assetDecisionPending = false; draft = editable(api.DEFAULT_THEME); draft = store.applyTheme(draft, { persist: true, applyBackground: false }); selectedThemeId=draft.id;
     document.querySelector("[data-theme-import-review]").hidden = true; refreshForm(); render(); message("已恢复柔和紫雾默认，聊天页也会同步生效。");
   });
+  document.querySelector("[data-theme-disable-slots]")?.addEventListener("click", () => {
+    const next=editable(draft); next.visualSlots=next.visualSlots||editable(api.DEFAULT_THEME.visualSlots); next.visualSlots.enabledByUser=true;
+    for(const key of Object.keys(slotLabels)) next.visualSlots[key].enabled=false;
+    next.migratedVisualSlotsSafe=true; draft=store.applyTheme(next,{persist:true,applyBackground:false}); selectedThemeId=draft.id; refreshForm(); render(); message("已只保留颜色，并关闭全部图片装饰。聊天页会立即恢复安全主题层。");
+  });
   document.querySelector("[data-theme-export]")?.addEventListener("click", () => {
     const blob = new Blob([`${JSON.stringify(store.exportTheme(draft), null, 2)}\n`], { type: "application/json" });
     const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `${draft.name.replace(/[^\p{Letter}\p{Number}_-]+/gu, "-") || "xinban-theme"}.json`; link.click(); URL.revokeObjectURL(link.href); message("主题 JSON 已导出");
@@ -176,21 +181,21 @@ document.addEventListener("DOMContentLoaded", () => {
       const payload = await gatewayRequest("/api/theme/assets/localize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ assets: assets.map(({ id, sourceUrl, kind }) => ({ id, sourceUrl, kind })) }) });
       const fields = { backgroundImage: "backgroundImage", bubbleUserDecoration: "userBubbleDecoration", bubbleAssistantDecoration: "assistantBubbleDecoration", bubbleDecoration: "assistantBubbleDecoration", avatarFrame: "avatarFrame", inputDecoration: "inputDecoration", headerDecoration: "headerDecoration", decorativeAsset: "decorativeAsset", navIcon: "navIcon" };
       const slots = { backgroundImage: "pageBackground", bubbleUserDecoration: "userBubbleDecor", bubbleAssistantDecoration: "assistantBubbleDecor", bubbleDecoration: "assistantBubbleDecor", avatarFrame: "avatarFrame", inputDecoration: "inputDecor", headerDecoration: "chatHeaderDecor", decorativeAsset: "homeCardDecor", navIcon: "navAccent" };
-      const next = editable(pendingImport.theme); next.assetLibrary = Array.isArray(next.assetLibrary) ? next.assetLibrary : []; next.visualSlots = next.visualSlots || editable(api.DEFAULT_THEME.visualSlots);
+      const next = editable(pendingImport.theme); next.assetLibrary = Array.isArray(next.assetLibrary) ? next.assetLibrary : []; next.visualSlots = next.visualSlots || editable(api.DEFAULT_THEME.visualSlots); next.visualSlots.enabledByUser=false;
       const applied = new Set();
       for (const localized of payload.data.localized || []) {
         const field = fields[localized.kind]; if (field && !next.assets[field]) next.assets[field] = localized.localUrl;
         next.assetLibrary.push({ id: localized.id, kind: localized.kind, url: localized.localUrl });
-        const slot = slots[localized.kind]; if (slot && !next.visualSlots[slot].url) { next.visualSlots[slot].url = localized.localUrl; applied.add(slot); }
+        const slot = slots[localized.kind]; if (slot && !next.visualSlots[slot].url) { next.visualSlots[slot].url = localized.localUrl; next.visualSlots[slot].enabled=false; applied.add(slot); }
       }
       pendingImport.theme = api.normalizeTheme(next); pendingImport.report.appliedSlots = [...applied]; draft = editable(pendingImport.theme); assetDecisionPending = false; document.querySelector("[data-theme-assets]").hidden = true; refreshForm(); render();
       const names=[...applied].map(key=>slotLabels[key]).join("、")||"无"; const savedOnly=Math.max(0,(payload.data.localized?.length||0)-applied.size);
-      message(`已本地化 ${payload.data.localized?.length || 0} 张；已应用到视觉槽位：${names}；另有 ${savedOnly} 张只保存到素材库。失败 ${payload.data.failed?.length || 0} 张。`);
+      message(`已本地化 ${payload.data.localized?.length || 0} 张；已放入视觉槽位（默认关闭）：${names}；另有 ${savedOnly} 张只保存到素材库。失败 ${payload.data.failed?.length || 0} 张。`);
     } catch (error) { message(error.message || "素材本地化失败，颜色主题仍可跳过图片后导入。"); }
   });
   const tavernTemplate = { name: "我的酒馆美化", main_text_color: "rgba(52,43,69,1)", blur_tint_color: "rgba(255,255,255,0.72)", user_mes_blur_tint_color: "rgba(210,190,255,0.72)", bot_mes_blur_tint_color: "rgba(255,255,255,0.78)", shadow_color: "rgba(42,24,74,0.2)", shadow_width: 8, font_scale: 1, chat_width: 78, custom_css: "" };
   const templateText = `${JSON.stringify(tavernTemplate, null, 2)}\n`; const templateNode = document.querySelector("[data-tavern-template]"); if (templateNode) templateNode.textContent = templateText;
   document.querySelector("[data-template-copy]")?.addEventListener("click", async () => { try { await navigator.clipboard.writeText(templateText); message("酒馆 JSON 模板已复制。"); } catch { message("复制失败，请手动选择模板文本。"); } });
   document.querySelector("[data-template-download]")?.addEventListener("click", () => { const blob = new Blob([templateText], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "xinban-tavern-theme-template.json"; link.click(); URL.revokeObjectURL(link.href); });
-  refreshForm(); render();
+  refreshForm(); render(); if(store.lastVisualSlotsMigration) message("已为旧导入主题关闭自动装饰，避免影响布局；可在装饰槽位设置中手动开启。");
 });

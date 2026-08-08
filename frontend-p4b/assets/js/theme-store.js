@@ -72,14 +72,15 @@
     assets: Object.freeze({ backgroundImage: "", chatBackgroundImage: "", homeBackgroundImage: "", bubbleTexture: "", bottomNavTexture: "", fontUrl: "", avatarFrame: "", inputDecoration: "", headerDecoration: "", userBubbleDecoration: "", assistantBubbleDecoration: "", decorativeAsset: "", navIcon: "" }),
     assetLibrary: Object.freeze([]),
     visualSlots: Object.freeze({
-      pageBackground: Object.freeze({ url: "", enabled: true, opacity: .35, position: "center", size: "cover" }),
-      chatHeaderDecor: Object.freeze({ url: "", enabled: true, opacity: .72, position: "right", size: "contain" }),
-      userBubbleDecor: Object.freeze({ url: "", enabled: true, opacity: .9, position: "top-right", size: "small" }),
-      assistantBubbleDecor: Object.freeze({ url: "", enabled: true, opacity: .9, position: "top-left", size: "small" }),
-      avatarFrame: Object.freeze({ url: "", enabled: true, opacity: 1, position: "center", size: "small" }),
-      inputDecor: Object.freeze({ url: "", enabled: true, opacity: .8, position: "right", size: "small" }),
-      homeCardDecor: Object.freeze({ url: "", enabled: true, opacity: .48, position: "corner", size: "medium" }),
-      navAccent: Object.freeze({ url: "", enabled: true, opacity: .32, position: "center", size: "small" })
+      enabledByUser: false,
+      pageBackground: Object.freeze({ url: "", enabled: false, opacity: .2, position: "center", size: "cover" }),
+      chatHeaderDecor: Object.freeze({ url: "", enabled: false, opacity: .72, position: "right", size: "contain" }),
+      userBubbleDecor: Object.freeze({ url: "", enabled: false, opacity: .9, position: "top-right", size: "small" }),
+      assistantBubbleDecor: Object.freeze({ url: "", enabled: false, opacity: .9, position: "top-left", size: "small" }),
+      avatarFrame: Object.freeze({ url: "", enabled: false, opacity: 1, position: "center", size: "small" }),
+      inputDecor: Object.freeze({ url: "", enabled: false, opacity: .8, position: "right", size: "small" }),
+      homeCardDecor: Object.freeze({ url: "", enabled: false, opacity: .48, position: "corner", size: "medium" }),
+      navAccent: Object.freeze({ url: "", enabled: false, opacity: .32, position: "center", size: "small" })
     }),
     layout: Object.freeze({ chatWidth: "auto", bubbleMaxWidth: "78%", messageGap: "14px", bottomNavHeight: "86px", glassIntensity: .62, backgroundDim: .12, bubbleOpacity: .96, navOpacity: .92, cardOpacity: .82, radiusNav: "24px", blurNav: "12px", blurBubble: "0px", effectsMode: "balanced", shadowLevel: "soft", backgroundBlur: "0px", enableGlass: true, enableAnimations: true, readabilityGuard: true }),
     customCss: ""
@@ -125,12 +126,12 @@
       avatarFrame: assets.avatarFrame, inputDecor: assets.inputDecoration,
       homeCardDecor: assets.decorativeAsset, navAccent: assets.navIcon
     };
-    const slots = {};
+    const enabledByUser = input?.enabledByUser === true; const slots = { enabledByUser };
     for (const key of VISUAL_SLOT_FIELDS) {
       const fallback = DEFAULT_THEME.visualSlots[key]; const candidate = input?.[key] || {};
       slots[key] = Object.freeze({
         url: safeVisualAsset(candidate.url || legacy[key]),
-        enabled: typeof candidate.enabled === "boolean" ? candidate.enabled : fallback.enabled,
+        enabled: enabledByUser && candidate.enabled === true,
         opacity: Number.isFinite(Number(candidate.opacity)) ? Math.max(0, Math.min(1, Number(candidate.opacity))) : fallback.opacity,
         position: ["center", "right", "left", "top-right", "top-left", "corner"].includes(candidate.position) ? candidate.position : fallback.position,
         size: ["cover", "contain", "small", "medium"].includes(candidate.size) ? candidate.size : fallback.size
@@ -233,6 +234,7 @@
         id: safeText(item?.id, `asset_${index + 1}`, 80), kind: safeText(item?.kind, "decorativeAsset", 40), url: safeVisualAsset(item?.url)
       })).filter(item => item.url)),
       visualSlots: normalizeVisualSlots(input.visualSlots, assets),
+      migratedVisualSlotsSafe: input.migratedVisualSlotsSafe === true || (Boolean(input.visualSlots) && input.visualSlots?.enabledByUser !== true),
       layout, customCss: safeCustomCss(input.customCss)
     };
     if (layout.readabilityGuard) normalized = guardReadability(normalized);
@@ -296,14 +298,16 @@
   class ThemeStore {
     constructor({ storage = typeof localStorage !== "undefined" ? localStorage : null,
       documentRef = typeof document !== "undefined" ? document : null } = {}) {
-      this.storage = storage; this.document = documentRef;
+      this.storage = storage; this.document = documentRef; this.lastVisualSlotsMigration = false;
     }
     getPresets() { return PRESET_THEMES.map(theme => normalizeTheme(theme)); }
     getActive() {
       try {
         const stored = this.storage?.getItem(ACTIVE_KEY);
         const parsed = stored ? JSON.parse(stored) : DEFAULT_THEME; const theme = normalizeTheme(parsed);
-        if (!stored || Number(parsed.harmonyVersion || 0) < 2) this.storage?.setItem(ACTIVE_KEY, JSON.stringify(theme));
+        const visualSlotsMigration = Boolean(parsed.visualSlots && parsed.visualSlots.enabledByUser !== true && parsed.migratedVisualSlotsSafe !== true);
+        if (visualSlotsMigration) this.lastVisualSlotsMigration = true;
+        if (!stored || Number(parsed.harmonyVersion || 0) < 2 || visualSlotsMigration) this.storage?.setItem(ACTIVE_KEY, JSON.stringify(theme));
         return theme;
       }
       catch { return normalizeTheme(DEFAULT_THEME); }

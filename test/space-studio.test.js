@@ -58,12 +58,13 @@ function fixture() {
   return { calls, controller, revoked };
 }
 
-test("Space Studio page loads the existing profile, theme, and avatar modules", () => {
+test("Space Studio page loads the profile, active-theme adapter, and avatar modules", () => {
   const html = fs.readFileSync(path.join(studioRoot, "index.html"), "utf8");
   assert.match(html, /空间工作室/);
   assert.match(html, /data-profile-name/);
   assert.match(html, /\.\.\/space-profile\.js/);
-  assert.match(html, /\.\.\/\.\.\/theme\/theme-engine\.js/);
+  assert.match(html, /\.\.\/theme-adapter\.js\?v=v62-p4b/);
+  assert.doesNotMatch(html, /theme\/theme-engine\.js/);
   assert.match(html, /\.\.\/\.\.\/avatar\/avatar-studio\.js/);
   assert.match(html, /<meta name="viewport"/);
 });

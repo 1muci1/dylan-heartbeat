@@ -129,3 +129,40 @@ html.has-xinban-theme :is(.lobby-card p,.game-status,.answer-field){color:var(--
 html.has-xinban-theme :is(.lobby-icon,.status,.mode-tabs button,.drawing-tools button,.guess-result button){border-color:var(--xb-button-border);color:var(--xb-badge-text);background:var(--xb-badge-bg)}
 html.has-xinban-theme :is(.lobby-card button,.primary-button,.secondary-button,.guess-form button,.mode-tabs .is-active){border-color:var(--xb-button-border);color:var(--xb-button-text);background:var(--xb-button-bg)}
 html.has-xinban-theme :is(.answer-field input,.guess-form input){border-color:var(--xb-input-border);color:var(--xb-input-text);background:var(--xb-input-bg)}
+
+/* v62 collaboration and space coverage. Color-only overrides preserve page and chat geometry. */
+html.has-xinban-theme body.collaboration-page,
+html.has-xinban-theme body.space-page,
+html.has-xinban-theme body.space-studio-page{color:var(--xb-page-text);background:var(--xb-page-bg)}
+html.has-xinban-theme :is(.collaboration-page,.space-page,.space-studio-page) :is(.page-header h1,.studio-header h1,.section-heading h2,.intro-card h2,.room-header h2,.preview-card h2,.profile-card h2,.panel h2){color:var(--xb-page-text)}
+html.has-xinban-theme :is(.collaboration-page,.space-page,.space-studio-page) :is(.page-header p,.studio-header p,.studio-kicker,.section-heading p,.eyebrow,label,legend,.agent-option small,.intro-card div>p:last-child,.preview-card div>p:last-child,.panel>p,.profile-card dt){color:var(--xb-color-text-muted)}
+
+html.has-xinban-theme .collaboration-page :is(.intro-card,.create-card,.room-card,.agent-card,.summary-card){border-color:var(--xb-card-border);color:var(--xb-card-text);background:var(--xb-card-bg);box-shadow:var(--xb-card-shadow)}
+html.has-xinban-theme .collaboration-page .page-header>a{border-color:var(--xb-button-border);color:var(--xb-button-text);background:var(--xb-button-bg);box-shadow:var(--xb-card-shadow)}
+html.has-xinban-theme .collaboration-page :is(textarea,input,select,.provider-config-dialog form){border-color:var(--xb-input-border);color:var(--xb-input-text);background:var(--xb-input-bg)}
+html.has-xinban-theme .collaboration-page textarea:focus{border-color:var(--xb-color-accent);box-shadow:0 0 0 3px var(--xb-color-accent-soft)}
+html.has-xinban-theme .collaboration-page :is(.roundtable-mark,.agent-option:has(input:checked),.room-context span){color:var(--xb-badge-text);background:var(--xb-color-accent-soft)}
+html.has-xinban-theme .collaboration-page :is(.roundtable-mark i,.roundtable-mark span,.agent-avatar,.participant-avatar,.message__avatar){border-color:var(--xb-avatar-ring);color:var(--xb-button-text);background:var(--xb-color-accent);box-shadow:none}
+html.has-xinban-theme .collaboration-page :is(.agent-card>button,.secondary-button,.provider-config-actions button){border-color:var(--xb-button-border);color:var(--xb-card-text);background:var(--xb-color-surface-soft)}
+html.has-xinban-theme .collaboration-page :is(.primary-button,.provider-config-actions button[type=submit]){border-color:var(--xb-button-border);color:var(--xb-button-text);background:var(--xb-color-accent);box-shadow:var(--xb-card-shadow)}
+html.has-xinban-theme .collaboration-page :is(.message__body,.message--chatgpt .message__body){color:var(--xb-card-text);background:var(--xb-color-surface-soft)}
+html.has-xinban-theme .collaboration-page .message__body p{color:var(--xb-card-muted)}
+
+html.has-xinban-theme :is(.space-page,.space-studio-page) :is(.preview-card,.studio-card,.studio-preview,.profile-card,.panel,fieldset){border-color:var(--xb-card-border);color:var(--xb-card-text);background:var(--xb-card-bg);box-shadow:var(--xb-card-shadow)}
+html.has-xinban-theme :is(.space-page,.space-studio-page) :is(.page-header>span,.profile-card dl div,.preset-preview span){border-color:var(--xb-card-border);color:var(--xb-badge-text);background:var(--xb-badge-bg)}
+html.has-xinban-theme :is(.space-page,.space-studio-page) :is(input[type=text],input[type=url],select){border-color:var(--xb-input-border);color:var(--xb-input-text);background:var(--xb-input-bg)}
+html.has-xinban-theme :is(.space-page,.space-studio-page) input[type=range]{accent-color:var(--xb-color-accent)}
+html.has-xinban-theme :is(.space-page,.space-studio-page) :is(.section-heading button,fieldset button,.file-control,.button--quiet){border-color:var(--xb-button-border);color:var(--xb-card-text);background:var(--xb-color-surface-soft)}
+html.has-xinban-theme :is(.space-page,.space-studio-page) :is(.segmented button.is-active,.button:not(.button--quiet)){border-color:var(--xb-button-border);color:var(--xb-button-text);background:var(--xb-color-accent)}
+html.has-xinban-theme :is(.space-page,.space-studio-page) :is(input,select,button):focus-visible{outline-color:var(--xb-color-accent);border-color:var(--xb-color-accent)}
+html.has-xinban-theme :is(.space-page,.space-studio-page) .moon{color:var(--xb-color-accent);background:var(--xb-color-accent-soft);box-shadow:0 0 36px color-mix(in srgb,var(--xb-color-accent) 20%,transparent)}
+html.has-xinban-theme :is(.space-page,.space-studio-page) .app-tab-bar{border-color:var(--xb-card-border);color:var(--xb-nav-text);background:var(--xb-bottom-nav-bg);box-shadow:var(--xb-card-shadow)}
+html.has-xinban-theme :is(.space-page,.space-studio-page) .app-tab-bar a{color:var(--xb-nav-text)}
+html.has-xinban-theme :is(.space-page,.space-studio-page) .app-tab-bar a[aria-current=page]{color:var(--xb-nav-active-text);background:var(--xb-nav-active-bg)}
+html.has-xinban-theme :is(.space-page,.space-studio-page) .app-tab-bar__chat-icon{border-color:var(--xb-button-border);background:var(--xb-color-accent);box-shadow:var(--xb-card-shadow)}
+
+html.has-xinban-theme :is(.bottom-nav,.app-tab-bar) a:is(.is-active,[aria-current=page]){color:var(--xb-nav-active-text);background:var(--xb-nav-active-bg)}
+html.has-xinban-theme .bottom-nav .bottom-nav__chat svg{border-color:var(--xb-button-border);color:var(--xb-button-text);background:var(--xb-color-accent);box-shadow:var(--xb-card-shadow)}
+html.has-xinban-theme :is(.today-card__mark,.action-card__icon,.status-card__icon){color:var(--xb-color-accent);background:var(--xb-color-accent-soft)}
+html.has-xinban-theme .today-card__meter span:nth-child(-n+4){background:var(--xb-progress-fill)}
+html.has-xinban-theme .action-card--chat{color:var(--xb-button-text);background:var(--xb-color-accent)}

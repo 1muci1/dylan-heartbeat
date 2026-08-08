@@ -16,6 +16,7 @@ audit-backups/
 runtime-data/draw-rounds.json*
 runtime-data/uploads/
 runtime-data/theme-assets/
+runtime-data/theme-asset-previews/
 runtime-data/upload-index.json*
 runtime-data/sticker-packs.json*
 runtime-data/memory-suggestions.json*

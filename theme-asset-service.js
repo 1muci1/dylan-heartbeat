@@ -10,6 +10,8 @@ const MAX_ASSETS = 30;
 const MAX_ASSET_SIZE = 2 * 1024 * 1024;
 const MAX_TOTAL_SIZE = 20 * 1024 * 1024;
 const DOWNLOAD_TIMEOUT_MS = 8000;
+const PREVIEW_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const MAX_PREVIEWS = 200;
 const MIME_EXTENSIONS = new Map([["image/png", ".png"], ["image/jpeg", ".jpg"], ["image/webp", ".webp"]]);
 
 class ThemeAssetError extends Error {
@@ -45,6 +47,22 @@ class ThemeAssetStore {
     throw new ThemeAssetError("素材不存在", 404, "THEME_ASSET_NOT_FOUND");
   }
 }
+class ThemeAssetPreviewStore extends ThemeAssetStore {
+  constructor({ rootDir = path.join("runtime-data", "theme-asset-previews"), maxAgeMs = PREVIEW_MAX_AGE_MS, maxItems = MAX_PREVIEWS, now = () => Date.now() } = {}) {
+    super({ rootDir }); this.maxAgeMs = maxAgeMs; this.maxItems = maxItems; this.now = now;
+  }
+  cleanup() {
+    fs.mkdirSync(this.rootDir, { recursive: true, mode: 0o700 });
+    const cutoff = this.now() - this.maxAgeMs;
+    const files = fs.readdirSync(this.rootDir).map(name => {
+      const filename = path.join(this.rootDir, name); try { return { filename, stat: fs.statSync(filename) }; } catch { return null; }
+    }).filter(item => item?.stat.isFile());
+    for (const item of files.filter(item => item.stat.mtimeMs < cutoff)) { try { fs.unlinkSync(item.filename); } catch {} }
+    const current = files.filter(item => item.stat.mtimeMs >= cutoff && fs.existsSync(item.filename)).sort((a, b) => b.stat.mtimeMs - a.stat.mtimeMs);
+    for (const item of current.slice(Math.max(0, this.maxItems - 1))) { try { fs.unlinkSync(item.filename); } catch {} }
+  }
+  save(buffer, mimeType) { this.cleanup(); const saved = super.save(buffer, mimeType); return { ...saved, previewUrl: `/api/theme/assets/preview/${saved.id}` }; }
+}
 class ThemeAssetLocalizer {
   constructor({ store = new ThemeAssetStore(), fetchFn = globalThis.fetch, lookup = dns.lookup, timeoutMs = DOWNLOAD_TIMEOUT_MS } = {}) { this.store = store; this.fetchFn = fetchFn; this.lookup = lookup; this.timeoutMs = timeoutMs; }
   async validateUrl(value) {
@@ -77,10 +95,29 @@ class ThemeAssetLocalizer {
     const localized = [], failed = []; let totalSize = 0;
     for (const item of assets) {
       const id = String(item?.id || "").slice(0, 80); const kind = String(item?.kind || "decorativeAsset").slice(0, 40);
-      try { const downloaded = await this.download(item?.sourceUrl); totalSize += downloaded.buffer.length; if (totalSize > MAX_TOTAL_SIZE) throw new ThemeAssetError("素材总大小不能超过 20MB", 413, "THEME_ASSET_TOTAL_TOO_LARGE"); localized.push({ id, kind, ...this.store.save(downloaded.buffer, downloaded.mimeType), status: "localized" }); }
-      catch (error) { failed.push({ id, kind, status: "failed", reason: error.code || "THEME_ASSET_FAILED" }); }
+      try { const downloaded = await this.download(item?.sourceUrl); totalSize += downloaded.buffer.length; if (totalSize > MAX_TOTAL_SIZE) throw new ThemeAssetError("素材总大小不能超过 20MB", 413, "THEME_ASSET_TOTAL_TOO_LARGE"); localized.push({ sourceId:id, kind, ...this.store.save(downloaded.buffer, downloaded.mimeType), status: "localized" }); }
+      catch (error) { failed.push({ sourceId:id, kind, status: "failed", reason: error.code || "THEME_ASSET_FAILED" }); }
     }
     return { localized, failed };
   }
 }
-module.exports = { DOWNLOAD_TIMEOUT_MS, MAX_ASSETS, MAX_ASSET_SIZE, MAX_TOTAL_SIZE, MIME_EXTENSIONS, ThemeAssetError, ThemeAssetLocalizer, ThemeAssetStore, detectMime, isPrivateIp };
+class ThemeAssetPreviewService {
+  constructor({ localizer, store = new ThemeAssetPreviewStore() } = {}) { this.store = store; this.localizer = localizer || new ThemeAssetLocalizer(); }
+  async preview(assets) {
+    if (!Array.isArray(assets) || !assets.length) throw new ThemeAssetError("请选择需要预览的素材");
+    if (assets.length > MAX_ASSETS) throw new ThemeAssetError("一次最多预览 30 张图片", 413, "THEME_ASSET_COUNT_EXCEEDED");
+    const items = [], failed = []; let totalSize = 0;
+    for (const item of assets) {
+      const sourceUrl = item?.sourceUrl; const sourceKey = crypto.createHash("sha256").update(String(sourceUrl || "")).digest("hex").slice(0, 20);
+      const id = String(item?.id || "").replace(/[^a-z0-9_-]/giu, "").slice(0, 80); const kind = String(item?.kind || "decorativeAsset").slice(0, 40); const selector = String(item?.selector || "").replace(/[\u0000-\u001f\u007f]/gu, "").slice(0, 160);
+      try {
+        const downloaded = await this.localizer.download(sourceUrl); totalSize += downloaded.buffer.length;
+        if (totalSize > MAX_TOTAL_SIZE) throw new ThemeAssetError("素材总大小不能超过 20MB", 413, "THEME_ASSET_TOTAL_TOO_LARGE");
+        const saved = this.store.save(downloaded.buffer, downloaded.mimeType);
+        items.push({ id, sourceKey, kind, selector, previewUrl: saved.previewUrl, width: null, height: null, status: "ready" });
+      } catch (error) { failed.push({ id, sourceKey, kind, selector, status: "failed", reason: error.code || "THEME_ASSET_FAILED" }); }
+    }
+    return { items, failed };
+  }
+}
+module.exports = { DOWNLOAD_TIMEOUT_MS, PREVIEW_MAX_AGE_MS, MAX_PREVIEWS, MAX_ASSETS, MAX_ASSET_SIZE, MAX_TOTAL_SIZE, MIME_EXTENSIONS, ThemeAssetError, ThemeAssetLocalizer, ThemeAssetPreviewService, ThemeAssetPreviewStore, ThemeAssetStore, detectMime, isPrivateIp };

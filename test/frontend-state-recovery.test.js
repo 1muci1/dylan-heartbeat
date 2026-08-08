@@ -45,7 +45,7 @@ test("Service Worker controller change refreshes only once per v56 tab session",
   listeners.controllerchange();
   assert.equal(reloads, 1);
   assert.equal(session.get("p4b-sw-controller-refresh-v56"), "1");
-  assert.equal(windowRef.XINBAN_BUILD, "v58-p4b");
+  assert.equal(windowRef.XINBAN_BUILD, "v59-p4b");
 });
 
 test("legacy nested chat path safely replaces to the formal root entry without looping", () => {

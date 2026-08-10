@@ -37,8 +37,8 @@ test("settings, workshop and memory review controls share themed surfaces", () =
 
 test("game outer UI reads the active theme while board and canvas remain functional", () => {
   const gameHtml = fs.readFileSync(path.join(__dirname, "..", "ai-companion-frontend", "game", "index.html"), "utf8");
-  assert.match(gameHtml, /\/assets\/css\/theme\.css\?v=v63-p4b/u);
-  assert.match(gameHtml, /\/assets\/js\/theme-store\.js\?v=v63-p4b/u);
+  assert.match(gameHtml, /\/assets\/css\/theme\.css\?v=v64-p4b/u);
+  assert.match(gameHtml, /\/assets\/js\/theme-store\.js\?v=v64-p4b/u);
   assert.match(gameHtml, /body class="game-page"/u);
   assert.match(theme, /body\.game-page/u);
   assert.match(theme, /\.lobby-card,\.game-panel/u);
@@ -56,6 +56,6 @@ test("chat coverage changes appearance without overriding protected layout prope
 
 test("service worker publishes the v60 theme coverage revision", () => {
   const sw = read("sw.js");
-  assert.match(sw, /CACHE_NAME = "xinban-shell-v63-p4b"/u);
-  assert.match(sw, /BUILD_REVISION = "v63-p4b-computed-theme-audit"/u);
+  assert.match(sw, /CACHE_NAME = "xinban-shell-v64-p4b"/u);
+  assert.match(sw, /BUILD_REVISION = "v64-p4b-unified-accent"/u);
 });

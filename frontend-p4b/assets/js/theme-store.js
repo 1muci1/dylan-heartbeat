@@ -289,14 +289,19 @@
     ,"--xb-color-bg": theme.tokens.colorBg, "--xb-color-text": theme.tokens.colorText
     ,"--xb-color-surface": theme.tokens.cardBg, "--xb-color-surface-soft": `color-mix(in srgb, ${theme.tokens.cardBg} 76%, ${theme.tokens.colorBg})`
     ,"--xb-color-text-muted": theme.tokens.colorMuted, "--xb-color-accent": theme.tokens.colorPrimary, "--xb-color-accent-soft": `color-mix(in srgb, ${theme.tokens.colorPrimary} 15%, ${theme.tokens.cardBg})`
+    ,"--xb-accent": theme.tokens.colorPrimary, "--xb-accent-soft": `color-mix(in srgb, ${theme.tokens.colorPrimary} 13%, ${theme.tokens.cardBg})`
+    ,"--xb-accent-soft-2": `color-mix(in srgb, ${theme.tokens.colorPrimary} 22%, ${theme.tokens.cardBg})`, "--xb-accent-strong": `color-mix(in srgb, ${theme.tokens.colorPrimary} 86%, ${theme.tokens.colorText})`
+    ,"--xb-accent-border": `color-mix(in srgb, ${theme.tokens.colorPrimary} 28%, ${theme.tokens.borderColor})`, "--xb-accent-text": theme.tokens.colorPrimary
+    ,"--xb-accent-icon-bg": `color-mix(in srgb, ${theme.tokens.colorPrimary} 14%, ${theme.tokens.cardBg})`, "--xb-accent-card-bg": `color-mix(in srgb, ${theme.tokens.colorPrimary} 19%, ${theme.tokens.cardBg})`
+    ,"--xb-accent-card-text": readableText(`rgba(255,255,255,.78)`, theme.tokens.cardText, theme.tokens.colorBg), "--xb-fab-bg": `color-mix(in srgb, ${theme.tokens.colorPrimary} 20%, ${theme.tokens.bottomNavBg})`, "--xb-fab-text": theme.tokens.colorPrimary
     ,"--xb-page-bg": theme.tokens.colorBg, "--xb-page-text": theme.tokens.colorText
     ,"--xb-header-bg": theme.tokens.headerBg, "--xb-header-text": theme.tokens.headerText
     ,"--xb-card-bg": theme.tokens.cardBg, "--xb-card-text": theme.tokens.cardText, "--xb-card-muted": theme.tokens.cardMutedText
     ,"--xb-card-border": theme.tokens.borderColor, "--xb-card-shadow": shadow
     ,"--xb-composer-bg": theme.tokens.composerBg, "--xb-input-bg": theme.tokens.inputBg, "--xb-input-text": theme.tokens.inputText, "--xb-input-border": theme.tokens.borderColor
     ,"--xb-button-bg": theme.tokens.colorPrimary, "--xb-button-text": readableText(theme.tokens.colorPrimary, "#ffffff", theme.tokens.colorBg), "--xb-button-border": theme.tokens.borderColor
-    ,"--xb-bottom-nav-bg": theme.tokens.bottomNavBg, "--xb-nav-text": theme.tokens.navText, "--xb-nav-active-text": readableText(theme.tokens.colorPrimary, "#ffffff", theme.tokens.colorBg)
-    ,"--xb-nav-active-bg": `color-mix(in srgb, ${theme.tokens.colorPrimary} 16%, ${theme.tokens.bottomNavBg})`
+    ,"--xb-bottom-nav-bg": theme.tokens.bottomNavBg, "--xb-nav-text": theme.tokens.navText, "--xb-nav-active-text": theme.tokens.colorPrimary, "--xb-nav-active-icon": theme.tokens.colorPrimary
+    ,"--xb-nav-active-bg": `color-mix(in srgb, ${theme.tokens.colorPrimary} 14%, ${theme.tokens.bottomNavBg})`
     ,"--xb-status-bg": `color-mix(in srgb, ${theme.tokens.colorAccent} 14%, ${theme.tokens.cardBg})`, "--xb-status-text": theme.tokens.cardText
     ,"--xb-badge-bg": `color-mix(in srgb, ${theme.tokens.colorPrimary} 13%, ${theme.tokens.cardBg})`, "--xb-badge-text": theme.tokens.cardText
     ,"--xb-avatar-ring": theme.tokens.colorPrimary, "--xb-progress-bg": `color-mix(in srgb, ${theme.tokens.cardMutedText} 18%, ${theme.tokens.cardBg})`, "--xb-progress-fill": theme.tokens.colorPrimary

@@ -92,9 +92,13 @@
   function buildTheme(values, format, filename = "") {
     const report = createReport(format); const base = JSON.parse(JSON.stringify(themeApi.DEFAULT_THEME));
     base.id = `theme_external_${Math.random().toString(36).slice(2, 10)}`;
+    base.source = format === "sillytavern" ? "sillytavern" : "external"; base.accentMode = "theme-or-transparent"; base.accentExplicit = false;
     base.name = safeName(values.name || values.title || values.themeName, filename.replace(/\.json$/iu, "") || "导入的外部主题");
     const mapColor = (source, targets) => { const color = safeColor(values[source]); if (!color) return; for (const target of targets) base.tokens[target] = color; note(report, "recognized", `${source} → ${targets.join(", ")}`); };
     mapColor("main_text_color", ["colorText", "chatAssistantBubbleText", "cardText", "inputText", "previewText"]);
+    for (const key of ["accent_color", "link_color", "primary_color", "button_color", "nav_active_color", "progress_color"]) {
+      if (safeColor(values[key])) { mapColor(key, ["colorPrimary", "colorAccent"]); base.accentExplicit = true; break; }
+    }
     mapColor("italics_text_color", ["colorMuted"]);
     if (safeColor(values.blur_tint_color)) { const tint = harmonizeGlassTint(values.blur_tint_color); base.tokens.cardBg = tint; base.tokens.chatAssistantBubbleBg = tint; note(report, "recognized", "blur_tint_color → glass tint"); }
     if (safeColor(values.chat_tint_color)) note(report, "ignored", themeApi.parseColor(values.chat_tint_color)[3] === 0 ? "chat_tint_color 完全透明，已忽略" : "chat_tint_color 不作为整页背景，已保留柔和紫雾底色");
@@ -192,6 +196,7 @@
     const info = inspectStyleText(input); const css = info.css; const format = detectStyleTextFormat(css);
     if (format === "unknown") { const message = !info.hasBraces ? "没有检测到 CSS 大括号；文件可能不是纯文本，请重新另存为 UTF-8 txt" : !info.hasProperty ? "检测到文本但没有 CSS 属性；请确认文件包含 background/color/border 等声明" : "检测到 CSS 片段，但选择器结构无法识别；请重新另存为 UTF-8 txt"; throw new AdapterError(message, !info.hasBraces ? "THEME_CSS_BRACES_MISSING" : !info.hasProperty ? "THEME_CSS_PROPERTIES_MISSING" : "THEME_CSS_RULE_INVALID"); }
     const base = JSON.parse(JSON.stringify(themeApi.DEFAULT_THEME)); base.harmonyVersion = 2; base.id = `theme_style_${Math.random().toString(36).slice(2,10)}`; base.name = safeName(filename.replace(/\.(?:docx|txt|css)$/iu, ""), format === "echoes-css" ? "Echoes 美化" : "CSS 美化");
+    base.source = format === "echoes-css" ? "echoes" : "css"; base.accentMode = "theme-or-transparent"; base.accentExplicit = false;
     const report = createReport(format); report.textLength = info.textLength; report.echoes = info.echoes; report.hasCssBlock = info.hasBraces; report.modules = []; report.changedTokens = [];
     const modules = new Set(), changed = new Set(); const assign = (key,value,module) => { if (!value || !(key in base.tokens)) return; base.tokens[key]=value; changed.add(key); modules.add(module); };
     const colorFrom = value => safeColor(value) || safeColor(String(value).match(/#[0-9a-f]{3,8}\b|rgba?\([^)]*\)/iu)?.[0]);
@@ -209,6 +214,7 @@
       if (/(?:echoes-input-area|echoes-chat-input|\btextarea\b|composer)/u.test(selector)) { assign("inputBg",bg,"输入栏"); assign("composerBg",bg,"输入栏"); assign("bottomNavBg",bg,"底栏"); assign("inputText",color,"输入栏"); assign("borderColor",border,"输入栏"); assign("inputRadius",radius,"输入栏"); assign("shadowSoft",shadow,"输入栏"); }
       if (/echoes-bubble-user/u.test(selector)) { assign("chatUserBubbleBg",bg,"用户气泡"); assign("chatUserBubbleText",color,"用户气泡"); assign("chatUserBubbleBorder",border,"用户气泡"); assign("radiusBubble",radius,"用户气泡"); assign("shadowSoft",shadow,"用户气泡"); }
       if (/echoes-bubble-other/u.test(selector)) { assign("chatAssistantBubbleBg",bg,"沉气泡"); assign("chatAssistantBubbleText",color,"沉气泡"); assign("chatAssistantBubbleBorder",border,"沉气泡"); assign("radiusBubble",radius,"沉气泡"); assign("shadowSoft",shadow,"沉气泡"); }
+      if (/(?:primary|accent|link|button|send|active|progress)/u.test(selector) && color) { assign("colorPrimary",color,"强调色"); assign("colorAccent",color,"强调色"); base.accentExplicit = true; }
     }
     report.modules=[...modules]; report.changedTokens=[...changed]; for(const module of report.modules) note(report,"recognized",`已转换：${module}`); report.counts.changedTokens=report.changedTokens.length; if(report.changedTokens.length<3) note(report,"ignored","转换较少，效果可能不明显");
     const sanitized=sanitizeExternalCustomCss(css); base.customCss=sanitized.css; for(const bucket of ["recognized","ignored","blocked"]){report[bucket].push(...sanitized.report[bucket]);report.counts[bucket]+=sanitized.report.counts[bucket];} report.counts.externalImages=Math.max(report.counts.externalImages,sanitized.report.counts.externalImages);

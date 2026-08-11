@@ -13,9 +13,9 @@ const themeCss = read("frontend-p4b/assets/css/theme.css");
 test("collaboration loads activeTheme and themes every primary surface and action", () => {
   const html = read("ai-companion-frontend/collaboration/index.html");
   assert.match(html, /class="collaboration-page"/u);
-  assert.match(html, /\/assets\/css\/theme\.css\?v=v64-p4b/u);
-  assert.match(html, /\/assets\/js\/theme-store\.js\?v=v64-p4b/u);
-  assert.match(html, /v64-p4b-unified-accent/u);
+  assert.match(html, /\/assets\/css\/theme\.css\?v=v65-p4b/u);
+  assert.match(html, /\/assets\/js\/theme-store\.js\?v=v65-p4b/u);
+  assert.match(html, /v65-p4b-no-purple-fallback/u);
   assert.match(themeCss, /\.collaboration-page :is\(\.intro-card,\.create-card,\.room-card,\.agent-card,\.summary-card\)[^}]*background:var\(--xb-card-bg\)/u);
   assert.match(themeCss, /\.collaboration-page :is\(\.primary-button,[^}]*background:var\(--xb-color-accent\)/u);
   assert.match(themeCss, /\.collaboration-page :is\(\.agent-card>button,[^}]*background:var\(--xb-color-surface-soft\)/u);
@@ -25,11 +25,11 @@ test("collaboration loads activeTheme and themes every primary surface and actio
 test("space and studio load activeTheme with themed cards, controls, sliders and navigation", () => {
   for (const file of ["ai-companion-frontend/space/index.html", "ai-companion-frontend/space/studio/index.html"]) {
     const html = read(file);
-    assert.match(html, /\/assets\/css\/theme\.css\?v=v64-p4b/u, file);
-    assert.match(html, /\/assets\/js\/theme-store\.js\?v=v64-p4b/u, file);
-    assert.match(html, /v64-p4b-unified-accent/u, file);
+    assert.match(html, /\/assets\/css\/theme\.css\?v=v65-p4b/u, file);
+    assert.match(html, /\/assets\/js\/theme-store\.js\?v=v65-p4b/u, file);
+    assert.match(html, /v65-p4b-no-purple-fallback/u, file);
     assert.doesNotMatch(html, /theme\/theme-engine\.js/u, file);
-    assert.match(html, /theme-adapter\.js\?v=v64-p4b/u, file);
+    assert.match(html, /theme-adapter\.js\?v=v65-p4b/u, file);
   }
   assert.match(themeCss, /:is\(\.space-page,\.space-studio-page\) :is\(\.preview-card,[^}]*background:var\(--xb-card-bg\)/u);
   assert.match(themeCss, /input\[type=range\]\{accent-color:var\(--xb-color-accent\)\}/u);
@@ -52,9 +52,8 @@ test("a blue active theme derives blue canonical accents instead of purple defau
     tokens: { ...DEFAULT_THEME.tokens, colorPrimary: "#397aa8", colorAccent: "#6da9cc" }
   });
   const vars = cssVariables(blue);
-  for (const name of ["--xb-color-accent", "--xb-progress-fill", "--xb-avatar-ring", "--xb-button-bg"]) {
-    assert.equal(vars[name], "#397aa8", name);
-  }
+  for (const name of ["--xb-color-accent", "--xb-progress-fill", "--xb-button-bg"]) assert.equal(vars[name], "#397aa8", name);
+  assert.match(vars["--xb-avatar-ring"], /#397aa8/u);
   assert.match(vars["--xb-nav-active-bg"], /#397aa8/u);
   assert.doesNotMatch(Object.values(vars).filter(value => typeof value === "string" && /--xb-|color-mix/u.test(value)).join("\n"), /#a78bfa|#9b7cff|#8b5cf6/iu);
 });
@@ -63,8 +62,8 @@ test("v62 cache markers update without changing the game build", () => {
   const sw = read("frontend-p4b/sw.js");
   const common = read("frontend-p4b/assets/js/common.js");
   const game = read("ai-companion-frontend/game/index.html");
-  assert.match(sw, /xinban-shell-v64-p4b/u);
-  assert.match(sw, /v64-p4b-unified-accent/u);
-  assert.match(common, /p4b-sw-controller-refresh-v64/u);
+  assert.match(sw, /xinban-shell-v65-p4b/u);
+  assert.match(sw, /v65-p4b-no-purple-fallback/u);
+  assert.match(common, /p4b-sw-controller-refresh-v65/u);
   assert.match(game, /game\.js\?v=game-v49-p4b/u);
 });

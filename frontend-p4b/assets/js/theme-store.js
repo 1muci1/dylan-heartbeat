@@ -56,6 +56,7 @@
   });
   const DEFAULT_THEME = Object.freeze({
     id: "theme_default_purple_mist", name: "默认紫雾", version: 1, author: "心伴",
+    source: "preset", accentMode: "theme", accentExplicit: true,
     createdAt: "2026-08-07T00:00:00.000Z", updatedAt: "2026-08-07T00:00:00.000Z",
     tokens: Object.freeze({
       colorPrimary: "#9a79c6", colorAccent: "#829bdd", colorBg: "#171326",
@@ -154,9 +155,17 @@
       return [...rgb, full.length === 8 ? parseInt(full.slice(6, 8), 16) / 255 : 1];
     }
     const rgb = text.match(/^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+)%?)?\s*\)$/u);
-    if (!rgb) return null;
-    const alphaRaw = rgb[4] === undefined ? 1 : Number(rgb[4]);
-    return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3]), Math.max(0, Math.min(1, alphaRaw > 1 ? alphaRaw / 100 : alphaRaw))];
+    if (rgb) {
+      const alphaRaw = rgb[4] === undefined ? 1 : Number(rgb[4]);
+      return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3]), Math.max(0, Math.min(1, alphaRaw > 1 ? alphaRaw / 100 : alphaRaw))];
+    }
+    const hsl = text.match(/^hsla?\(\s*([\d.]+)(?:deg)?[,\s]+([\d.]+)%[,\s]+([\d.]+)%(?:\s*[,/]\s*([\d.]+)%?)?\s*\)$/u);
+    if (!hsl) return null;
+    const hue = ((Number(hsl[1]) % 360) + 360) % 360; const saturation = Number(hsl[2]) / 100; const lightness = Number(hsl[3]) / 100;
+    const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation; const section = hue / 60; const x = chroma * (1 - Math.abs(section % 2 - 1));
+    const [r, g, b] = section < 1 ? [chroma, x, 0] : section < 2 ? [x, chroma, 0] : section < 3 ? [0, chroma, x] : section < 4 ? [0, x, chroma] : section < 5 ? [x, 0, chroma] : [chroma, 0, x];
+    const offset = lightness - chroma / 2; const alphaRaw = hsl[4] === undefined ? 1 : Number(hsl[4]);
+    return [(r + offset) * 255, (g + offset) * 255, (b + offset) * 255, Math.max(0, Math.min(1, alphaRaw > 1 ? alphaRaw / 100 : alphaRaw))];
   };
   const composite = (foreground, background) => {
     const alpha = foreground[3];
@@ -178,6 +187,39 @@
     if (contrastRatio(preferred, background, pageBackground) >= minimum) return preferred;
     const candidates = ["#241c30", "#ffffff"];
     return candidates.sort((a, b) => contrastRatio(b, background, pageBackground) - contrastRatio(a, background, pageBackground))[0];
+  };
+  const rgbHue = ([red, green, blue]) => {
+    const [r, g, b] = [red, green, blue].map(value => value / 255); const max = Math.max(r, g, b); const min = Math.min(r, g, b); const delta = max - min;
+    if (!delta) return 0;
+    const sector = max === r ? ((g - b) / delta) % 6 : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4;
+    return (sector * 60 + 360) % 360;
+  };
+  const colorSaturation = color => {
+    const parsed = parseColor(color); if (!parsed) return 0;
+    const max = Math.max(...parsed.slice(0, 3)); const min = Math.min(...parsed.slice(0, 3));
+    return max ? (max - min) / max : 0;
+  };
+  const isPurpleColor = color => {
+    const parsed = parseColor(color); if (!parsed || parsed[3] < .08 || colorSaturation(color) < .12) return false;
+    const hue = rgbHue(parsed); return hue >= 260 && hue <= 285;
+  };
+  const sameColor = (left, right) => String(left || "").replace(/\s+/gu, "").toLowerCase() === String(right || "").replace(/\s+/gu, "").toLowerCase();
+  const PRESET_IDS = new Set(["theme_default_purple_mist", "theme_milk_glass", "theme_midnight_blue", "theme_sakura", "theme_obsidian"]);
+  const themeIsDefaultPurple = theme => theme?.id === DEFAULT_THEME.id;
+  const themeAllowsPurpleAccent = theme => themeIsDefaultPurple(theme) || (PRESET_IDS.has(theme?.id) && isPurpleColor(theme?.tokens?.colorPrimary)) || (theme?.accentExplicit === true && isPurpleColor(theme?.tokens?.colorPrimary));
+  const deriveThemeAccent = theme => {
+    const imported = theme.accentMode === "theme-or-transparent" || ["echoes", "css", "imported", "json", "sillytavern", "external"].includes(theme.source);
+    const allowsPurple = themeAllowsPurpleAccent(theme);
+    const inheritedDefaults = new Set([DEFAULT_THEME.tokens.colorPrimary, DEFAULT_THEME.tokens.colorAccent].map(value => value.toLowerCase()));
+    const candidates = [theme.tokens.colorPrimary, theme.tokens.colorAccent, theme.tokens.navActiveText, theme.tokens.borderColor,
+      theme.tokens.colorText, theme.tokens.headerText, theme.tokens.cardText, theme.tokens.inputText, theme.tokens.navText, theme.tokens.colorMuted];
+    for (const color of candidates) {
+      const parsed = parseColor(color); if (!parsed || parsed[3] < .08 || colorSaturation(color) < .12) continue;
+      if (imported && theme.accentExplicit !== true && inheritedDefaults.has(String(color).toLowerCase())) continue;
+      if (!allowsPurple && isPurpleColor(color)) continue;
+      return color;
+    }
+    return theme.tokens.colorText || "rgba(80,110,130,.72)";
   };
   const needsHarmonyBackground = value => {
     const parsed = parseColor(value); if (!parsed || parsed[3] < .2) return true;
@@ -224,10 +266,14 @@
     if (!input.tokens?.chatAssistantBubbleText) tokens.chatAssistantBubbleText = safeColor(input.tokens?.chatBubbleText, tokens.chatAssistantBubbleText);
     if (Number(input.harmonyVersion || 0) < 2 && needsHarmonyBackground(tokens.colorBg)) tokens.colorBg = DEFAULT_THEME.tokens.colorBg;
     const stamp = now.toISOString();
+    const source = ["preset", "echoes", "css", "imported", "json", "sillytavern", "external", "custom"].includes(input.source) ? input.source : PRESET_IDS.has(input.id) ? "preset" : "custom";
+    const inheritedPurple = !PRESET_IDS.has(input.id) && sameColor(input.tokens?.colorPrimary, DEFAULT_THEME.tokens.colorPrimary) && sameColor(input.tokens?.colorAccent, DEFAULT_THEME.tokens.colorAccent);
+    const accentMode = ["theme", "transparent", "theme-or-transparent"].includes(input.accentMode) ? input.accentMode : source === "preset" ? "theme" : inheritedPurple ? "theme-or-transparent" : "theme";
     let normalized = {
       id: safeText(input.id, `theme_${Math.random().toString(36).slice(2, 10)}`, 80),
       name: safeText(input.name, "未命名主题", 80), version: THEME_VERSION, harmonyVersion: 2,
       author: safeText(input.author, "辞辞", 80),
+      source, accentMode, accentExplicit: input.accentExplicit === true || (source === "custom" && !sameColor(input.tokens?.colorPrimary, DEFAULT_THEME.tokens.colorPrimary)),
       createdAt: /^\d{4}-\d{2}-\d{2}T/.test(input.createdAt || "") ? input.createdAt : stamp,
       updatedAt: stamp, tokens: Object.freeze(tokens), assets: Object.freeze(assets),
       assetLibrary: Object.freeze((Array.isArray(input.assetLibrary) ? input.assetLibrary : []).slice(0, 30).map((item, index) => Object.freeze({
@@ -242,12 +288,14 @@
   }
   const cssVariables = input => {
     const theme = normalizeTheme(input); const mode = theme.layout.effectsMode;
+    const accent = deriveThemeAccent(theme); const transparentAccent = theme.accentMode !== "theme" && !themeIsDefaultPurple(theme);
+    const effectivePrimary = transparentAccent ? accent : theme.tokens.colorPrimary; const effectiveAccent = transparentAccent ? accent : theme.tokens.colorAccent;
     const maxBlur = mode === "pretty" ? 24 : mode === "balanced" ? 12 : 2;
     const clampBlur = value => `${Math.min(maxBlur, Math.max(0, parseFloat(value) || 0))}px`;
-    const shadow = mode === "performance" || theme.layout.shadowLevel === "none" ? "none" : theme.layout.shadowLevel === "medium" && mode === "pretty" ? theme.tokens.shadowSoft : "0 8px 22px rgba(63,44,78,.10)";
+    const shadow = mode === "performance" || theme.layout.shadowLevel === "none" ? "none" : transparentAccent ? "0 8px 22px rgba(45,65,78,.10)" : theme.layout.shadowLevel === "medium" && mode === "pretty" ? theme.tokens.shadowSoft : "0 8px 22px rgba(63,44,78,.10)";
     const glass = theme.layout.enableGlass && mode !== "performance";
     return ({
-    "--theme-primary": theme.tokens.colorPrimary, "--theme-accent": theme.tokens.colorAccent,
+    "--theme-primary": effectivePrimary, "--theme-accent": effectiveAccent,
     "--theme-bg": theme.tokens.colorBg, "--theme-text": theme.tokens.colorText,
     "--theme-muted": theme.tokens.colorMuted, "--theme-user-bubble": theme.tokens.chatUserBubbleBg,
     "--theme-user-bubble-text": theme.tokens.chatUserBubbleText, "--theme-assistant-bubble": theme.tokens.chatAssistantBubbleBg,
@@ -273,14 +321,14 @@
     "--theme-background-blur": mode === "performance" ? "0px" : clampBlur(theme.layout.backgroundBlur),
     "--theme-animation-duration": theme.layout.enableAnimations && mode !== "performance" ? ".2s" : "0s"
     ,"--theme-color-text": theme.tokens.colorText, "--theme-color-text-muted": theme.tokens.colorMuted
-    ,"--theme-color-primary": theme.tokens.colorPrimary, "--theme-color-primary-strong": theme.tokens.colorPrimary
-    ,"--theme-color-primary-bright": theme.tokens.colorAccent
+    ,"--theme-color-primary": effectivePrimary, "--theme-color-primary-strong": effectivePrimary
+    ,"--theme-color-primary-bright": effectiveAccent
     ,"--theme-color-surface": theme.tokens.cardBg, "--theme-color-surface-soft": `color-mix(in srgb, ${theme.tokens.cardBg} 76%, ${theme.tokens.colorBg})`
-    ,"--theme-color-border": theme.tokens.borderColor, "--theme-color-focus": `color-mix(in srgb, ${theme.tokens.colorPrimary} 38%, transparent)`
+    ,"--theme-color-border": theme.tokens.borderColor, "--theme-color-focus": `color-mix(in srgb, ${effectivePrimary} 38%, transparent)`
     ,"--theme-shadow": shadow, "--theme-background-overlay": "transparent"
-    ,"--theme-background": `linear-gradient(180deg, ${theme.tokens.colorBg}, color-mix(in srgb, ${theme.tokens.colorBg} 92%, ${theme.tokens.colorPrimary}))`
-    ,"--avatar-border-color": theme.tokens.colorPrimary, "--avatar-ring-color": `color-mix(in srgb, ${theme.tokens.colorPrimary} 24%, transparent)`
-    ,"--avatar-surface": `linear-gradient(145deg, ${theme.tokens.colorAccent}, ${theme.tokens.colorPrimary})`
+    ,"--theme-background": `linear-gradient(180deg, ${theme.tokens.colorBg}, color-mix(in srgb, ${theme.tokens.colorBg} 92%, ${effectivePrimary}))`
+    ,"--avatar-border-color": effectivePrimary, "--avatar-ring-color": `color-mix(in srgb, ${effectivePrimary} 24%, transparent)`
+    ,"--avatar-surface": `linear-gradient(145deg, ${effectiveAccent}, ${effectivePrimary})`
     ,"--theme-bubble-texture": theme.assets.bubbleTexture ? `url(${JSON.stringify(theme.assets.bubbleTexture)})` : "none"
     ,"--theme-nav-texture": theme.assets.bottomNavTexture ? `url(${JSON.stringify(theme.assets.bottomNavTexture)})` : "none"
     ,"--theme-input-decoration": theme.assets.inputDecoration ? `url(${JSON.stringify(theme.assets.inputDecoration)})` : "none"
@@ -288,23 +336,23 @@
     ,"--theme-avatar-frame": theme.assets.avatarFrame ? `url(${JSON.stringify(theme.assets.avatarFrame)})` : "none"
     ,"--xb-color-bg": theme.tokens.colorBg, "--xb-color-text": theme.tokens.colorText
     ,"--xb-color-surface": theme.tokens.cardBg, "--xb-color-surface-soft": `color-mix(in srgb, ${theme.tokens.cardBg} 76%, ${theme.tokens.colorBg})`
-    ,"--xb-color-text-muted": theme.tokens.colorMuted, "--xb-color-accent": theme.tokens.colorPrimary, "--xb-color-accent-soft": `color-mix(in srgb, ${theme.tokens.colorPrimary} 15%, ${theme.tokens.cardBg})`
-    ,"--xb-accent": theme.tokens.colorPrimary, "--xb-accent-soft": `color-mix(in srgb, ${theme.tokens.colorPrimary} 13%, ${theme.tokens.cardBg})`
-    ,"--xb-accent-soft-2": `color-mix(in srgb, ${theme.tokens.colorPrimary} 22%, ${theme.tokens.cardBg})`, "--xb-accent-strong": `color-mix(in srgb, ${theme.tokens.colorPrimary} 86%, ${theme.tokens.colorText})`
-    ,"--xb-accent-border": `color-mix(in srgb, ${theme.tokens.colorPrimary} 28%, ${theme.tokens.borderColor})`, "--xb-accent-text": theme.tokens.colorPrimary
-    ,"--xb-accent-icon-bg": `color-mix(in srgb, ${theme.tokens.colorPrimary} 14%, ${theme.tokens.cardBg})`, "--xb-accent-card-bg": `color-mix(in srgb, ${theme.tokens.colorPrimary} 19%, ${theme.tokens.cardBg})`
-    ,"--xb-accent-card-text": readableText(`rgba(255,255,255,.78)`, theme.tokens.cardText, theme.tokens.colorBg), "--xb-fab-bg": `color-mix(in srgb, ${theme.tokens.colorPrimary} 20%, ${theme.tokens.bottomNavBg})`, "--xb-fab-text": theme.tokens.colorPrimary
+    ,"--xb-color-text-muted": theme.tokens.colorMuted, "--xb-color-accent": accent, "--xb-color-accent-soft": transparentAccent ? "rgba(80,110,130,.10)" : `color-mix(in srgb, ${accent} 15%, ${theme.tokens.cardBg})`
+    ,"--xb-accent": accent, "--xb-accent-soft": transparentAccent ? "rgba(255,255,255,.18)" : `color-mix(in srgb, ${accent} 13%, ${theme.tokens.cardBg})`
+    ,"--xb-accent-soft-2": transparentAccent ? "rgba(80,110,130,.10)" : `color-mix(in srgb, ${accent} 22%, ${theme.tokens.cardBg})`, "--xb-accent-strong": `color-mix(in srgb, ${accent} 86%, ${theme.tokens.colorText})`
+    ,"--xb-accent-border": `color-mix(in srgb, ${accent} 28%, ${theme.tokens.borderColor})`, "--xb-accent-text": accent
+    ,"--xb-accent-icon-bg": transparentAccent ? "rgba(80,110,130,.10)" : `color-mix(in srgb, ${accent} 14%, ${theme.tokens.cardBg})`, "--xb-accent-card-bg": transparentAccent ? "rgba(255,255,255,.35)" : `color-mix(in srgb, ${accent} 19%, ${theme.tokens.cardBg})`
+    ,"--xb-accent-card-text": readableText(`rgba(255,255,255,.78)`, theme.tokens.cardText, theme.tokens.colorBg), "--xb-fab-bg": transparentAccent ? "rgba(255,255,255,.35)" : `color-mix(in srgb, ${accent} 20%, ${theme.tokens.bottomNavBg})`, "--xb-fab-text": accent
     ,"--xb-page-bg": theme.tokens.colorBg, "--xb-page-text": theme.tokens.colorText
     ,"--xb-header-bg": theme.tokens.headerBg, "--xb-header-text": theme.tokens.headerText
     ,"--xb-card-bg": theme.tokens.cardBg, "--xb-card-text": theme.tokens.cardText, "--xb-card-muted": theme.tokens.cardMutedText
     ,"--xb-card-border": theme.tokens.borderColor, "--xb-card-shadow": shadow
     ,"--xb-composer-bg": theme.tokens.composerBg, "--xb-input-bg": theme.tokens.inputBg, "--xb-input-text": theme.tokens.inputText, "--xb-input-border": theme.tokens.borderColor
-    ,"--xb-button-bg": theme.tokens.colorPrimary, "--xb-button-text": readableText(theme.tokens.colorPrimary, "#ffffff", theme.tokens.colorBg), "--xb-button-border": theme.tokens.borderColor
-    ,"--xb-bottom-nav-bg": theme.tokens.bottomNavBg, "--xb-nav-text": theme.tokens.navText, "--xb-nav-active-text": theme.tokens.colorPrimary, "--xb-nav-active-icon": theme.tokens.colorPrimary
-    ,"--xb-nav-active-bg": `color-mix(in srgb, ${theme.tokens.colorPrimary} 14%, ${theme.tokens.bottomNavBg})`
-    ,"--xb-status-bg": `color-mix(in srgb, ${theme.tokens.colorAccent} 14%, ${theme.tokens.cardBg})`, "--xb-status-text": theme.tokens.cardText
-    ,"--xb-badge-bg": `color-mix(in srgb, ${theme.tokens.colorPrimary} 13%, ${theme.tokens.cardBg})`, "--xb-badge-text": theme.tokens.cardText
-    ,"--xb-avatar-ring": theme.tokens.colorPrimary, "--xb-progress-bg": `color-mix(in srgb, ${theme.tokens.cardMutedText} 18%, ${theme.tokens.cardBg})`, "--xb-progress-fill": theme.tokens.colorPrimary
+    ,"--xb-button-bg": effectivePrimary, "--xb-button-text": readableText(effectivePrimary, "#ffffff", theme.tokens.colorBg), "--xb-button-border": theme.tokens.borderColor
+    ,"--xb-bottom-nav-bg": theme.tokens.bottomNavBg, "--xb-nav-text": theme.tokens.navText, "--xb-nav-active-text": accent, "--xb-nav-active-icon": accent
+    ,"--xb-nav-active-bg": transparentAccent ? "rgba(255,255,255,.18)" : `color-mix(in srgb, ${accent} 14%, ${theme.tokens.bottomNavBg})`
+    ,"--xb-status-bg": transparentAccent ? "rgba(80,110,130,.10)" : `color-mix(in srgb, ${effectiveAccent} 14%, ${theme.tokens.cardBg})`, "--xb-status-text": theme.tokens.cardText
+    ,"--xb-badge-bg": transparentAccent ? "rgba(255,255,255,.18)" : `color-mix(in srgb, ${effectivePrimary} 13%, ${theme.tokens.cardBg})`, "--xb-badge-text": theme.tokens.cardText
+    ,"--xb-avatar-ring": `color-mix(in srgb, ${accent} 58%, transparent)`, "--xb-progress-bg": `color-mix(in srgb, ${theme.tokens.cardMutedText} 18%, ${theme.tokens.cardBg})`, "--xb-progress-fill": accent
     ,"--xb-chat-user-bubble-bg": theme.tokens.chatUserBubbleBg, "--xb-chat-user-bubble-text": theme.tokens.chatUserBubbleText
     ,"--xb-chat-assistant-bubble-bg": theme.tokens.chatAssistantBubbleBg, "--xb-chat-assistant-bubble-text": theme.tokens.chatAssistantBubbleText
     ,"--xb-border-color": theme.tokens.borderColor, "--xb-radius-bubble": theme.tokens.radiusBubble, "--xb-radius-card": theme.tokens.radiusCard, "--xb-radius-button": `calc(${theme.tokens.radiusCard} * .48)`
@@ -375,5 +423,6 @@
     exportTheme(input = this.getActive()) { return Object.freeze({ type: "xinban-theme", themeVersion: THEME_VERSION, theme: normalizeTheme(input) }); }
   }
   return { ACTIVE_KEY, LIBRARY_KEY, DEFAULT_THEME, PRESET_THEMES, ThemeError, ThemeStore,
-    normalizeTheme, normalizeVisualSlots, safeAsset, safeVisualAsset, safeCustomCss, cssVariables, parseColor, contrastRatio, readableText, guardReadability, needsHarmonyBackground, THEME_VERSION };
+    normalizeTheme, normalizeVisualSlots, safeAsset, safeVisualAsset, safeCustomCss, cssVariables, parseColor, contrastRatio, readableText, guardReadability, needsHarmonyBackground,
+    isPurpleColor, themeIsDefaultPurple, themeAllowsPurpleAccent, deriveThemeAccent, THEME_VERSION };
 });

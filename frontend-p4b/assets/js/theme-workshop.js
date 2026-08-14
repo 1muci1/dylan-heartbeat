@@ -13,6 +13,11 @@ document.addEventListener("DOMContentLoaded", () => {
   let pendingImport = null;
   let assetDecisionPending = false;
   let renderFrame = 0;
+  let selectedSlotKey = "pageBackground";
+  let selectedDesignPage = "chat";
+  let selectedDesignRegion = "chat.page";
+  let designPreviewTab = "chat";
+  const DESIGN_DRAFT_KEY = "xinban-theme-design-draft-v1";
   const message = value => { if (status) status.textContent = value; };
   const editable = theme => JSON.parse(JSON.stringify(theme));
   const updateThemeNames = () => { const previewName=document.querySelector("[data-theme-preview-name]"),activeName=document.querySelector("[data-theme-active-name]"); if(previewName)previewName.textContent=draft.name; if(activeName)activeName.textContent=store.getActive().name; };
@@ -67,16 +72,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const root = document.querySelector("[data-theme-slot-editor]"); if (!root) return;
     root.replaceChildren(); const assets = draft.assetLibrary || [];
     for (const [key, labelText] of Object.entries(slotLabels)) {
-      const slot = draft.visualSlots?.[key] || {}; const row = document.createElement("div"); row.className = "theme-slot-row";
+      const slot = draft.visualSlots?.[key] || {}; const row = document.createElement("div"); row.className = `theme-slot-row${selectedSlotKey===key?" is-selected":""}`; row.dataset.slotKey=key;
       const toggle = document.createElement("input"); toggle.type = "checkbox"; toggle.checked = slot.enabled !== false; toggle.setAttribute("aria-label", `${labelText}显示`);
       const label = document.createElement("span"); label.textContent = labelText;
       const select = document.createElement("select"); const empty = document.createElement("option"); empty.value = ""; empty.textContent = "未选择"; select.append(empty);
       for (const asset of assets) { const option = document.createElement("option"); option.value = asset.url; option.textContent = asset.kind; option.selected = asset.url === slot.url; select.append(option); }
       const clear = document.createElement("button"); clear.type = "button"; clear.textContent = "清除";
+      const controls=document.createElement("div");controls.className="theme-slot-controls";
+      const addControl=(text,field,{min,max,step=1,scale=1,type="range",wide=false}={})=>{const control=document.createElement("label");control.className=`theme-slot-control${wide?" theme-slot-control--wide":""}`;control.append(document.createTextNode(text));const input=document.createElement("input");input.type=type;if(type==="range"){input.min=min;input.max=max;input.step=step;input.value=Number(slot[field]??0)*scale;}else{input.value=slot[field]||"";}input.dataset.slotControl=field;input.addEventListener("input",()=>update(next=>{next.visualSlots[key][field]=type==="range"?Number(input.value)/scale:input.value;}));control.append(input);controls.append(control);};
+      addControl("水平", "x", {min:-100,max:100});addControl("垂直", "y", {min:-100,max:100});addControl("缩放", "scale", {min:25,max:300,scale:100});addControl("旋转", "rotation", {min:-180,max:180});addControl("透明度", "opacity", {min:0,max:100,scale:100});addControl("圆角", "radius", {min:0,max:50});addControl("边框", "borderWidth", {min:0,max:12});addControl("边框色", "borderColor", {type:"color"});addControl("阴影", "shadow", {type:"text",wide:true});
       toggle.addEventListener("change", () => update(next => { next.visualSlots.enabledByUser = true; next.visualSlots[key].enabled = toggle.checked; next.migratedVisualSlotsSafe = true; }));
       select.addEventListener("change", () => update(next => { next.visualSlots[key].url = select.value; }));
       clear.addEventListener("click", () => update(next => { next.visualSlots[key].url = ""; }));
-      row.append(toggle, label, select, clear); root.append(row);
+      row.addEventListener("click",event=>{if(event.target.closest("input,select,button"))return;selectedSlotKey=key;render();});
+      row.append(toggle, label, select, clear,controls); root.append(row);
     }
   };
   const refreshForm = () => {
@@ -95,14 +104,37 @@ document.addEventListener("DOMContentLoaded", () => {
     const customFont = document.querySelector("[data-theme-custom-font]"); if (customFont) customFont.value = ["system","rounded","serif","sans"].includes(draft.tokens.fontFamily) ? "" : draft.tokens.fontFamily;
     renderSlotEditor();
   };
+  const designRegion = key => editable(draft.customDesign?.regions?.[key] || api.DESIGN_REGION_DEFAULT);
+  const ensureDesignRegion = (next,key) => { next.customDesign=next.customDesign||{version:1,regions:{}};next.customDesign.regions=next.customDesign.regions||{};next.customDesign.regions[key]=editable(next.customDesign.regions[key]||api.DESIGN_REGION_DEFAULT);return next.customDesign.regions[key]; };
+  const renderDesignNavigation = () => {
+    const pages=document.querySelector("[data-design-pages]"),regions=document.querySelector("[data-design-regions]");if(!pages||!regions)return;pages.replaceChildren();regions.replaceChildren();
+    for(const [key,label] of Object.entries(api.DESIGN_PAGES)){const button=document.createElement("button");button.type="button";button.textContent=label;button.classList.toggle("is-active",key===selectedDesignPage);button.addEventListener("click",()=>{selectedDesignPage=key;selectedDesignRegion=Object.keys(api.DESIGN_REGIONS).find(region=>region.startsWith(`${key}.`))||selectedDesignRegion;designPreviewTab=["chat","home"].includes(key)?key:"generic";render();});pages.append(button);}
+    for(const [key,label] of Object.entries(api.DESIGN_REGIONS).filter(([key])=>key.startsWith(`${selectedDesignPage}.`))){const button=document.createElement("button");button.type="button";button.textContent=label.split(" · ")[1];button.classList.toggle("is-active",key===selectedDesignRegion);button.addEventListener("click",()=>{selectedDesignRegion=key;render();});regions.append(button);}
+  };
+  const renderDesignForm = () => {
+    const region=designRegion(selectedDesignRegion),name=document.querySelector("[data-design-region-name]");if(name)name.textContent=api.DESIGN_REGIONS[selectedDesignRegion]||"区域属性";
+    const enabled=document.querySelector("[data-design-enabled]");if(enabled)enabled.checked=region.enabled===true;
+    document.querySelectorAll("[data-design-field]").forEach(input=>{const value=region[input.dataset.designField];input.value=input.dataset.designScale?Number(value)*Number(input.dataset.designScale):value;});
+    const image=region.image||api.DESIGN_IMAGE_DEFAULT;document.querySelectorAll("[data-design-image-field]").forEach(input=>{const value=image[input.dataset.designImageField];if(input.type==="checkbox")input.checked=value===true;else input.value=input.dataset.designScale?Number(value)*Number(input.dataset.designScale):value;});
+    const assetSelect=document.querySelector('[data-design-image-field="url"]');if(assetSelect){const selected=image.url;assetSelect.replaceChildren(new Option("不使用图片",""));for(const asset of draft.assetLibrary||[]){if(!safeAssetImage(asset.url))continue;const option=new Option(`${asset.kind} · ${asset.id}`,asset.url);option.selected=asset.url===selected;assetSelect.append(option);}}
+  };
+  const renderDesignPreview = () => {
+    document.querySelectorAll("[data-design-preview-page]").forEach(page=>{page.hidden=page.dataset.designPreviewPage!==designPreviewTab;});document.querySelectorAll("[data-design-preview-tab]").forEach(button=>button.classList.toggle("is-active",button.dataset.designPreviewTab===designPreviewTab));
+    const normalized=api.normalizeCustomDesign(draft.customDesign);document.querySelectorAll("[data-design-preview-region]").forEach(node=>{node.removeAttribute("style");const region=normalized.regions[node.dataset.designPreviewRegion];if(!region?.enabled)return;node.style.backgroundColor=region.backgroundColor;node.style.color=region.textColor;node.style.borderColor=region.borderColor;node.style.borderWidth=`${region.borderWidth}px`;node.style.borderRadius=`${region.radius}px`;node.style.boxShadow=region.shadow?`0 10px 28px rgba(25,30,38,${region.shadow})`:"none";node.style.backdropFilter=`blur(${region.blur}px)`;if(region.image.enabled&&region.image.url){node.style.backgroundImage=`linear-gradient(rgba(255,255,255,${1-region.image.opacity}),rgba(255,255,255,${1-region.image.opacity})),url(${JSON.stringify(region.image.url)})`;node.style.backgroundSize=region.image.size;node.style.backgroundPosition=region.image.position;node.style.backgroundRepeat=region.image.repeat;node.style.backgroundBlendMode=region.image.blendMode;}}
+    );
+  };
+  const renderAdvancedEditor=()=>{renderDesignNavigation();renderDesignForm();renderDesignPreview();};
   const renderNow = () => {
     renderFrame = 0;
     try {
       draft = api.normalizeTheme(draft);
-      for (const [key, value] of Object.entries(api.cssVariables(draft))) preview.style.setProperty(key, value);
+      const variables=api.cssVariables(draft);for (const [key, value] of Object.entries(variables)){preview.style.setProperty(key, value);document.querySelector("[data-design-preview]")?.style.setProperty(key,value);}
       const bg = draft.assets.backgroundImage; preview.style.setProperty("--theme-background-image", bg ? `url(${JSON.stringify(bg)})` : "none");
       updateThemeNames();
+      const selectedName=document.querySelector("[data-theme-selected-slot]");if(selectedName)selectedName.textContent=slotLabels[selectedSlotKey];
+      document.querySelectorAll("[data-preview-layer]").forEach(layer=>layer.classList.toggle("is-selected",layer.dataset.previewLayer===selectedSlotKey));
       renderSlotEditor();
+      renderAdvancedEditor();
     } catch (error) { message(error.message || "主题预览失败"); }
   };
   const render = () => { if (!renderFrame) renderFrame = requestAnimationFrame(renderNow); };
@@ -171,10 +203,30 @@ document.addEventListener("DOMContentLoaded", () => {
     for(const key of Object.keys(slotLabels)) next.visualSlots[key].enabled=false;
     next.migratedVisualSlotsSafe=true; draft=store.applyTheme(next,{persist:true,applyBackground:false}); selectedThemeId=draft.id; refreshForm(); render(); message("已只保留颜色，并关闭全部图片装饰。聊天页会立即恢复安全主题层。");
   });
-  document.querySelector("[data-theme-export]")?.addEventListener("click", () => {
+  document.querySelector("[data-theme-reset-slot]")?.addEventListener("click",()=>update(next=>{Object.assign(next.visualSlots[selectedSlotKey],{x:0,y:0,scale:1,rotation:0,opacity:api.DEFAULT_THEME.visualSlots[selectedSlotKey].opacity,radius:api.DEFAULT_THEME.visualSlots[selectedSlotKey].radius,borderWidth:0,borderColor:"transparent",shadow:"none"});}));
+  document.querySelectorAll("[data-preview-layer]").forEach(layer=>{
+    layer.addEventListener("pointerdown",event=>{selectedSlotKey=layer.dataset.previewLayer;const startX=event.clientX,startY=event.clientY,slot=draft.visualSlots[selectedSlotKey],originX=slot.x||0,originY=slot.y||0;layer.setPointerCapture?.(event.pointerId);const move=moveEvent=>{const x=Math.max(-100,Math.min(100,originX+moveEvent.clientX-startX)),y=Math.max(-100,Math.min(100,originY+moveEvent.clientY-startY));update(next=>{next.visualSlots[selectedSlotKey].x=Math.round(x);next.visualSlots[selectedSlotKey].y=Math.round(y);});};const end=()=>{layer.removeEventListener("pointermove",move);layer.removeEventListener("pointerup",end);layer.removeEventListener("pointercancel",end);};layer.addEventListener("pointermove",move);layer.addEventListener("pointerup",end);layer.addEventListener("pointercancel",end);render();});
+  });
+  document.querySelectorAll("[data-open-advanced-editor]").forEach(button=>button.addEventListener("click",()=>{const panel=document.querySelector("[data-advanced-editor]");if(panel){panel.hidden=false;render();panel.scrollIntoView?.({behavior:"smooth",block:"start"});}}));
+  document.querySelector("[data-close-advanced-editor]")?.addEventListener("click",()=>{document.querySelector("[data-advanced-editor]").hidden=true;});
+  document.querySelectorAll("[data-design-preview-tab]").forEach(button=>button.addEventListener("click",()=>{designPreviewTab=button.dataset.designPreviewTab;render();}));
+  document.querySelector("[data-design-enabled]")?.addEventListener("change",event=>update(next=>{ensureDesignRegion(next,selectedDesignRegion).enabled=event.target.checked;}));
+  document.querySelectorAll("[data-design-field]").forEach(input=>input.addEventListener("input",()=>update(next=>{const region=ensureDesignRegion(next,selectedDesignRegion);region[input.dataset.designField]=input.dataset.designScale?Number(input.value)/Number(input.dataset.designScale):input.type==="range"?Number(input.value):input.value;})));
+  document.querySelectorAll("[data-design-image-field]").forEach(input=>input.addEventListener("input",()=>update(next=>{const region=ensureDesignRegion(next,selectedDesignRegion);region.image=region.image||editable(api.DESIGN_IMAGE_DEFAULT);region.image[input.dataset.designImageField]=input.type==="checkbox"?input.checked:input.dataset.designScale?Number(input.value)/Number(input.dataset.designScale):input.type==="range"?Number(input.value):input.value;})));
+  document.querySelector("[data-design-reset-region]")?.addEventListener("click",()=>update(next=>{next.customDesign=next.customDesign||{version:1,regions:{}};delete next.customDesign.regions[selectedDesignRegion];}));
+  document.querySelector("[data-design-reset-all]")?.addEventListener("click",()=>update(next=>{next.customDesign={version:1,regions:{}};}));
+  const disableDesignImages=()=>update(next=>{next.customDesign=next.customDesign||{version:1,regions:{}};for(const region of Object.values(next.customDesign.regions||{})){region.image=region.image||editable(api.DESIGN_IMAGE_DEFAULT);region.image.enabled=false;}});
+  document.querySelector("[data-design-disable-images]")?.addEventListener("click",disableDesignImages);document.querySelector("[data-design-colors-only]")?.addEventListener("click",()=>{disableDesignImages();const next=editable(draft);next.visualSlots.enabledByUser=true;for(const key of Object.keys(slotLabels))next.visualSlots[key].enabled=false;draft=next;render();});
+  document.querySelector("[data-design-save-draft]")?.addEventListener("click",()=>{localStorage.setItem(DESIGN_DRAFT_KEY,JSON.stringify(api.normalizeCustomDesign(draft.customDesign)));message("高级美化草稿已保存；当前主题未改变。");});
+  document.querySelector("[data-design-apply]")?.addEventListener("click",()=>{draft=store.applyTheme(draft,{persist:true,applyBackground:true});selectedThemeId=draft.id;updateThemeNames();message("高级设计已应用到当前主题。");});
+  document.querySelector("[data-design-save-as]")?.addEventListener("click",()=>{const name=window.prompt("新主题名称",`${draft.name} · 自定义`)?.trim();if(!name)return;const next=editable(draft);next.name=name;next.id=`theme_${Date.now().toString(36)}`;next.source="custom";const imported=store.importTheme({type:"xinban-theme",themeVersion:1,theme:next});setCurrentWorkshopTheme(imported);message(`已另存为「${imported.name}」，尚未应用。`);});
+  document.querySelector("[data-design-image-preview]")?.addEventListener("click",()=>{const url=designRegion(selectedDesignRegion).image?.url,src=safeAssetImage(url),dialog=document.querySelector("[data-asset-preview-dialog]"),image=dialog?.querySelector("[data-asset-preview-image]");if(!src||!dialog||!image){message("请先选择已本地化素材。");return;}image.src=src;dialog.querySelector("[data-asset-preview-kind]").textContent="高级编辑器素材";dialog.querySelector("[data-asset-preview-selector]").textContent=api.DESIGN_REGIONS[selectedDesignRegion];dialog.querySelector("[data-asset-preview-domain]").textContent="本地素材库";dialog.querySelector("[data-asset-preview-localized]").textContent="已本地化";dialog.showModal();});
+  const designPresets={glass:{backgroundColor:"rgba(255,255,255,.12)",borderColor:"rgba(255,255,255,.28)",shadow:.08,blur:14,glassOpacity:.7},light:{backgroundColor:"rgba(255,255,255,.72)",borderColor:"rgba(80,110,130,.14)",shadow:.12,blur:8,glassOpacity:.82},image:{backgroundColor:"rgba(255,255,255,.32)",borderColor:"rgba(255,255,255,.22)",shadow:.1,blur:12,glassOpacity:.62},minimal:{backgroundColor:"transparent",borderColor:"rgba(80,110,130,.22)",accentColor:"transparent",shadow:0,blur:0,glassOpacity:1}};
+  document.querySelectorAll("[data-design-preset]").forEach(button=>button.addEventListener("click",()=>update(next=>{const region=ensureDesignRegion(next,selectedDesignRegion);Object.assign(region,designPresets[button.dataset.designPreset],{enabled:true});if(button.dataset.designPreset!=="image")region.image.enabled=false;})));
+  document.querySelectorAll("[data-theme-export]").forEach(button=>button.addEventListener("click", () => {
     const blob = new Blob([`${JSON.stringify(store.exportTheme(draft), null, 2)}\n`], { type: "application/json" });
     const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `${draft.name.replace(/[^\p{Letter}\p{Number}_-]+/gu, "-") || "xinban-theme"}.json`; link.click(); URL.revokeObjectURL(link.href); message("主题 JSON 已导出");
-  });
+  }));
   document.querySelector("[data-theme-import]")?.addEventListener("change", async event => {
     const file = event.target.files?.[0]; if (!file) return;
     try {
@@ -245,5 +297,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const templateText = `${JSON.stringify(tavernTemplate, null, 2)}\n`; const templateNode = document.querySelector("[data-tavern-template]"); if (templateNode) templateNode.textContent = templateText;
   document.querySelector("[data-template-copy]")?.addEventListener("click", async () => { try { await navigator.clipboard.writeText(templateText); message("酒馆 JSON 模板已复制。"); } catch { message("复制失败，请手动选择模板文本。"); } });
   document.querySelector("[data-template-download]")?.addEventListener("click", () => { const blob = new Blob([templateText], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "xinban-tavern-theme-template.json"; link.click(); URL.revokeObjectURL(link.href); });
+  try{const savedDesign=JSON.parse(localStorage.getItem(DESIGN_DRAFT_KEY)||"null");if(savedDesign){const next=editable(draft);next.customDesign=api.normalizeCustomDesign(savedDesign);draft=editable(api.normalizeTheme(next));message("已恢复上次保存的高级美化草稿；当前主题未改变。");}}catch{}
   refreshForm(); render(); if(store.lastVisualSlotsMigration) message("已为旧导入主题关闭自动装饰，避免影响布局；可在装饰槽位设置中手动开启。");
 });

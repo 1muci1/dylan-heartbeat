@@ -8,9 +8,17 @@ const { ThemeAssetError } = require("./theme-asset-service");
 function safeEqual(actual, expected) { const left = Buffer.from(String(actual)); const right = Buffer.from(String(expected)); return left.length === right.length && crypto.timingSafeEqual(left, right); }
 function registerThemeAssetRoutes(app, { localizer, store, previewService, previewStore, apiKey = process.env.GATEWAY_API_KEY } = {}) {
   const auth = (req, reply, done) => { if (!apiKey) return reply.code(503).send({ ok:false,error:{code:"GATEWAY_KEY_MISSING",message:"主题素材服务暂不可用"} }); if (!safeEqual(req.headers.authorization || "", `Bearer ${apiKey}`)) return reply.code(401).header("WWW-Authenticate","Bearer").send({ok:false,error:{code:"UNAUTHORIZED",message:"Unauthorized"}}); done(); };
-  const run = handler => async (req, reply) => { try { return await handler(req, reply); } catch (raw) { const error = raw instanceof ThemeAssetError ? raw : new ThemeAssetError("主题素材服务暂不可用",500,"THEME_ASSET_INTERNAL_ERROR"); if (error.statusCode >= 500) req.log.error({ errorCode:error.code }, "theme asset operation failed"); return reply.code(error.statusCode).send({ok:false,error:{code:error.code,message:error.message}}); } };
+  const run = handler => async (req, reply) => { try { return await handler(req, reply); } catch (raw) { const error = raw instanceof ThemeAssetError ? raw : raw?.code === "FST_REQ_FILE_TOO_LARGE" ? new ThemeAssetError("图片超过允许大小",413,"THEME_ASSET_TOO_LARGE") : new ThemeAssetError("主题素材服务暂不可用",500,"THEME_ASSET_INTERNAL_ERROR"); if (error.statusCode >= 500) req.log.error({ errorCode:error.code }, "theme asset operation failed"); return reply.code(error.statusCode).send({ok:false,error:{code:error.code,message:error.message}}); } };
   app.post("/api/theme/assets/localize", { preHandler: auth }, run(async req => ({ ok:true,data:await localizer.localize(req.body?.assets) })));
   app.post("/api/theme/assets/preview", { preHandler: auth }, run(async req => ({ ok:true,data:await previewService.preview(req.body?.assets) })));
+  app.post("/api/theme/assets/upload", { preHandler: auth }, run(async req => {
+    const part = await req.file({ limits:{files:1,fileSize:2*1024*1024,fields:2,parts:3} }); if (!part) throw new ThemeAssetError("请选择图片",400,"THEME_ASSET_FILE_REQUIRED");
+    const buffer = await part.toBuffer(); if (part.file.truncated || buffer.length > 2*1024*1024) throw new ThemeAssetError("图片超过允许大小",413,"THEME_ASSET_TOO_LARGE");
+    return { ok:true, data:store.upload(buffer, { mimeType:String(part.mimetype || "").toLowerCase(), filename:part.filename, category:req.query?.category || "other" }) };
+  }));
+  app.get("/api/theme/assets/library", { preHandler: auth }, run(async () => ({ ok:true,data:{items:store.list()} })));
+  app.patch("/api/theme/assets/:id", { preHandler: auth }, run(async req => ({ ok:true,data:store.update(req.params.id, req.body) })));
+  app.delete("/api/theme/assets/:id", { preHandler: auth }, run(async req => ({ ok:true,data:store.delete(req.params.id) })));
   app.post("/api/theme/import/extract", { preHandler: auth }, run(async req => {
     const part = await req.file({ limits:{files:1,fileSize:1024*1024,parts:2} }); if (!part) throw new ThemeAssetError("请选择美化文件",400,"THEME_IMPORT_FILE_REQUIRED");
     const extension = path.extname(String(part.filename || "")).toLowerCase(); if (![".docx",".txt",".css"].includes(extension)) throw new ThemeAssetError("只支持 DOCX/TXT/CSS",415,"THEME_IMPORT_TYPE_UNSUPPORTED");

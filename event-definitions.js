@@ -108,6 +108,22 @@ const EVENT_DEFINITIONS = Object.freeze({
   "tool.failed": Object.freeze({
     category: "tool",
     allowedSources: Object.freeze(["tool-audit-store"])
+  }),
+  "theme_asset.uploaded": Object.freeze({
+    category: "theme_asset",
+    allowedSources: Object.freeze(["theme-asset-store"])
+  }),
+  "theme_asset.localized": Object.freeze({
+    category: "theme_asset",
+    allowedSources: Object.freeze(["theme-asset-store"])
+  }),
+  "theme_asset.renamed": Object.freeze({
+    category: "theme_asset",
+    allowedSources: Object.freeze(["theme-asset-store"])
+  }),
+  "theme_asset.deleted": Object.freeze({
+    category: "theme_asset",
+    allowedSources: Object.freeze(["theme-asset-store"])
   })
 });
 

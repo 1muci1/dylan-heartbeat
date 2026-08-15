@@ -10,14 +10,14 @@ const read = file => fs.readFileSync(path.join(root, file), "utf8");
 
 test("v68 service worker replaces old shell caches and keeps HTML network-first", () => {
   const sw = read("frontend-p4b/sw.js");
-  assert.match(sw, /CACHE_NAME = "xinban-shell-v68-p4b"/u);
-  assert.match(sw, /BUILD_REVISION = "v68-p4b-visual-asset-library"/u);
+  assert.match(sw, /CACHE_NAME = "xinban-shell-v69-p4b"/u);
+  assert.match(sw, /BUILD_REVISION = "v69-p4b-theme-asset-manager"/u);
   assert.match(sw, /self\.skipWaiting\(\)/u);
   assert.match(sw, /key\.startsWith\(CACHE_PREFIX\) && key !== CACHE_NAME/u);
   assert.match(sw, /self\.clients\.claim\(\)/u);
-  const shouldDelete = key => key.startsWith("xinban-shell-") && key !== "xinban-shell-v68-p4b";
+  const shouldDelete = key => key.startsWith("xinban-shell-") && key !== "xinban-shell-v69-p4b";
   assert.equal(shouldDelete("xinban-shell-v67-p4b"), true);
-  assert.equal(shouldDelete("xinban-shell-v68-p4b"), false);
+  assert.equal(shouldDelete("xinban-shell-v69-p4b"), false);
   const htmlBranch = sw.slice(sw.indexOf('event.request.mode === "navigate"'));
   assert.ok(htmlBranch.indexOf("fetch(event.request)") < htmlBranch.indexOf("caches.match(event.request)"));
 });
@@ -32,15 +32,15 @@ test("v68 pages and shell assets use the new cache-bust version", () => {
   for (const file of pages) {
     const html = read(file);
     assert.doesNotMatch(html, /v67-p4b/u, file);
-    assert.match(html, /v68-p4b/u, file);
+    assert.match(html, /v69-p4b/u, file);
   }
   assert.doesNotMatch(read("frontend-p4b/sw.js"), /\?v=v67-p4b/u);
-  assert.match(read("frontend-p4b/sw.js"), /\?v=v68-p4b/u);
+  assert.match(read("frontend-p4b/sw.js"), /\?v=v69-p4b/u);
 });
 
 test("v68 controller refresh is guarded once and game build remains v49", () => {
   const common = read("frontend-p4b/assets/js/common.js");
-  assert.match(common, /CONTROLLER_REFRESH_GUARD = "p4b-sw-controller-refresh-v68"/u);
+  assert.match(common, /CONTROLLER_REFRESH_GUARD = "p4b-sw-controller-refresh-v69"/u);
   assert.match(common, /getItem\(CONTROLLER_REFRESH_GUARD\) === "1"/u);
   assert.match(common, /setItem\(CONTROLLER_REFRESH_GUARD, "1"\)/u);
   assert.match(common, /addEventListener\("controllerchange", refreshOnceForController\)/u);

@@ -183,7 +183,7 @@ const mediaStore = new MediaStore({
 });
 const uploadStore = new UploadStore();
 const stickerImporter = new StickerImporter({ uploadStore });
-const themeAssetStore = new ThemeAssetStore();
+const themeAssetStore = new ThemeAssetStore({ eventStore });
 const themeAssetLocalizer = new ThemeAssetLocalizer({ store: themeAssetStore });
 const themeAssetPreviewStore = new ThemeAssetPreviewStore();
 const themeAssetPreviewService = new ThemeAssetPreviewService({ localizer: themeAssetLocalizer, store: themeAssetPreviewStore });

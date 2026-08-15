@@ -451,6 +451,20 @@
     ,...Object.fromEntries(VISUAL_SLOT_FIELDS.flatMap(key => { const slot=theme.visualSlots[key]; const prefix=`--xb-slot-${key.replace(/[A-Z]/gu, match=>`-${match.toLowerCase()}`)}`; return [[`${prefix}-opacity`,String(slot.opacity)],[`${prefix}-x`,`${slot.x}px`],[`${prefix}-y`,`${slot.y}px`],[`${prefix}-scale`,String(slot.scale)],[`${prefix}-rotation`,`${slot.rotation}deg`],[`${prefix}-radius`,`${slot.radius}%`],[`${prefix}-border-width`,`${slot.borderWidth}px`],[`${prefix}-border-color`,slot.borderColor],[`${prefix}-shadow`,slot.shadow]]; }))
     ,...customDesignVariables(theme.customDesign)
   }); };
+  const collectThemeAssetReferences = (assetUrl, { activeTheme = null, currentTheme = null, draft = null, savedThemes = [] } = {}) => {
+    if (!LOCAL_THEME_ASSET.test(String(assetUrl || ""))) return [];
+    const references = [], seen = new Set();
+    const add = (scope, location) => { const key=`${scope}\u0000${location}`;if(!seen.has(key)){seen.add(key);references.push({scope,location});} };
+    const inspect = (theme, scope) => {
+      if (!theme || typeof theme !== "object") return;
+      for (const [field,value] of Object.entries(theme.assets || {})) if (value === assetUrl) add(scope, `主题素材 · ${field}`);
+      for (const [field,slot] of Object.entries(theme.visualSlots || {})) if (slot && typeof slot === "object" && slot.url === assetUrl) add(scope, `装饰槽位 · ${field}`);
+      for (const [region,config] of Object.entries(theme.customDesign?.regions || {})) if (config?.image?.url === assetUrl) add(scope, DESIGN_REGIONS[region] || region);
+    };
+    inspect(activeTheme,"当前主题"); inspect(currentTheme,"当前编辑主题"); inspect(draft,"当前草稿");
+    for (const theme of Array.isArray(savedThemes) ? savedThemes : []) inspect(theme, `保存主题 · ${String(theme?.name || "未命名主题").slice(0,80)}`);
+    return references;
+  };
   class ThemeStore {
     constructor({ storage = typeof localStorage !== "undefined" ? localStorage : null,
       documentRef = typeof document !== "undefined" ? document : null } = {}) {
@@ -509,6 +523,6 @@
     exportTheme(input = this.getActive()) { return Object.freeze({ type: "xinban-theme", themeVersion: THEME_VERSION, theme: normalizeTheme(input) }); }
   }
   return { ACTIVE_KEY, LIBRARY_KEY, DEFAULT_THEME, PRESET_THEMES, ThemeError, ThemeStore,
-    normalizeTheme, normalizeVisualSlots, normalizeCustomDesign, customDesignVariables, safeAsset, safeVisualAsset, resolveThemeAssetUrl, safeCustomCss, cssVariables, parseColor, contrastRatio, readableText, guardReadability, needsHarmonyBackground,
+    normalizeTheme, normalizeVisualSlots, normalizeCustomDesign, customDesignVariables, collectThemeAssetReferences, safeAsset, safeVisualAsset, resolveThemeAssetUrl, safeCustomCss, cssVariables, parseColor, contrastRatio, readableText, guardReadability, needsHarmonyBackground,
     isPurpleColor, themeIsDefaultPurple, themeAllowsPurpleAccent, deriveThemeAccent, DESIGN_REGIONS, DESIGN_PAGES, DESIGN_REGION_DEFAULT, DESIGN_IMAGE_DEFAULT, THEME_VERSION };
 });

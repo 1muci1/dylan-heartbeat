@@ -1,7 +1,7 @@
 "use strict";
 
 ((root, factory) => {
-  const api = factory();
+  const api = factory(root);
   if (typeof module === "object" && module.exports) module.exports = api;
   if (root) {
     root.XinbanThemes = Object.freeze(api);
@@ -10,7 +10,7 @@
     root.addEventListener?.("storage", event => { if (event.key === api.ACTIVE_KEY) root.XinbanThemeStore.applyActiveTheme(); });
     root.addEventListener?.("pageshow", () => root.XinbanThemeStore.applyActiveTheme());
   }
-})(typeof window !== "undefined" ? window : null, () => {
+})(typeof window !== "undefined" ? window : null, root => {
   const ACTIVE_KEY = "xinban-theme-active-v1";
   const LIBRARY_KEY = "xinban-theme-library-v1";
   const THEME_VERSION = 1;
@@ -44,6 +44,7 @@
     "avatarFrame", "inputDecor", "homeCardDecor", "navAccent"
   ]);
   const LOCAL_THEME_ASSET = /^\/api\/theme\/assets\/[a-z0-9-]{8,80}$/iu;
+  const DISPLAY_THEME_ASSET = /^\/api\/theme\/assets\/(?:preview\/)?[a-z0-9-]{3,80}$/iu;
   const LAYOUT_FIELDS = Object.freeze([
     "chatWidth", "bubbleMaxWidth", "messageGap", "bottomNavHeight", "glassIntensity",
     "backgroundDim", "bubbleOpacity", "navOpacity", "cardOpacity", "radiusNav", "blurNav", "blurBubble",
@@ -132,6 +133,26 @@
   const safeVisualAsset = value => {
     const text = typeof value === "string" ? value.trim() : "";
     return LOCAL_THEME_ASSET.test(text) ? text : "";
+  };
+  const resolveThemeAssetUrl = (value, { baseUrl = root?.AppConfig?.getProviderConfig?.().baseUrl || "", locationRef = root?.location || null } = {}) => {
+    const text = typeof value === "string" ? value.trim() : "";
+    let path = text;
+    if (!text.startsWith("/")) {
+      try { path = new URL(text).pathname; }
+      catch { return ""; }
+    }
+    if (!DISPLAY_THEME_ASSET.test(path)) return "";
+    const configured = String(baseUrl || "").trim(); let gatewayOrigin = "", gatewayPrefix = "";
+    if (configured) {
+      try { const url = new URL(configured); gatewayOrigin = url.origin; gatewayPrefix = url.pathname.replace(/\/+$/u, "").replace(/\/v1$/u, ""); if (gatewayPrefix === "/") gatewayPrefix = ""; }
+      catch { return ""; }
+    } else if (String(locationRef?.hostname || "").toLowerCase() === "chat.xiaowo.homes") gatewayOrigin = "https://api.xiaowo.homes";
+    else gatewayOrigin = String(locationRef?.origin || "").replace(/\/+$/u, "");
+    if (!gatewayOrigin) return "";
+    const resolved = `${gatewayOrigin}${gatewayPrefix}${path}`;
+    if (text.startsWith("/")) return resolved;
+    try { const input = new URL(text); return input.origin === gatewayOrigin && `${gatewayPrefix}${path}` === input.pathname && !input.search && !input.hash ? resolved : ""; }
+    catch { return ""; }
   };
   const boundedNumber = (value, fallback, min, max) => Number.isFinite(Number(value)) ? Math.max(min, Math.min(max, Number(value))) : fallback;
   const normalizeCustomDesign = input => {
@@ -337,10 +358,10 @@
     if(/(?:button|progress|activeButton|iconBlock|avatar)/u.test(key))return {bg:"var(--xb-accent-icon-bg)",text:"var(--xb-accent-text)",border:"var(--xb-accent-border)",accent:"var(--xb-accent)"};
     return {bg:"var(--xb-card-bg)",text:"var(--xb-card-text)",border:"var(--xb-card-border)",accent:"var(--xb-accent)"};
   };
-  const customDesignVariables = input => {
+  const customDesignVariables = (input, resolveOptions) => {
     const design=normalizeCustomDesign(input),variables={};
     for(const key of Object.keys(DESIGN_REGIONS)){const slug=key.replace(/\./gu,"-").replace(/[A-Z]/gu,match=>`-${match.toLowerCase()}`),prefix=`--xb-design-${slug}`,region=design.regions[key],enabled=region?.enabled===true,image=region?.image,fields=["bg","text","border","accent","border-width","radius","shadow","blur","glass-opacity","image","image-opacity","image-size","image-position","image-repeat","image-blend","image-x","image-y","image-scale","image-blur","image-layer","image-clip"];
-      variables[`${prefix}-enabled`]=enabled?"1":"0";if(!enabled){for(const field of fields)variables[`${prefix}-${field}`]="";continue;}variables[`${prefix}-bg`]=region.backgroundColor;variables[`${prefix}-text`]=region.textColor;variables[`${prefix}-border`]=region.borderColor;variables[`${prefix}-accent`]=region.accentColor;variables[`${prefix}-border-width`]=`${region.borderWidth}px`;variables[`${prefix}-radius`]=`${region.radius}px`;variables[`${prefix}-shadow`]=region.shadow>0?`0 10px 28px rgba(25,30,38,${region.shadow})`:"none";variables[`${prefix}-blur`]=`${region.blur}px`;variables[`${prefix}-glass-opacity`]=String(region.glassOpacity);variables[`${prefix}-image`]=image?.enabled&&image.url?`url(${JSON.stringify(image.url)})`:"none";variables[`${prefix}-image-opacity`]=String(image?.opacity??0);variables[`${prefix}-image-size`]=image?.size||"cover";variables[`${prefix}-image-position`]=image?.position||"center";variables[`${prefix}-image-repeat`]=image?.repeat||"no-repeat";variables[`${prefix}-image-blend`]=image?.blendMode||"normal";variables[`${prefix}-image-x`]=`${image?.offsetX||0}px`;variables[`${prefix}-image-y`]=`${image?.offsetY||0}px`;variables[`${prefix}-image-scale`]=String(image?.scale||1);variables[`${prefix}-image-blur`]=`${image?.blur||0}px`;variables[`${prefix}-image-layer`]=image?.layer||"behind";variables[`${prefix}-image-clip`]=image?.clip===false?"visible":"hidden";
+      variables[`${prefix}-enabled`]=enabled?"1":"0";if(!enabled){for(const field of fields)variables[`${prefix}-${field}`]="";continue;}variables[`${prefix}-bg`]=region.backgroundColor;variables[`${prefix}-text`]=region.textColor;variables[`${prefix}-border`]=region.borderColor;variables[`${prefix}-accent`]=region.accentColor;variables[`${prefix}-border-width`]=`${region.borderWidth}px`;variables[`${prefix}-radius`]=`${region.radius}px`;variables[`${prefix}-shadow`]=region.shadow>0?`0 10px 28px rgba(25,30,38,${region.shadow})`:"none";variables[`${prefix}-blur`]=`${region.blur}px`;variables[`${prefix}-glass-opacity`]=String(region.glassOpacity);const imageUrl=image?.enabled?resolveThemeAssetUrl(image.url,resolveOptions):"";variables[`${prefix}-image`]=imageUrl?`url(${JSON.stringify(imageUrl)})`:"none";variables[`${prefix}-image-opacity`]=String(image?.opacity??0);variables[`${prefix}-image-size`]=image?.size||"cover";variables[`${prefix}-image-position`]=image?.position||"center";variables[`${prefix}-image-repeat`]=image?.repeat||"no-repeat";variables[`${prefix}-image-blend`]=image?.blendMode||"normal";variables[`${prefix}-image-x`]=`${image?.offsetX||0}px`;variables[`${prefix}-image-y`]=`${image?.offsetY||0}px`;variables[`${prefix}-image-scale`]=String(image?.scale||1);variables[`${prefix}-image-blur`]=`${image?.blur||0}px`;variables[`${prefix}-image-layer`]=image?.layer||"behind";variables[`${prefix}-image-clip`]=image?.clip===false?"visible":"hidden";
     }return variables;
   };
   const cssVariables = input => {
@@ -488,6 +509,6 @@
     exportTheme(input = this.getActive()) { return Object.freeze({ type: "xinban-theme", themeVersion: THEME_VERSION, theme: normalizeTheme(input) }); }
   }
   return { ACTIVE_KEY, LIBRARY_KEY, DEFAULT_THEME, PRESET_THEMES, ThemeError, ThemeStore,
-    normalizeTheme, normalizeVisualSlots, normalizeCustomDesign, customDesignVariables, safeAsset, safeVisualAsset, safeCustomCss, cssVariables, parseColor, contrastRatio, readableText, guardReadability, needsHarmonyBackground,
+    normalizeTheme, normalizeVisualSlots, normalizeCustomDesign, customDesignVariables, safeAsset, safeVisualAsset, resolveThemeAssetUrl, safeCustomCss, cssVariables, parseColor, contrastRatio, readableText, guardReadability, needsHarmonyBackground,
     isPurpleColor, themeIsDefaultPurple, themeAllowsPurpleAccent, deriveThemeAccent, DESIGN_REGIONS, DESIGN_PAGES, DESIGN_REGION_DEFAULT, DESIGN_IMAGE_DEFAULT, THEME_VERSION };
 });

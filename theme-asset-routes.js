@@ -16,8 +16,9 @@ function registerThemeAssetRoutes(app, { localizer, store, previewService, previ
     const buffer = await part.toBuffer(); if (part.file.truncated || buffer.length > 2*1024*1024) throw new ThemeAssetError("图片超过允许大小",413,"THEME_ASSET_TOO_LARGE");
     return { ok:true, data:store.upload(buffer, { mimeType:String(part.mimetype || "").toLowerCase(), filename:part.filename, category:req.query?.category || "other" }) };
   }));
-  app.get("/api/theme/assets/library", { preHandler: auth }, run(async () => ({ ok:true,data:{items:store.list()} })));
+  app.get("/api/theme/assets/library", { preHandler: auth }, run(async req => { const view=req.query?.view || (req.query?.includeDeleted === "1" ? "all" : "active"); return { ok:true,data:{items:store.list({view})} }; }));
   app.patch("/api/theme/assets/:id", { preHandler: auth }, run(async req => ({ ok:true,data:store.update(req.params.id, req.body) })));
+  app.post("/api/theme/assets/:id/restore", { preHandler: auth }, run(async req => ({ ok:true,data:store.restore(req.params.id) })));
   app.delete("/api/theme/assets/:id", { preHandler: auth }, run(async req => ({ ok:true,data:store.delete(req.params.id) })));
   app.post("/api/theme/import/extract", { preHandler: auth }, run(async req => {
     const part = await req.file({ limits:{files:1,fileSize:1024*1024,parts:2} }); if (!part) throw new ThemeAssetError("请选择美化文件",400,"THEME_IMPORT_FILE_REQUIRED");
@@ -35,6 +36,7 @@ function registerThemeAssetRoutes(app, { localizer, store, previewService, previ
     }
     return reply.header("Cache-Control","private, max-age=3600").header("X-Content-Type-Options","nosniff").type(file.mimeType).send(fs.createReadStream(file.filename));
   }));
+  app.get("/api/theme/assets/trash/:id", { preHandler:auth }, run((req,reply)=>{const file=store.resolveTrash(req.params.id);return reply.header("Cache-Control","private, max-age=300").header("X-Content-Type-Options","nosniff").type(file.mimeType).send(fs.createReadStream(file.filename));}));
   app.get("/api/theme/assets/:id", run((req,reply)=>{const file=store.resolve(req.params.id);return reply.header("Cache-Control","public, max-age=31536000, immutable").header("X-Content-Type-Options","nosniff").type(file.mimeType).send(fs.createReadStream(file.filename));}));
 }
 module.exports = { registerThemeAssetRoutes };

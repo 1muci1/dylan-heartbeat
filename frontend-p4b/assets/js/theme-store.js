@@ -454,12 +454,12 @@
   const collectThemeAssetReferences = (assetUrl, { activeTheme = null, currentTheme = null, draft = null, savedThemes = [] } = {}) => {
     if (!LOCAL_THEME_ASSET.test(String(assetUrl || ""))) return [];
     const references = [], seen = new Set();
-    const add = (scope, location) => { const key=`${scope}\u0000${location}`;if(!seen.has(key)){seen.add(key);references.push({scope,location});} };
+    const add = (scope, location, detail = {}) => { const key=`${scope}\u0000${location}`;if(!seen.has(key)){seen.add(key);references.push({scope,location,...detail});} };
     const inspect = (theme, scope) => {
       if (!theme || typeof theme !== "object") return;
-      for (const [field,value] of Object.entries(theme.assets || {})) if (value === assetUrl) add(scope, `主题素材 · ${field}`);
-      for (const [field,slot] of Object.entries(theme.visualSlots || {})) if (slot && typeof slot === "object" && slot.url === assetUrl) add(scope, `装饰槽位 · ${field}`);
-      for (const [region,config] of Object.entries(theme.customDesign?.regions || {})) if (config?.image?.url === assetUrl) add(scope, DESIGN_REGIONS[region] || region);
+      for (const [field,value] of Object.entries(theme.assets || {})) if (value === assetUrl) add(scope, `主题素材 · ${field}`,{type:"asset",key:field});
+      for (const [field,slot] of Object.entries(theme.visualSlots || {})) if (slot && typeof slot === "object" && slot.url === assetUrl) add(scope, `装饰槽位 · ${field}`,{type:"slot",key:field});
+      for (const [region,config] of Object.entries(theme.customDesign?.regions || {})) if (config?.image?.url === assetUrl) add(scope, DESIGN_REGIONS[region] || region,{type:"region",key:region});
     };
     inspect(activeTheme,"当前主题"); inspect(currentTheme,"当前编辑主题"); inspect(draft,"当前草稿");
     for (const theme of Array.isArray(savedThemes) ? savedThemes : []) inspect(theme, `保存主题 · ${String(theme?.name || "未命名主题").slice(0,80)}`);

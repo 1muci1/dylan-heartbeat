@@ -104,14 +104,18 @@ class ThemeAssetStore {
   }
   record(eventType, metadata) {
     if (!this.eventStore) return;
-    this.eventStore.create({ eventType, subjectType:"theme_asset", subjectId:metadata.id, payload:{ source:metadata.source, mime:metadata.mime, bytes:metadata.bytes, width:metadata.width, height:metadata.height, ...(eventType === "theme_asset.renamed" ? { label:metadata.label, category:metadata.category } : {}) } }, { source:"theme-asset-store" });
+    const payload = eventType === "theme_asset.favorite_changed" ? { assetId:metadata.id, favorite:metadata.favorite === true, timestamp:this.clock().toISOString() }
+      : eventType === "theme_asset.restored" ? { assetId:metadata.id, timestamp:this.clock().toISOString() }
+      : { source:metadata.source, mime:metadata.mime, bytes:metadata.bytes, width:metadata.width, height:metadata.height, ...(eventType === "theme_asset.renamed" ? { label:metadata.label, category:metadata.category } : {}) };
+    this.eventStore.create({ eventType, subjectType:"theme_asset", subjectId:metadata.id, payload }, { source:"theme-asset-store" });
   }
-  publicMetadata(metadata) { return { id:metadata.id, url:`/api/theme/assets/${metadata.id}`, source:metadata.source, label:metadata.label, category:metadata.category, mime:metadata.mime, width:metadata.width, height:metadata.height, bytes:metadata.bytes, createdAt:metadata.createdAt }; }
+  publicMetadata(metadata, { includeDeleted = false } = {}) { return { id:metadata.id, url:`/api/theme/assets/${metadata.id}`, source:metadata.source, label:metadata.label, category:metadata.category, favorite:metadata.favorite === true, mime:metadata.mime, width:metadata.width, height:metadata.height, bytes:metadata.bytes, createdAt:metadata.createdAt, ...(includeDeleted ? { deletedAt:metadata.deletedAt || null } : {}) }; }
   metadataForFile(id, filename, mimeType, current = {}) {
     const stat = fs.statSync(filename), buffer = fs.readFileSync(filename), dimensions = imageDimensions(buffer, mimeType);
-    return { id, source:current.source || "history", label:current.label || "未命名素材", category:ASSET_CATEGORIES.has(current.category) ? current.category : "other", mime:mimeType, width:current.width || dimensions?.width || null, height:current.height || dimensions?.height || null, bytes:stat.size, createdAt:current.createdAt || stat.birthtime.toISOString(), deletedAt:current.deletedAt || null };
+    return { id, source:current.source || "history", label:current.label || "未命名素材", category:ASSET_CATEGORIES.has(current.category) ? current.category : "other", favorite:current.favorite === true, mime:mimeType, width:current.width || dimensions?.width || null, height:current.height || dimensions?.height || null, bytes:stat.size, createdAt:current.createdAt || stat.birthtime.toISOString(), deletedAt:current.deletedAt || null };
   }
-  list() {
+  list({ view = "active" } = {}) {
+    if (!["active","trash","all"].includes(view)) throw new ThemeAssetError("素材库视图无效",400,"THEME_ASSET_LIBRARY_VIEW_INVALID");
     const metadata = this.readMetadata(); let changed = false;
     for (const name of fs.readdirSync(this.rootDir)) {
       const match = name.match(/^([0-9a-f-]{36})(\.png|\.jpg|\.webp)$/iu); if (!match) continue;
@@ -121,7 +125,8 @@ class ThemeAssetStore {
       const next = this.metadataForFile(match[1], filename, mimeType, current); if (JSON.stringify(next) !== JSON.stringify(current)) { metadata[match[1]] = next; changed = true; }
     }
     if (changed) this.writeMetadata(metadata);
-    return Object.values(metadata).filter(item => !item.deletedAt && fs.existsSync(path.join(this.rootDir, `${item.id}${MIME_EXTENSIONS.get(item.mime)}`))).map(item => this.publicMetadata(item)).sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+    const hasFile = item => fs.existsSync(path.join(item.deletedAt ? this.trashDir : this.rootDir, `${item.id}${MIME_EXTENSIONS.get(item.mime)}`));
+    return Object.values(metadata).filter(item => (view === "all" || (view === "trash" ? item.deletedAt : !item.deletedAt)) && hasFile(item)).map(item => this.publicMetadata(item,{includeDeleted:view!=="active"})).sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")) || String(a.id).localeCompare(String(b.id)));
   }
   save(buffer, mimeType, { source = "localized", label = "未命名素材", category = "other", requireDimensions = false } = {}) {
     const extension = MIME_EXTENSIONS.get(mimeType); if (!extension || detectMime(buffer) !== mimeType) throw new ThemeAssetError("图片内容与类型不一致", 415, "THEME_ASSET_MAGIC_INVALID");
@@ -130,22 +135,37 @@ class ThemeAssetStore {
     const id = crypto.randomUUID(); this.ensureDirectories();
     const filename = path.join(this.rootDir, `${id}${extension}`); const temporary = path.join(this.rootDir, `.${id}.${crypto.randomUUID()}.tmp`);
     fs.writeFileSync(temporary, buffer, { flag: "wx", mode: 0o600 }); fs.renameSync(temporary, filename);
-    const metadata = this.readMetadata(), item = { id, source:["upload","localized"].includes(source) ? source : "localized", label:safeLabel(label), category:safeCategory(category), mime:mimeType, width:dimensions?.width || null, height:dimensions?.height || null, bytes:buffer.length, createdAt:this.clock().toISOString(), deletedAt:null };
+    const metadata = this.readMetadata(), item = { id, source:["upload","localized"].includes(source) ? source : "localized", label:safeLabel(label), category:safeCategory(category), favorite:false, mime:mimeType, width:dimensions?.width || null, height:dimensions?.height || null, bytes:buffer.length, createdAt:this.clock().toISOString(), deletedAt:null };
     metadata[id] = item; this.writeMetadata(metadata); this.record(source === "upload" ? "theme_asset.uploaded" : "theme_asset.localized", item);
     return { ...this.publicMetadata(item), localUrl:`/api/theme/assets/${id}` };
   }
   upload(buffer, { mimeType, filename, category = "other" } = {}) { const original=String(filename||"");if(!original||path.basename(original)!==original||/[\\/\u0000-\u001f\u007f]/u.test(original))throw new ThemeAssetError("文件名无效",400,"THEME_ASSET_FILENAME_INVALID");validateImageStructure(buffer,mimeType); return this.save(buffer, mimeType, { source:"upload", label:safeLabel(original.replace(/\.[^.]+$/u, "") || "未命名素材"), category, requireDimensions:true }); }
   update(id, changes) {
     this.resolve(id); if (!changes || typeof changes !== "object" || Array.isArray(changes)) throw new ThemeAssetError("素材 metadata 无效");
-    const unknown = Object.keys(changes).find(key => !["label","category"].includes(key)); if (unknown) throw new ThemeAssetError(`不允许修改字段：${unknown}`, 400, "THEME_ASSET_METADATA_FIELD_INVALID");
+    const unknown = Object.keys(changes).find(key => !["label","category","favorite"].includes(key)); if (unknown) throw new ThemeAssetError(`不允许修改字段：${unknown}`, 400, "THEME_ASSET_METADATA_FIELD_INVALID");
     if (!Object.keys(changes).length) throw new ThemeAssetError("请选择需要修改的字段");
     let metadata = this.readMetadata(); if (!metadata[id]) { this.list(); metadata = this.readMetadata(); } const item = metadata[id]; if (!item) throw new ThemeAssetError("素材不存在",404,"THEME_ASSET_NOT_FOUND");
     if (Object.hasOwn(changes,"label")) item.label = safeLabel(changes.label); if (Object.hasOwn(changes,"category")) item.category = safeCategory(changes.category);
-    metadata[id] = item; this.writeMetadata(metadata); this.record("theme_asset.renamed", item); return this.publicMetadata(item);
+    if (Object.hasOwn(changes,"favorite")) { if (typeof changes.favorite !== "boolean") throw new ThemeAssetError("收藏状态必须是 boolean",400,"THEME_ASSET_FAVORITE_INVALID"); item.favorite=changes.favorite; }
+    metadata[id] = item; this.writeMetadata(metadata); if (Object.hasOwn(changes,"label") || Object.hasOwn(changes,"category")) this.record("theme_asset.renamed", item); if (Object.hasOwn(changes,"favorite")) this.record("theme_asset.favorite_changed",item); return this.publicMetadata(item);
   }
   delete(id) {
     const file = this.resolve(id), metadata = this.readMetadata(), item = metadata[id] || this.metadataForFile(id, file.filename, file.mimeType); this.ensureDirectories();
     const target = path.join(this.trashDir, path.basename(file.filename)); fs.renameSync(file.filename, target); fs.chmodSync(target, 0o600); item.deletedAt = this.clock().toISOString(); metadata[id] = item; this.writeMetadata(metadata); this.record("theme_asset.deleted", item); return { id, deleted:true };
+  }
+  restore(id) {
+    if (!/^[0-9a-f-]{36}$/iu.test(String(id || ""))) throw new ThemeAssetError("素材 ID 无效",400,"THEME_ASSET_ID_INVALID");
+    const metadata=this.readMetadata(),item=metadata[id]; if (!item) throw new ThemeAssetError("素材不存在",404,"THEME_ASSET_NOT_FOUND");
+    if (!item.deletedAt) throw new ThemeAssetError("素材不在回收站",409,"THEME_ASSET_NOT_DELETED");
+    const extension=MIME_EXTENSIONS.get(item.mime); if (!extension) throw new ThemeAssetError("素材类型无效",400,"THEME_ASSET_MIME_INVALID");
+    this.ensureDirectories(); const source=path.join(this.trashDir,`${id}${extension}`),target=path.join(this.rootDir,`${id}${extension}`);
+    if (!fs.existsSync(source)) throw new ThemeAssetError("回收站素材不存在",404,"THEME_ASSET_TRASH_FILE_NOT_FOUND"); if (fs.existsSync(target)) throw new ThemeAssetError("素材恢复冲突",409,"THEME_ASSET_RESTORE_CONFLICT");
+    fs.renameSync(source,target); fs.chmodSync(target,0o600); item.deletedAt=null; item.favorite=item.favorite===true; metadata[id]=item; this.writeMetadata(metadata); this.record("theme_asset.restored",item); return this.publicMetadata(item);
+  }
+  resolveTrash(id) {
+    if (!/^[0-9a-f-]{36}$/iu.test(String(id || ""))) throw new ThemeAssetError("素材 ID 无效",400,"THEME_ASSET_ID_INVALID");
+    const item=this.readMetadata()[id]; if (!item?.deletedAt) throw new ThemeAssetError("回收站素材不存在",404,"THEME_ASSET_NOT_FOUND");
+    const extension=MIME_EXTENSIONS.get(item.mime),filename=extension?path.join(this.trashDir,`${id}${extension}`):""; if (!filename || !fs.existsSync(filename)) throw new ThemeAssetError("回收站素材不存在",404,"THEME_ASSET_NOT_FOUND"); return {filename,mimeType:item.mime};
   }
   resolve(id) {
     if (!/^[0-9a-f-]{36}$/iu.test(String(id || ""))) throw new ThemeAssetError("素材 ID 无效", 400, "THEME_ASSET_ID_INVALID");

@@ -63,8 +63,8 @@ test("v58 renders bounded visual slots on chat and home surfaces", () => {
 test("v58 home, dashboard and settings share the global theme runtime", () => {
   for (const page of ["index.html", "dashboard.html", "settings.html"]) {
     const html = read(page);
-    assert.match(html, /assets\/css\/theme\.css\?v=v70-p4b/u, page);
-    assert.match(html, /assets\/js\/theme-store\.js\?v=v70-p4b/u, page);
+    assert.match(html, /assets\/css\/theme\.css\?v=v71-p4b/u, page);
+    assert.match(html, /assets\/js\/theme-store\.js\?v=v71-p4b/u, page);
   }
   const css = read("assets/css/theme.css");
   for (const variable of ["--xb-color-bg", "--xb-card-bg", "--xb-card-text", "--xb-header-bg", "--xb-border-color", "--xb-bottom-nav-bg"]) assert.ok(css.includes(variable), variable);
@@ -75,6 +75,6 @@ test("v58 workshop exposes controlled asset management and versioned shell", () 
   assert.match(html, /装饰槽位设置/u);
   assert.match(html, /data-theme-slot-editor/u);
   assert.match(html, /不会原样执行 Echoes CSS/u);
-  assert.match(sw, /xinban-shell-v70-p4b/u);
-  assert.match(sw, /v70-p4b-theme-asset-experience/u);
+  assert.match(sw, /xinban-shell-v71-p4b/u);
+  assert.match(sw, /v71-p4b-theme-asset-organization/u);
 });

@@ -129,6 +129,14 @@ const EVENT_DEFINITIONS = Object.freeze({
     category: "theme_asset",
     allowedSources: Object.freeze(["theme-asset-store"])
   }),
+  "theme_asset.tags_changed": Object.freeze({
+    category: "theme_asset",
+    allowedSources: Object.freeze(["theme-asset-store"])
+  }),
+  "theme_asset.note_changed": Object.freeze({
+    category: "theme_asset",
+    allowedSources: Object.freeze(["theme-asset-store"])
+  }),
   "theme_asset.restored": Object.freeze({
     category: "theme_asset",
     allowedSources: Object.freeze(["theme-asset-store"])

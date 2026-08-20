@@ -18,6 +18,8 @@ function registerThemeAssetRoutes(app, { localizer, store, previewService, previ
   }));
   app.get("/api/theme/assets/library", { preHandler: auth }, run(async req => { const view=req.query?.view || (req.query?.includeDeleted === "1" ? "all" : "active"); return { ok:true,data:{items:store.list({view})} }; }));
   app.patch("/api/theme/assets/:id", { preHandler: auth }, run(async req => ({ ok:true,data:store.update(req.params.id, req.body) })));
+  app.post("/api/theme/assets/:id/used", { preHandler: auth }, run(async req => ({ ok:true,data:store.markUsed(req.params.id) })));
+  app.post("/api/theme/assets/duplicates/scan", { preHandler: auth }, run(async req => ({ ok:true,data:await store.scanDuplicateHashes({limit:req.body?.limit}) })));
   app.post("/api/theme/assets/:id/restore", { preHandler: auth }, run(async req => ({ ok:true,data:store.restore(req.params.id) })));
   app.delete("/api/theme/assets/:id", { preHandler: auth }, run(async req => ({ ok:true,data:store.delete(req.params.id) })));
   app.post("/api/theme/import/extract", { preHandler: auth }, run(async req => {

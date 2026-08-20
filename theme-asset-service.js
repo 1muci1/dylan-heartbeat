@@ -14,6 +14,9 @@ const PREVIEW_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const MAX_PREVIEWS = 200;
 const MAX_ASSET_EDGE = 8192;
 const MAX_ASSET_PIXELS = 32 * 1024 * 1024;
+const MAX_TAGS = 20;
+const MAX_TAG_LENGTH = 24;
+const MAX_TAG_CHARACTERS = 240;
 const MIME_EXTENSIONS = new Map([["image/png", ".png"], ["image/jpeg", ".jpg"], ["image/webp", ".webp"]]);
 const ASSET_CATEGORIES = new Set(["background", "bubble", "avatar", "header", "composer", "card", "decoration", "nav", "other"]);
 
@@ -84,6 +87,25 @@ function safeLabel(value, fallback = "未命名素材") {
 function safeCategory(value, fallback = "other") {
   const category = String(value || fallback); if (!ASSET_CATEGORIES.has(category)) throw new ThemeAssetError("素材分类无效", 400, "THEME_ASSET_CATEGORY_INVALID"); return category;
 }
+function safeTags(value) {
+  if (!Array.isArray(value)) throw new ThemeAssetError("标签必须是数组", 400, "THEME_ASSET_TAGS_INVALID");
+  const tags = [], seen = new Set();
+  for (const raw of value) {
+    if (typeof raw !== "string") throw new ThemeAssetError("标签只能是文本", 400, "THEME_ASSET_TAGS_INVALID");
+    const tag = raw.trim(); if (!tag) continue;
+    if (tag.length > MAX_TAG_LENGTH || /[<>\u0000-\u001f\u007f]/u.test(tag)) throw new ThemeAssetError("标签内容无效", 400, "THEME_ASSET_TAG_INVALID");
+    if (!seen.has(tag)) { seen.add(tag); tags.push(tag); }
+  }
+  if (tags.length > MAX_TAGS || tags.reduce((sum, tag) => sum + tag.length, 0) > MAX_TAG_CHARACTERS) throw new ThemeAssetError("标签数量或总长度超出限制", 400, "THEME_ASSET_TAGS_LIMIT");
+  return tags;
+}
+function safeNote(value) {
+  if (typeof value !== "string") throw new ThemeAssetError("备注只能是文本", 400, "THEME_ASSET_NOTE_INVALID");
+  const note = value.trim();
+  if (note.length > 300 || /[<>\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(note)) throw new ThemeAssetError("备注内容无效", 400, "THEME_ASSET_NOTE_INVALID");
+  return note;
+}
+const contentHash = buffer => `sha256:${crypto.createHash("sha256").update(buffer).digest("hex")}`;
 function categoryFromKind(kind) {
   const value = String(kind || "").toLowerCase();
   if (value.includes("background")) return "background"; if (value.includes("bubble")) return "bubble"; if (value.includes("avatar")) return "avatar";
@@ -105,14 +127,16 @@ class ThemeAssetStore {
   record(eventType, metadata) {
     if (!this.eventStore) return;
     const payload = eventType === "theme_asset.favorite_changed" ? { assetId:metadata.id, favorite:metadata.favorite === true, timestamp:this.clock().toISOString() }
+      : eventType === "theme_asset.tags_changed" ? { assetId:metadata.id, tagCount:metadata.tags?.length || 0, timestamp:this.clock().toISOString() }
+      : eventType === "theme_asset.note_changed" ? { assetId:metadata.id, noteLength:metadata.note?.length || 0, timestamp:this.clock().toISOString() }
       : eventType === "theme_asset.restored" ? { assetId:metadata.id, timestamp:this.clock().toISOString() }
       : { source:metadata.source, mime:metadata.mime, bytes:metadata.bytes, width:metadata.width, height:metadata.height, ...(eventType === "theme_asset.renamed" ? { label:metadata.label, category:metadata.category } : {}) };
     this.eventStore.create({ eventType, subjectType:"theme_asset", subjectId:metadata.id, payload }, { source:"theme-asset-store" });
   }
-  publicMetadata(metadata, { includeDeleted = false } = {}) { return { id:metadata.id, url:`/api/theme/assets/${metadata.id}`, source:metadata.source, label:metadata.label, category:metadata.category, favorite:metadata.favorite === true, mime:metadata.mime, width:metadata.width, height:metadata.height, bytes:metadata.bytes, createdAt:metadata.createdAt, ...(includeDeleted ? { deletedAt:metadata.deletedAt || null } : {}) }; }
+  publicMetadata(metadata, { includeDeleted = false } = {}) { return { id:metadata.id, url:`/api/theme/assets/${metadata.id}`, source:metadata.source, label:metadata.label, category:metadata.category, favorite:metadata.favorite === true, tags:Array.isArray(metadata.tags)?metadata.tags:[], note:typeof metadata.note==="string"?metadata.note:"", lastUsedAt:metadata.lastUsedAt||null, contentHash:metadata.contentHash||null, mime:metadata.mime, width:metadata.width, height:metadata.height, bytes:metadata.bytes, createdAt:metadata.createdAt, ...(includeDeleted ? { deletedAt:metadata.deletedAt || null } : {}) }; }
   metadataForFile(id, filename, mimeType, current = {}) {
     const stat = fs.statSync(filename), buffer = fs.readFileSync(filename), dimensions = imageDimensions(buffer, mimeType);
-    return { id, source:current.source || "history", label:current.label || "未命名素材", category:ASSET_CATEGORIES.has(current.category) ? current.category : "other", favorite:current.favorite === true, mime:mimeType, width:current.width || dimensions?.width || null, height:current.height || dimensions?.height || null, bytes:stat.size, createdAt:current.createdAt || stat.birthtime.toISOString(), deletedAt:current.deletedAt || null };
+    return { id, source:current.source || "history", label:current.label || "未命名素材", category:ASSET_CATEGORIES.has(current.category) ? current.category : "other", favorite:current.favorite === true, tags:Array.isArray(current.tags)?current.tags:[], note:typeof current.note==="string"?current.note:"", lastUsedAt:current.lastUsedAt||null, contentHash:current.contentHash||null, mime:mimeType, width:current.width || dimensions?.width || null, height:current.height || dimensions?.height || null, bytes:stat.size, createdAt:current.createdAt || stat.birthtime.toISOString(), deletedAt:current.deletedAt || null };
   }
   list({ view = "active" } = {}) {
     if (!["active","trash","all"].includes(view)) throw new ThemeAssetError("素材库视图无效",400,"THEME_ASSET_LIBRARY_VIEW_INVALID");
@@ -135,19 +159,28 @@ class ThemeAssetStore {
     const id = crypto.randomUUID(); this.ensureDirectories();
     const filename = path.join(this.rootDir, `${id}${extension}`); const temporary = path.join(this.rootDir, `.${id}.${crypto.randomUUID()}.tmp`);
     fs.writeFileSync(temporary, buffer, { flag: "wx", mode: 0o600 }); fs.renameSync(temporary, filename);
-    const metadata = this.readMetadata(), item = { id, source:["upload","localized"].includes(source) ? source : "localized", label:safeLabel(label), category:safeCategory(category), favorite:false, mime:mimeType, width:dimensions?.width || null, height:dimensions?.height || null, bytes:buffer.length, createdAt:this.clock().toISOString(), deletedAt:null };
+    const metadata = this.readMetadata(), item = { id, source:["upload","localized"].includes(source) ? source : "localized", label:safeLabel(label), category:safeCategory(category), favorite:false, tags:[], note:"", lastUsedAt:null, contentHash:contentHash(buffer), mime:mimeType, width:dimensions?.width || null, height:dimensions?.height || null, bytes:buffer.length, createdAt:this.clock().toISOString(), deletedAt:null };
     metadata[id] = item; this.writeMetadata(metadata); this.record(source === "upload" ? "theme_asset.uploaded" : "theme_asset.localized", item);
     return { ...this.publicMetadata(item), localUrl:`/api/theme/assets/${id}` };
   }
   upload(buffer, { mimeType, filename, category = "other" } = {}) { const original=String(filename||"");if(!original||path.basename(original)!==original||/[\\/\u0000-\u001f\u007f]/u.test(original))throw new ThemeAssetError("文件名无效",400,"THEME_ASSET_FILENAME_INVALID");validateImageStructure(buffer,mimeType); return this.save(buffer, mimeType, { source:"upload", label:safeLabel(original.replace(/\.[^.]+$/u, "") || "未命名素材"), category, requireDimensions:true }); }
   update(id, changes) {
     this.resolve(id); if (!changes || typeof changes !== "object" || Array.isArray(changes)) throw new ThemeAssetError("素材 metadata 无效");
-    const unknown = Object.keys(changes).find(key => !["label","category","favorite"].includes(key)); if (unknown) throw new ThemeAssetError(`不允许修改字段：${unknown}`, 400, "THEME_ASSET_METADATA_FIELD_INVALID");
+    const unknown = Object.keys(changes).find(key => !["label","category","favorite","tags","note"].includes(key)); if (unknown) throw new ThemeAssetError(`不允许修改字段：${unknown}`, 400, "THEME_ASSET_METADATA_FIELD_INVALID");
     if (!Object.keys(changes).length) throw new ThemeAssetError("请选择需要修改的字段");
     let metadata = this.readMetadata(); if (!metadata[id]) { this.list(); metadata = this.readMetadata(); } const item = metadata[id]; if (!item) throw new ThemeAssetError("素材不存在",404,"THEME_ASSET_NOT_FOUND");
     if (Object.hasOwn(changes,"label")) item.label = safeLabel(changes.label); if (Object.hasOwn(changes,"category")) item.category = safeCategory(changes.category);
     if (Object.hasOwn(changes,"favorite")) { if (typeof changes.favorite !== "boolean") throw new ThemeAssetError("收藏状态必须是 boolean",400,"THEME_ASSET_FAVORITE_INVALID"); item.favorite=changes.favorite; }
-    metadata[id] = item; this.writeMetadata(metadata); if (Object.hasOwn(changes,"label") || Object.hasOwn(changes,"category")) this.record("theme_asset.renamed", item); if (Object.hasOwn(changes,"favorite")) this.record("theme_asset.favorite_changed",item); return this.publicMetadata(item);
+    if (Object.hasOwn(changes,"tags")) item.tags=safeTags(changes.tags); if (Object.hasOwn(changes,"note")) item.note=safeNote(changes.note);
+    metadata[id] = item; this.writeMetadata(metadata); if (Object.hasOwn(changes,"label") || Object.hasOwn(changes,"category")) this.record("theme_asset.renamed", item); if (Object.hasOwn(changes,"favorite")) this.record("theme_asset.favorite_changed",item); if(Object.hasOwn(changes,"tags"))this.record("theme_asset.tags_changed",item);if(Object.hasOwn(changes,"note"))this.record("theme_asset.note_changed",item); return this.publicMetadata(item);
+  }
+  markUsed(id) { this.resolve(id); const metadata=this.readMetadata(),item=metadata[id];if(!item)throw new ThemeAssetError("素材不存在",404,"THEME_ASSET_NOT_FOUND");item.lastUsedAt=this.clock().toISOString();metadata[id]=item;this.writeMetadata(metadata);return this.publicMetadata(item); }
+  async scanDuplicateHashes({ limit=24, concurrency=3 }={}) {
+    const metadata=this.readMetadata(),missing=Object.values(metadata).filter(item=>!item.deletedAt&&!item.contentHash).slice(0,Math.max(1,Math.min(24,limit))),queue=[...missing];
+    const worker=async()=>{for(let item;(item=queue.shift());){let file;try{file=this.resolve(item.id);}catch{continue;}item.contentHash=await new Promise((resolve,reject)=>{const hash=crypto.createHash("sha256"),stream=fs.createReadStream(file.filename);stream.on("data",chunk=>hash.update(chunk));stream.on("error",reject);stream.on("end",()=>resolve(`sha256:${hash.digest("hex")}`));});}};
+    await Promise.all(Array.from({length:Math.min(Math.max(1,concurrency),3)},worker));for(const item of missing)if(item.contentHash)metadata[item.id]=item;if(missing.some(item=>item.contentHash))this.writeMetadata(metadata);
+    const active=Object.values(metadata).filter(item=>!item.deletedAt),groups=Object.values(active.reduce((map,item)=>{if(item.contentHash)(map[item.contentHash]||=[]).push(this.publicMetadata(item));return map;},{})).filter(group=>group.length>1);
+    return {processed:missing.filter(item=>item.contentHash).length,remaining:active.filter(item=>!item.contentHash).length,groups};
   }
   delete(id) {
     const file = this.resolve(id), metadata = this.readMetadata(), item = metadata[id] || this.metadataForFile(id, file.filename, file.mimeType); this.ensureDirectories();

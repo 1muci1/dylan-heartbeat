@@ -19,6 +19,11 @@ function registerThemePresetRoutes(app,{store,apiKey=process.env.GATEWAY_API_KEY
   app.get("/api/theme/presets/:id/export",{preHandler:auth},run(req=>({ok:true,data:store.export(req.params.id)})));
   app.post("/api/theme/presets/:id/share",{preHandler:auth},run(req=>({ok:true,data:store.enableShare(req.params.id,req.body||{})})));
   app.delete("/api/theme/presets/:id/share",{preHandler:auth},run(req=>({ok:true,data:store.disableShare(req.params.id)})));
+  app.get("/api/theme/community",run(req=>({ok:true,data:store.community(req.query||{})})));
+  app.get("/api/theme/community/:id",run(req=>({ok:true,data:store.communityDetail(req.params.id)})));
+  app.post("/api/theme/community/:id/copy",{preHandler:auth},run(req=>({ok:true,data:store.copyCommunity(req.params.id)})));
+  app.post("/api/theme/community/:id/favorite",{preHandler:auth},run(req=>({ok:true,data:store.favoriteCommunity(req.params.id,true)})));
+  app.delete("/api/theme/community/:id/favorite",{preHandler:auth},run(req=>({ok:true,data:store.favoriteCommunity(req.params.id,false)})));
   app.get("/api/theme/share/:code",run(req=>({ok:true,data:store.shared(req.params.code)})));
   app.post("/api/theme/share/:code/import",{preHandler:auth},run(req=>({ok:true,data:store.importShared(req.params.code,req.body||{})})));
 }

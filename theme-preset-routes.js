@@ -7,6 +7,7 @@ function registerThemePresetRoutes(app,{store,apiKey=process.env.GATEWAY_API_KEY
   const auth=(req,reply,done)=>{if(!apiKey)return reply.code(503).send({ok:false,error:{code:"GATEWAY_KEY_MISSING",message:"主题预设服务暂不可用"}});if(!equal(req.headers.authorization||"",`Bearer ${apiKey}`))return reply.code(401).header("WWW-Authenticate","Bearer").send({ok:false,error:{code:"UNAUTHORIZED",message:"Unauthorized"}});done();};
   const run=handler=>async(req,reply)=>{try{return await handler(req,reply);}catch(raw){const error=raw instanceof ThemePresetError?raw:new ThemePresetError("主题预设服务暂不可用",500,"THEME_PRESET_INTERNAL_ERROR");if(error.statusCode>=500)req.log.error({errorCode:error.code},"theme preset operation failed");if(error.code==="THEME_PRESET_INVALID_FIELD")return reply.code(error.statusCode).send({error:error.code,field:error.field});return reply.code(error.statusCode).send({ok:false,error:{code:error.code,message:error.message}});}};
   app.get("/api/theme/presets",{preHandler:auth},run(()=>({ok:true,data:{items:store.list()}})));
+  app.get("/api/theme/presets/library",{preHandler:auth},run(req=>({ok:true,data:store.library(req.query||{})})));
   app.post("/api/theme/presets",{preHandler:auth},run(req=>({ok:true,data:store.create(req.body)})));
   app.post("/api/theme/presets/import",{preHandler:auth},run(req=>({ok:true,data:store.import(req.body)})));
   app.get("/api/theme/presets/:id",{preHandler:auth},run(req=>({ok:true,data:store.public(store.get(req.params.id))})));

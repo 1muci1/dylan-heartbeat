@@ -46,9 +46,9 @@ test("canonical navigation and cache markers use v61", () => {
   assert.match(read("frontend-p4b/index.html"), /href="\/chat\.html"/u);
   assert.match(read("frontend-p4b/chat.html"), /href="\/index\.html"[^>]*data-nav="home"/u);
   const common = read("frontend-p4b/assets/js/common.js");
-  assert.match(common, /APP_VERSION = "v72-p4b"/u);
-  assert.match(common, /p4b-sw-controller-refresh-v72/u);
+  assert.match(common, /APP_VERSION = "v73-p4b"/u);
+  assert.match(common, /p4b-sw-controller-refresh-v73/u);
   const sw = read("frontend-p4b/sw.js");
-  assert.match(sw, /CACHE_NAME = "xinban-shell-v72-p4b"/u);
-  assert.match(sw, /BUILD_REVISION = "v72"/u);
+  assert.match(sw, /CACHE_NAME = "xinban-shell-v73-p4b"/u);
+  assert.match(sw, /BUILD_REVISION = "v73"/u);
 });

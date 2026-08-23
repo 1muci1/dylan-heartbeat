@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f7f4fb"><title>心伴 · 主题中心</title>
+  <link rel="stylesheet" href="assets/css/common.css?v=v73-p4b">
+  <link rel="stylesheet" href="assets/css/theme.css?v=v73-p4b">
+  <link rel="stylesheet" href="assets/css/theme-center.css?v=v73-p4b">
+  <script src="assets/js/theme-store.js?v=v73-p4b"></script>
+  <script src="assets/js/theme-gateway.js?v=v73-p4b"></script>
+  <script src="assets/js/common.js?v=v73-p4b"></script>
+  <script src="assets/js/data.js"></script>
+</head>
+<body class="theme-center-page" data-page="settings">
+<main class="app-shell theme-center-shell">
+  <header class="theme-center-header"><a href="settings.html?returnTo=%2Ftheme-center.html#appearance" aria-label="返回设置">‹</a><div><p class="eyebrow">THEME CENTER · V73</p><h1>主题中心</h1><p>浏览、预览并收藏属于你的小世界。</p></div><a href="theme-workshop.html">美化工坊</a></header>
+  <section class="theme-center-filters" aria-label="主题筛选">
+    <div class="theme-center-scopes" role="group" aria-label="主题范围">
+      <button type="button" data-theme-scope="all" aria-pressed="true">全部主题</button>
+      <button type="button" data-theme-scope="mine" aria-pressed="false">我的主题</button>
+      <button type="button" data-theme-scope="favorite" aria-pressed="false">收藏主题</button>
+      <button type="button" data-theme-scope="recent" aria-pressed="false">最近使用</button>
+    </div>
+    <label>搜索主题<input type="search" data-theme-center-search placeholder="名称、简介、标签、氛围、风格、色彩"></label>
+    <label>标签筛选<select data-theme-center-tag><option value="">全部标签</option></select></label>
+    <label>排序<select data-theme-center-sort><option value="updated">最近更新</option><option value="recent">最近使用</option><option value="popular">使用最多</option><option value="created">最近创建</option><option value="name">名称</option></select></label>
+  </section>
+  <p class="theme-center-status" role="status" data-theme-center-status>正在读取主题…</p>
+  <section class="theme-center-grid" aria-label="主题列表" data-theme-center-grid></section>
+  <button class="theme-center-more" type="button" data-theme-center-more hidden>加载更多</button>
+</main>
+
+<dialog class="theme-center-preview" data-theme-center-preview aria-labelledby="theme-preview-title">
+  <div class="theme-center-preview__shell">
+    <header><div><p class="eyebrow">隔离预览</p><h2 id="theme-preview-title" data-theme-preview-title>主题预览</h2></div><button type="button" data-theme-preview-close aria-label="关闭预览">×</button></header>
+    <nav aria-label="预览页面"><button type="button" data-theme-preview-page="home" aria-pressed="true">首页</button><button type="button" data-theme-preview-page="chat" aria-pressed="false">聊天</button><button type="button" data-theme-preview-page="space" aria-pressed="false">空间</button><button type="button" data-theme-preview-page="collaboration" aria-pressed="false">议事厅</button></nav>
+    <div class="theme-center-preview__stage" data-theme-preview-stage data-preview-page="home">
+      <section class="theme-scene theme-scene--home" data-theme-scene="home"><div class="scene-header">早安，小窝</div><div class="scene-hero">今天也慢慢来</div><div class="scene-card">今日心情 · 平静</div><div class="scene-actions"><span>开始聊天</span><span>看看回忆</span></div></section>
+      <section class="theme-scene theme-scene--chat" data-theme-scene="chat" hidden><div class="scene-header">和沉的聊天</div><div class="scene-chat"><p>今天过得怎么样？</p><p>我在这里，慢慢说。</p></div><div class="scene-input">写点什么…</div></section>
+      <section class="theme-scene theme-scene--space" data-theme-scene="space" hidden><div class="scene-header">我们的小窝</div><div class="scene-hero">窗边的下午</div><div class="scene-card">一起布置的空间</div></section>
+      <section class="theme-scene theme-scene--collaboration" data-theme-scene="collaboration" hidden><div class="scene-header">心伴议事厅</div><div class="scene-card">今天想一起讨论什么？</div><div class="scene-card">成员正在安静思考</div></section>
+    </div>
+    <footer><button type="button" data-theme-preview-previous>上一页</button><p data-theme-preview-note>预览不会修改当前主题</p><button type="button" data-theme-preview-next>下一页</button><button type="button" data-theme-preview-apply>应用主题</button></footer>
+  </div>
+</dialog>
+<script src="assets/js/theme-center.js?v=v73-p4b"></script>
+</body>
+</html>

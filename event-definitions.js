@@ -156,6 +156,10 @@ const EVENT_DEFINITIONS = Object.freeze({
   "theme_preset.applied": Object.freeze({
     category: "theme_preset",
     allowedSources: Object.freeze(["theme-preset-store"])
+  }),
+  "theme_preset.favorite_changed": Object.freeze({
+    category: "theme_preset",
+    allowedSources: Object.freeze(["theme-preset-store"])
   })
 });
 

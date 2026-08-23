@@ -3,17 +3,17 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#f7f4fb"><title>心伴 · 主题中心</title>
-  <link rel="stylesheet" href="assets/css/common.css?v=v73-p4b">
-  <link rel="stylesheet" href="assets/css/theme.css?v=v73-p4b">
-  <link rel="stylesheet" href="assets/css/theme-center.css?v=v73-p4b">
-  <script src="assets/js/theme-store.js?v=v73-p4b"></script>
-  <script src="assets/js/theme-gateway.js?v=v73-p4b"></script>
-  <script src="assets/js/common.js?v=v73-p4b"></script>
+  <link rel="stylesheet" href="assets/css/common.css?v=v74-p4b">
+  <link rel="stylesheet" href="assets/css/theme.css?v=v74-p4b">
+  <link rel="stylesheet" href="assets/css/theme-center.css?v=v74-p4b">
+  <script src="assets/js/theme-store.js?v=v74-p4b"></script>
+  <script src="assets/js/theme-gateway.js?v=v74-p4b"></script>
+  <script src="assets/js/common.js?v=v74-p4b"></script>
   <script src="assets/js/data.js"></script>
 </head>
 <body class="theme-center-page" data-page="settings">
 <main class="app-shell theme-center-shell">
-  <header class="theme-center-header"><a href="settings.html?returnTo=%2Ftheme-center.html#appearance" aria-label="返回设置">‹</a><div><p class="eyebrow">THEME CENTER · V73</p><h1>主题中心</h1><p>浏览、预览并收藏属于你的小世界。</p></div><a href="theme-workshop.html">美化工坊</a></header>
+  <header class="theme-center-header"><a href="settings.html?returnTo=%2Ftheme-center.html#appearance" aria-label="返回设置">‹</a><div><p class="eyebrow">THEME CENTER · V74</p><h1>主题中心</h1><p>浏览、预览、收藏并安全分享属于你的小世界。</p></div><a href="theme-workshop.html">美化工坊</a></header>
   <section class="theme-center-filters" aria-label="主题筛选">
     <div class="theme-center-scopes" role="group" aria-label="主题范围">
       <button type="button" data-theme-scope="all" aria-pressed="true">全部主题</button>
@@ -43,6 +43,23 @@
     <footer><button type="button" data-theme-preview-previous>上一页</button><p data-theme-preview-note>预览不会修改当前主题</p><button type="button" data-theme-preview-next>下一页</button><button type="button" data-theme-preview-apply>应用主题</button></footer>
   </div>
 </dialog>
-<script src="assets/js/theme-center.js?v=v73-p4b"></script>
+<dialog class="theme-share-dialog" data-theme-share-dialog aria-labelledby="theme-share-title">
+  <form method="dialog" class="theme-share-dialog__panel">
+    <header><div><p class="eyebrow">THEME SHARE</p><h2 id="theme-share-title" data-theme-share-title>分享主题</h2></div><button value="cancel" aria-label="关闭分享管理">×</button></header>
+    <p data-theme-share-state>🔒 私有</p>
+    <label>分享码<input type="text" data-theme-share-code readonly placeholder="尚未生成分享码"></label>
+    <p class="theme-share-dialog__hint">任何获得分享码的人都能查看主题；导入和其他写操作仍需 Gateway Authorization。</p>
+    <footer><button type="button" data-theme-share-enable>生成分享码</button><button type="button" data-theme-share-copy>复制分享码</button><button type="button" data-theme-share-disable>关闭分享</button></footer>
+  </form>
+</dialog>
+<dialog class="theme-share-import" data-theme-share-import aria-labelledby="theme-share-import-title">
+  <section class="theme-share-dialog__panel">
+    <header><div><p class="eyebrow">公开主题</p><h2 id="theme-share-import-title" data-theme-share-import-title>分享主题预览</h2></div><button type="button" data-theme-share-import-cancel aria-label="取消导入">×</button></header>
+    <div data-theme-share-import-card></div>
+    <p data-theme-share-missing hidden></p>
+    <footer><button type="button" data-theme-share-preview>预览</button><button type="button" data-theme-share-import-button>导入</button><button type="button" data-theme-share-continue hidden>继续导入</button><button type="button" data-theme-share-cancel>取消</button></footer>
+  </section>
+</dialog>
+<script src="assets/js/theme-center.js?v=v74-p4b"></script>
 </body>
 </html>

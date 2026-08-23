@@ -3,19 +3,21 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#09090d"><title>心伴 · 美化工坊</title>
-  <link rel="stylesheet" href="assets/css/common.css?v=v71-p4b">
-  <link rel="stylesheet" href="assets/css/theme.css?v=v71-p4b">
-  <link rel="stylesheet" href="assets/css/theme-workshop.css?v=v71-p4b">
-  <link rel="stylesheet" href="assets/css/theme-editor.css?v=v71-p4b">
-  <script src="assets/js/theme-store.js?v=v71-p4b"></script>
-  <script src="assets/js/tavern-theme-adapter.js?v=v71-p4b"></script>
-  <script src="assets/js/theme-gateway.js?v=v71-p4b"></script>
-  <script src="assets/js/common.js?v=v71-p4b"></script>
+  <link rel="stylesheet" href="assets/css/common.css?v=v72-p4b">
+  <link rel="stylesheet" href="assets/css/theme.css?v=v72-p4b">
+  <link rel="stylesheet" href="assets/css/theme-workshop.css?v=v72-p4b">
+  <link rel="stylesheet" href="assets/css/theme-editor.css?v=v72-p4b">
+  <script src="assets/js/theme-store.js?v=v72-p4b"></script>
+  <script src="assets/js/tavern-theme-adapter.js?v=v72-p4b"></script>
+  <script src="assets/js/theme-gateway.js?v=v72-p4b"></script>
+  <script src="assets/js/common.js?v=v72-p4b"></script>
   <script src="assets/js/data.js"></script>
 </head>
 <body class="theme-workshop-page" data-page="settings">
 <main class="app-shell theme-workshop-shell">
-  <header class="theme-workshop-header"><a href="settings.html?returnTo=%2Ftheme-workshop.html#appearance" aria-label="返回设置">‹</a><div><p class="eyebrow">THEME STUDIO · V70</p><h1>美化工坊</h1></div><button type="button" data-open-asset-manager>我的素材</button></header>
+  <header class="theme-workshop-header"><a href="settings.html?returnTo=%2Ftheme-workshop.html#appearance" aria-label="返回设置">‹</a><div><p class="eyebrow">THEME STUDIO · V72</p><h1>美化工坊</h1></div><button type="button" data-open-asset-manager>我的素材</button></header>
+  <nav class="theme-workshop-tabs" role="tablist" aria-label="美化工坊功能"><button type="button" role="tab" aria-selected="true" data-workshop-tab="editor">主题编辑</button><button type="button" role="tab" aria-selected="false" data-workshop-tab="presets">主题预设</button></nav>
+  <section class="theme-panel theme-panel--saved-presets" data-preset-panel hidden><div class="theme-preset-heading"><div><h2>主题预设</h2><p>保存完整主题状态；应用前会先生成隔离草稿并显示变化。</p></div><button type="button" data-preset-save-current>保存当前主题</button></div><div class="theme-preset-toolbar"><label>搜索<input type="search" data-preset-search placeholder="搜索名称、描述、标签"></label><label>排序<select data-preset-sort><option value="recent">最近使用</option><option value="created">最近创建</option><option value="name">名称</option></select></label><label class="theme-preset-import">导入预设 JSON<input type="file" accept="application/json,.json" data-preset-import></label></div><p class="theme-preset-state" data-preset-state></p><div class="theme-preset-library" data-preset-library></div></section>
   <section class="theme-panel theme-panel--assets"><div><h2>我的素材</h2><p>上传、网络导入、命名和分类都在统一素材库中完成。</p></div><button type="button" data-open-asset-manager>打开我的素材</button></section>
   <section class="theme-panel theme-panel--presets"><h2>预设主题</h2><p>选择后先进入预览，点击应用才会保存。</p><div class="theme-presets" data-theme-presets></div></section>
   <section class="theme-panel theme-panel--editor"><h2>颜色与字体</h2><p>所有修改会立即出现在右侧小手机中。</p><div class="theme-grid">
@@ -84,5 +86,7 @@
 <dialog class="design-url-import" data-design-url-import><header><strong>从图片链接导入</strong><button type="button" data-design-url-close>×</button></header><label>图片链接<input type="url" data-design-url-input placeholder="https://example.com/image.png"></label><div class="design-url-preview checkerboard" data-design-url-preview>等待生成安全预览</div><dl><div><dt>来源域名</dt><dd data-design-url-domain>—</dd></div><div><dt>尺寸/格式</dt><dd data-design-url-meta>—</dd></div></dl><p data-design-url-status></p><div class="theme-actions"><button type="button" data-design-url-preview-button>生成预览</button><button type="button" data-design-url-save disabled>保存到素材库</button><button type="button" data-design-url-cancel>取消</button></div></dialog>
 <dialog class="theme-asset-preview-dialog" data-asset-preview-dialog><button class="theme-asset-preview-close" type="button" data-asset-preview-close aria-label="关闭">×</button><img data-asset-preview-image alt="安全素材大图预览"><dl><div><dt>用途建议</dt><dd data-asset-preview-kind></dd></div><div><dt>选择器</dt><dd data-asset-preview-selector></dd></div><div><dt>来源</dt><dd data-asset-preview-domain></dd></div><div><dt>状态</dt><dd data-asset-preview-localized></dd></div></dl><div class="theme-actions"><button type="button" data-asset-preview-toggle>选择/取消选择</button><button type="button" data-preview-slot="userBubbleDecor">设为用户气泡装饰</button><button type="button" data-preview-slot="assistantBubbleDecor">设为沉气泡装饰</button><button type="button" data-preview-slot="avatarFrame">设为头像框</button><button type="button" data-preview-slot="inputDecor">设为输入栏装饰</button></div></dialog>
 <dialog class="theme-asset-delete-blocked" data-asset-delete-blocked><h3>素材引用详情</h3><p data-asset-reference-summary></p><ul data-asset-reference-list></ul><button type="button" data-asset-reference-close>关闭</button></dialog>
-<script src="assets/js/theme-workshop.js?v=v71-p4b"></script>
+<dialog class="theme-preset-dialog" data-preset-dialog><form method="dialog"><h3 data-preset-dialog-title>保存当前主题</h3><label>名称<input maxlength="80" required data-preset-name></label><label>描述<textarea maxlength="300" data-preset-description></textarea></label><label>标签<input maxlength="240" data-preset-tags placeholder="用逗号分隔"></label><label>封面素材 ID（可选）<input maxlength="36" data-preset-cover></label><div class="theme-actions"><button type="button" data-preset-dialog-save>保存</button><button type="button" data-preset-dialog-cancel>取消</button></div></form></dialog>
+<dialog class="theme-preset-dialog" data-preset-apply-dialog><h3>应用主题预设</h3><p>预设已进入隔离草稿，确认后才会替换当前主题。</p><ul data-preset-change-list></ul><div class="theme-preset-warning" data-preset-missing hidden>部分素材不存在，将使用默认样式</div><ul data-preset-missing-list></ul><div class="theme-actions"><button type="button" data-preset-apply-confirm>确认应用</button><button type="button" data-preset-apply-cancel>取消</button></div></dialog>
+<script src="assets/js/theme-workshop.js?v=v72-p4b"></script>
 </body></html>

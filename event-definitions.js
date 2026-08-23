@@ -140,6 +140,22 @@ const EVENT_DEFINITIONS = Object.freeze({
   "theme_asset.restored": Object.freeze({
     category: "theme_asset",
     allowedSources: Object.freeze(["theme-asset-store"])
+  }),
+  "theme_preset.created": Object.freeze({
+    category: "theme_preset",
+    allowedSources: Object.freeze(["theme-preset-store"])
+  }),
+  "theme_preset.updated": Object.freeze({
+    category: "theme_preset",
+    allowedSources: Object.freeze(["theme-preset-store"])
+  }),
+  "theme_preset.deleted": Object.freeze({
+    category: "theme_preset",
+    allowedSources: Object.freeze(["theme-preset-store"])
+  }),
+  "theme_preset.applied": Object.freeze({
+    category: "theme_preset",
+    allowedSources: Object.freeze(["theme-preset-store"])
   })
 });
 

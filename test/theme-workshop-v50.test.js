@@ -101,7 +101,7 @@ test("theme workshop is linked, live-preview driven, and every main page loads t
   assert.match(script, /applyTheme/);
   for (const page of ["index.html", "chat.html", "dashboard.html", "settings.html", "memory.html", "stickers.html"]) {
     const html = fs.readFileSync(path.join(root, page), "utf8");
-    assert.match(html, /assets\/css\/theme\.css\?v=v71-p4b/, page);
-    assert.match(html, /assets\/js\/theme-store\.js\?v=v71-p4b/, page);
+    assert.match(html, /assets\/css\/theme\.css\?v=v72-p4b/, page);
+    assert.match(html, /assets\/js\/theme-store\.js\?v=v72-p4b/, page);
   }
 });

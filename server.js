@@ -26,6 +26,8 @@ const { StickerImporter } = require("./sticker-importer");
 const { registerUploadRoutes } = require("./upload-routes");
 const { ThemeAssetLocalizer, ThemeAssetPreviewService, ThemeAssetPreviewStore, ThemeAssetStore } = require("./theme-asset-service");
 const { registerThemeAssetRoutes } = require("./theme-asset-routes");
+const { ThemePresetStore } = require("./theme-preset-service");
+const { registerThemePresetRoutes } = require("./theme-preset-routes");
 const { AiMemoryStore } = require("./ai-memory-store");
 const { DeliveryStore } = require("./delivery-store");
 const { ConversationSummaryService } = require("./conversation-summary-service");
@@ -184,6 +186,7 @@ const mediaStore = new MediaStore({
 const uploadStore = new UploadStore();
 const stickerImporter = new StickerImporter({ uploadStore });
 const themeAssetStore = new ThemeAssetStore({ eventStore });
+const themePresetStore = new ThemePresetStore({ assetStore:themeAssetStore, eventStore });
 const themeAssetLocalizer = new ThemeAssetLocalizer({ store: themeAssetStore });
 const themeAssetPreviewStore = new ThemeAssetPreviewStore();
 const themeAssetPreviewService = new ThemeAssetPreviewService({ localizer: themeAssetLocalizer, store: themeAssetPreviewStore });
@@ -224,7 +227,8 @@ registerMemoryRoutes(app, {
 });
 registerMediaRoutes(app, { store: mediaStore, sessionStore });
 registerUploadRoutes(app, { uploadStore, stickerImporter });
-registerThemeAssetRoutes(app, { localizer: themeAssetLocalizer, store: themeAssetStore, previewService: themeAssetPreviewService, previewStore: themeAssetPreviewStore });
+registerThemeAssetRoutes(app, { localizer: themeAssetLocalizer, store: themeAssetStore, previewService: themeAssetPreviewService, previewStore: themeAssetPreviewStore, presetStore:themePresetStore });
+registerThemePresetRoutes(app, { store:themePresetStore });
 registerAiRoutes(app, { store: aiMemoryStore, runner: aiTaskRunner, config: aiConfig, adapter: aiAdapter });
 registerEventRoutes(app, { store: eventStore });
 registerGameEventRoutes(app, { service: gameEventService, suggestionStore: memorySuggestionStore });

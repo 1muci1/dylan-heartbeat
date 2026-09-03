@@ -375,6 +375,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const templateText = `${JSON.stringify(tavernTemplate, null, 2)}\n`; const templateNode = document.querySelector("[data-tavern-template]"); if (templateNode) templateNode.textContent = templateText;
   document.querySelector("[data-template-copy]")?.addEventListener("click", async () => { try { await navigator.clipboard.writeText(templateText); message("酒馆 JSON 模板已复制。"); } catch { message("复制失败，请手动选择模板文本。"); } });
   document.querySelector("[data-template-download]")?.addEventListener("click", () => { const blob = new Blob([templateText], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "xinban-tavern-theme-template.json"; link.click(); URL.revokeObjectURL(link.href); });
+  window.XinbanThemeStudioBridge=Object.freeze({
+    getDraft:()=>editable(draft),getActive:()=>editable(store.getActive()),getPresets:()=>editable(serverThemePresets),getAssets:()=>editable(serverAssets),
+    getSelectedPreset:()=>editable(serverThemePresets.find(item=>item.id===draft.id)||null),request:gatewayRequest,
+    setDraft:theme=>{setCurrentWorkshopTheme(api.normalizeTheme({...theme,customCss:""}));message("Theme Studio 草稿已更新；当前 activeTheme 未改变。");},
+    selectRegion:key=>{if(!api.DESIGN_REGIONS[key])return;selectedDesignPage=key.split(".")[0];selectedDesignRegion=key;document.querySelector("[data-advanced-editor]").hidden=false;renderAdvancedEditor();},
+    refreshPresets:loadThemePresets,notify:message
+  });
+  document.dispatchEvent(new CustomEvent("xinban-theme-studio-ready"));
   try{const savedDesign=JSON.parse(localStorage.getItem(DESIGN_DRAFT_KEY)||"null");if(savedDesign){const next=editable(draft);next.customDesign=api.normalizeCustomDesign(savedDesign);draft=editable(api.normalizeTheme(next));message("已恢复上次保存的高级美化草稿；当前主题未改变。");}}catch{}
   refreshForm(); render(); if(store.lastVisualSlotsMigration) message("已为旧导入主题关闭自动装饰，避免影响布局；可在装饰槽位设置中手动开启。");
 });

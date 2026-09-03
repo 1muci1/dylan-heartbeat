@@ -1,10 +1,10 @@
 "use strict";
 
 ((windowRef, documentRef, navigatorRef) => {
-  const APP_VERSION = "v75-p4b";
-  const SW_CACHE_NAME = "xinban-shell-v75-p4b";
-  const CONTROLLER_REFRESH_GUARD = "p4b-sw-controller-refresh-v75";
-  windowRef.XINBAN_BUILD = "v75-p4b";
+  const APP_VERSION = "v76-p4b";
+  const SW_CACHE_NAME = "xinban-shell-v76-p4b";
+  const CONTROLLER_REFRESH_GUARD = "p4b-sw-controller-refresh-v76";
+  windowRef.XINBAN_BUILD = "v76-p4b";
   const communityDetail = String(windowRef.location.pathname || "").match(/^\/theme-community\/([^/]+)\/?$/u);
   if (communityDetail) windowRef.location.replace(`/theme-community.html?id=${encodeURIComponent(decodeURIComponent(communityDetail[1]))}`);
 

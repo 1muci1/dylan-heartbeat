@@ -7,12 +7,13 @@
   <meta name="description" content="Dylan Gateway Provider 设置">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="assets/css/common.css?v=v76-p4b">
-  <link rel="stylesheet" href="assets/css/settings.css?v=v76-p4b">
-  <link rel="stylesheet" href="assets/css/theme.css?v=v76-p4b">
+  <link rel="stylesheet" href="assets/css/common.css?v=v77-p4b">
+  <link rel="stylesheet" href="assets/css/settings.css?v=v77-p4b">
+  <link rel="stylesheet" href="assets/css/voice-v77.css?v=v77-p4b">
+  <link rel="stylesheet" href="assets/css/theme.css?v=v77-p4b">
   <link rel="stylesheet" href="/shared/provider-config-panel.css">
-  <script src="assets/js/theme-store.js?v=v76-p4b"></script>
-  <script src="assets/js/common.js?v=v76-p4b"></script>
+  <script src="assets/js/theme-store.js?v=v77-p4b"></script>
+  <script src="assets/js/common.js?v=v77-p4b"></script>
   <script src="assets/js/appearance.js"></script>
   <script src="assets/js/settings-section.js"></script>
   <script src="/storage/user-preference-store.js"></script>
@@ -79,6 +80,22 @@
       <div class="avatar-settings__actions"><button type="button" data-avatar-target="user">更改我的头像</button><button type="button" data-avatar-target="chen">更改沉沉头像</button></div>
     </section>
     </div>
+
+    <section class="voice-settings" aria-labelledby="voice-settings-title">
+      <div class="voice-settings__heading"><span>VOICE FOUNDATION</span><h2 id="voice-settings-title">语音</h2><p>设置沉的朗读声音与语音输入。自动朗读默认关闭。</p></div>
+      <label class="provider-mode" for="voice-auto-read"><span class="provider-mode__copy"><strong>自动朗读沉的新回复</strong><small>仅朗读当前新完成的回复，不朗读历史或生成中的内容。</small></span><input id="voice-auto-read" type="checkbox" data-voice-auto-read><span class="provider-mode__switch" aria-hidden="true"></span></label>
+      <div class="voice-settings__grid">
+        <label class="voice-field voice-field--wide">沉的声音<select data-voice-select><option value="">浏览器默认声音</option></select></label>
+        <label class="voice-field">语速 <output data-voice-rate-output>1.0</output><input type="range" min="0.6" max="1.6" step="0.1" value="1" data-voice-rate></label>
+        <label class="voice-field">音调 <output data-voice-pitch-output>1.0</output><input type="range" min="0.7" max="1.3" step="0.1" value="1" data-voice-pitch></label>
+        <label class="voice-field">音量 <output data-voice-volume-output>1.0</output><input type="range" min="0" max="1" step="0.1" value="1" data-voice-volume></label>
+        <label class="voice-field">语音输入语言<select data-voice-language><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文</option><option value="ja-JP">日本語</option><option value="en-US">English (US)</option></select></label>
+      </div>
+      <label class="provider-mode" for="voice-show-interim"><span class="provider-mode__copy"><strong>显示识别临时文本</strong><small>临时结果只显示状态，不进入聊天历史。</small></span><input id="voice-show-interim" type="checkbox" data-voice-show-interim><span class="provider-mode__switch" aria-hidden="true"></span></label>
+      <p class="voice-capability" data-voice-capability>正在检查浏览器语音能力…</p>
+      <p class="voice-privacy">麦克风：由浏览器管理。语音识别由浏览器提供。根据浏览器实现，语音可能由浏览器厂商的在线识别服务处理。本项目不保存或上传录音。</p>
+      <p class="voice-settings__status" role="status" data-voice-settings-status></p>
+    </section>
 
     <div class="settings-zone settings-zone--model" id="model">
     <section class="model-settings" aria-labelledby="model-settings-title">
@@ -248,6 +265,7 @@
   <script src="assets/js/avatar-chat.js"></script>
   <script src="assets/js/settings-return.js"></script>
   <script src="/shared/provider-config-panel.js"></script>
-  <script src="assets/js/settings.js?v=v76-p4b"></script>
+  <script src="assets/js/voice-adapter.js?v=v77-p4b"></script>
+  <script src="assets/js/settings.js?v=v77-p4b"></script>
 </body>
 </html>

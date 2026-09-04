@@ -42,6 +42,35 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   const preferenceStore = window.CompanionUserPreferences?.UserPreferenceStore
     ? new window.CompanionUserPreferences.UserPreferenceStore() : null;
+  const voiceApi = window.CompanionVoice;
+  if (voiceApi) {
+    const voiceStore = new voiceApi.VoiceSettingsStore(window.localStorage);
+    const voiceAdapter = new voiceApi.BrowserVoiceAdapter(window);
+    const voiceNodes = {
+      autoRead: document.querySelector("[data-voice-auto-read]"), voice: document.querySelector("[data-voice-select]"),
+      rate: document.querySelector("[data-voice-rate]"), pitch: document.querySelector("[data-voice-pitch]"), volume: document.querySelector("[data-voice-volume]"),
+      language: document.querySelector("[data-voice-language]"), interim: document.querySelector("[data-voice-show-interim]"),
+      capability: document.querySelector("[data-voice-capability]"), status: document.querySelector("[data-voice-settings-status]")
+    };
+    const currentVoiceSettings = voiceStore.load();
+    const fillVoices = () => {
+      const selected = voiceNodes.voice?.value || currentVoiceSettings.voiceURI;
+      const voices = voiceAdapter.getVoices();
+      voiceNodes.voice?.querySelectorAll("option:not(:first-child)").forEach(option => option.remove());
+      voices.forEach(voice => { const option = document.createElement("option"); option.value = voice.voiceURI; option.textContent = `${voice.name} (${voice.lang})`; option.dataset.name = voice.name; option.dataset.lang = voice.lang; voiceNodes.voice?.append(option); });
+      if (voices.some(voice => voice.voiceURI === selected)) voiceNodes.voice.value = selected;
+    };
+    fillVoices();
+    window.speechSynthesis?.addEventListener?.("voiceschanged", fillVoices);
+    voiceNodes.autoRead.checked = currentVoiceSettings.autoRead;
+    voiceNodes.rate.value = String(currentVoiceSettings.rate); voiceNodes.pitch.value = String(currentVoiceSettings.pitch); voiceNodes.volume.value = String(currentVoiceSettings.volume);
+    voiceNodes.language.value = currentVoiceSettings.recognitionLanguage; voiceNodes.interim.checked = currentVoiceSettings.showInterimTranscript;
+    const updateOutputs = () => ["rate","pitch","volume"].forEach(key => { const output = document.querySelector(`[data-voice-${key}-output]`); if (output) output.textContent = Number(voiceNodes[key].value).toFixed(1); });
+    const saveVoiceSettings = () => { const option = voiceNodes.voice.selectedOptions?.[0]; voiceStore.save({autoRead:voiceNodes.autoRead.checked,voiceURI:voiceNodes.voice.value,voiceName:option?.dataset.name||"",voiceLang:option?.dataset.lang||"",rate:voiceNodes.rate.value,pitch:voiceNodes.pitch.value,volume:voiceNodes.volume.value,recognitionLanguage:voiceNodes.language.value,showInterimTranscript:voiceNodes.interim.checked});updateOutputs();if(voiceNodes.status)voiceNodes.status.textContent="语音设置已保存到本设备"; };
+    Object.values(voiceNodes).filter(node=>node?.matches?.("input,select")).forEach(node=>node.addEventListener("change",saveVoiceSettings));
+    updateOutputs();
+    const caps=voiceAdapter.capabilities();if(voiceNodes.capability)voiceNodes.capability.textContent=`朗读：${caps.tts?"支持":"当前浏览器不支持"} · 语音识别：${caps.stt?"支持":"当前浏览器不支持"}`;
+  }
   const preferenceResult = document.querySelector("[data-preference-result]");
   const preferenceMessage = message => { if (preferenceResult) preferenceResult.textContent = message; };
   document.querySelector("[data-preference-save]")?.addEventListener("click", () => {
@@ -194,7 +223,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const preferences = preferenceStore?.loadSync?.();
     return {
       appVersion: window.CompanionP4BShell?.APP_VERSION || "v44",
-      swCacheName: window.CompanionP4BShell?.SW_CACHE_NAME || "xinban-shell-v76-p4b",
+      swCacheName: window.CompanionP4BShell?.SW_CACHE_NAME || "xinban-shell-v77-p4b",
       providerConfigured: Boolean(config.type && config.baseUrl),
       modelConfigured: Boolean(config.model),
       displayNameConfigured: Boolean(config.displayName),

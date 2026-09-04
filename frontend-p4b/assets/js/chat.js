@@ -75,6 +75,7 @@ document.addEventListener("DOMContentLoaded", () => {
     copy: '<rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>',
     regenerate: '<path d="M20 7v5h-5"></path><path d="M18.5 15a7 7 0 1 1-.2-6.2L20 12"></path>',
     voice: '<path d="M5 10v4h3l4 4V6L8 10H5Z"></path><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"></path>',
+    "voice-stop": '<rect x="7" y="7" width="10" height="10" rx="1"></rect>',
     translate: '<circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"></path>',
     more: '<circle cx="5" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle>',
     edit: '<path d="m4 20 4.2-1 10.6-10.6a2 2 0 0 0-2.8-2.8L5.4 16.2 4 20Z"></path><path d="m14.5 7.1 2.8 2.8"></path>',
@@ -86,8 +87,10 @@ document.addEventListener("DOMContentLoaded", () => {
     bar.className = "message-actions";
     bar.setAttribute("role", "group");
     bar.setAttribute("aria-label", message.role === "assistant" ? "助理消息操作" : "用户消息操作");
+    const assistantActions = [["copy", "复制"], ["regenerate", "重新生成"], ["translate", "翻译"], ["more", "更多"]];
+    if (!message.transient && String(message.content || "").trim()) assistantActions.splice(2, 0, ["voice", "朗读"], ["voice-stop", "停止朗读"]);
     const actions = message.role === "assistant"
-      ? [["copy", "复制"], ["regenerate", "重新生成"], ["voice", "语音播放"], ["translate", "翻译"], ["more", "更多"]]
+      ? assistantActions
       : [["copy", "复制"], ["edit", "编辑"], ["resend", "重新发送"], ["more", "更多"]];
     actions.forEach(([action, label]) => {
       const button = document.createElement("button");
@@ -227,6 +230,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const renderMessages = (messages) => {
+    if (voiceUI?.activeMessageId && !messages.some(message => message.id === voiceUI.activeMessageId)) voiceUI.stop(false);
     document.querySelectorAll(".message-row").forEach((row) => row.remove());
     setText(".time-divider span", messages.length ? `今天 ${messages[0].time}` : "今天");
     messages.forEach((message, index) => {
@@ -234,6 +238,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     window.CompanionChatAvatars?.apply();
     window.CompanionChatPreferences?.apply();
+    voiceUI?.syncButtons();
     scrollToLatest();
     hydrateAssistantMessages(messages);
   };
@@ -410,6 +415,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function switchSession(id) {
     if (!sessionApiAvailable || api.loading) return;
+    voiceUI?.stop(false);
     try {
       const synchronized = chatSync
         ? await chatSync.select(id)
@@ -646,6 +652,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         nextState.memory.recent = nextState.memory.recent.slice(0, 5);
       });
+      voiceUI?.onAssistantMessageCompleted(reply, { history: false, streaming: false });
       if (serverSessionId && chatSync && serverSessionId === chatSync.serverSessionId) {
         try {
           const synchronized = await chatSync.pull();
@@ -1003,20 +1010,22 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
     if (action === "voice") {
-      if (!message?.content || !("speechSynthesis" in window)) {
-        showToast("当前浏览器不支持语音播放");
-        return;
-      }
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(message.content);
-      utterance.lang = "zh-CN";
-      window.speechSynthesis.speak(utterance);
-      showToast("正在播放");
+      voiceUI?.handleAction(message);
+      return;
+    }
+    if (action === "voice-stop") {
+      voiceUI?.stop(true);
       return;
     }
     showToast(action === "translate" ? "翻译功能即将开放" : "更多操作即将开放");
   });
 
+  const voiceUI = window.CompanionVoiceUI?.create?.({
+    windowRef: window, documentRef: document,
+    adapter: new window.CompanionVoice.BrowserVoiceAdapter(window), storage: window.localStorage,
+    input, micButton: document.querySelector(".composer__voice"),
+    statusNode: document.querySelector("[data-voice-recognition-status]"), notify: showToast
+  });
   const initialState = store.saveState(store.getState());
   legacyMessages = initialState.messages.map(message => ({ ...message }));
   renderMessages(initialState.messages);
@@ -1093,5 +1102,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   window.addEventListener("storage", reapplyUiState);
   window.addEventListener("provider-config-change", reapplyUiState);
+  window.addEventListener("pagehide", () => voiceUI?.destroy());
   window.addEventListener("user-preferences-change", reapplyUiState);
 });

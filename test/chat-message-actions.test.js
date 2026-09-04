@@ -12,7 +12,7 @@ test("chat renders role-specific message action bars with accessible icon button
   const chat = read("assets/js/chat.js");
   const html = read("chat.html");
 
-  for (const label of ["复制", "重新生成", "语音播放", "翻译", "更多", "编辑", "重新发送"]) {
+  for (const label of ["复制", "重新生成", "朗读", "停止朗读", "翻译", "更多", "编辑", "重新发送"]) {
     assert.match(chat, new RegExp(`"${label}"`));
   }
   assert.match(chat, /createActionBar\(message\)/);

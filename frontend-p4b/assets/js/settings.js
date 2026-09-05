@@ -223,7 +223,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const preferences = preferenceStore?.loadSync?.();
     return {
       appVersion: window.CompanionP4BShell?.APP_VERSION || "v44",
-      swCacheName: window.CompanionP4BShell?.SW_CACHE_NAME || "xinban-shell-v77-p4b",
+      swCacheName: window.CompanionP4BShell?.SW_CACHE_NAME || "xinban-shell-v78-p4b",
       providerConfigured: Boolean(config.type && config.baseUrl),
       modelConfigured: Boolean(config.model),
       displayNameConfigured: Boolean(config.displayName),

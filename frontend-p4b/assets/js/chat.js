@@ -406,6 +406,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     serverSessions = ensured.sessions;
     activeSessionId = ensured.serverSessionId;
+    if (voiceSession?.active) voiceSession.sessionId = activeSessionId;
     sessions.setActiveId(activeSessionId);
     sessionApiAvailable = true;
     showServerSyncStatus();
@@ -415,6 +416,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function switchSession(id) {
     if (!sessionApiAvailable || api.loading) return;
+    voiceSession?.close();
     voiceUI?.stop(false);
     try {
       const synchronized = chatSync
@@ -456,6 +458,7 @@ document.addEventListener("DOMContentLoaded", () => {
       await sessions.remove(session.id);
       serverSessions = serverSessions.filter(item => item.id !== session.id);
       if (activeSessionId === session.id) {
+        voiceSession?.close();
         activeSessionId = "";
         sessions.setActiveId("");
         const state = store.getState();
@@ -581,6 +584,8 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const requestAssistantReply = async (userMessage, requestHistory = null, options = {}) => {
+    const voiceGeneration = voiceSession?.generation;
+    voiceSession?.thinking();
     const state = store.getState();
     const history = withRecentGameContext(
       Array.isArray(requestHistory) ? requestHistory : state.messages
@@ -592,6 +597,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const pendingText = pendingRow.querySelector(".message-bubble p");
     let completeReply = "";
     let completeThinking = "";
+    let streamFailed = false;
     scrollToLatest();
 
     try {
@@ -610,6 +616,7 @@ document.addEventListener("DOMContentLoaded", () => {
         headers: serverSessionId
           ? { "X-Session-Id": serverSessionId }
           : {},
+        onStreamFailure: () => { streamFailed = true; },
         timeoutMs: Number(options.timeoutMs) || 60000
       })) {
         const event = typeof chunk === "string" ? { type: "content", content: chunk } : chunk;
@@ -626,7 +633,8 @@ document.addEventListener("DOMContentLoaded", () => {
         scrollToLatest();
       }
 
-      if (!completeReply) {
+      if (streamFailed || !completeReply) {
+        if (voiceSession?.generation === voiceGeneration) voiceSession?.assistantError();
         pendingRow.remove();
         renderMessages(store.getState().messages);
         return;
@@ -652,7 +660,8 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         nextState.memory.recent = nextState.memory.recent.slice(0, 5);
       });
-      voiceUI?.onAssistantMessageCompleted(reply, { history: false, streaming: false });
+      if (voiceSession?.active) voiceSession.completedReply(reply, { history: false, streaming: false, generation: voiceGeneration });
+      else voiceUI?.onAssistantMessageCompleted(reply, { history: false, streaming: false });
       if (serverSessionId && chatSync && serverSessionId === chatSync.serverSessionId) {
         try {
           const synchronized = await chatSync.pull();
@@ -670,6 +679,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     } catch (error) {
       pendingRow.remove();
+      if (voiceSession?.generation === voiceGeneration) voiceSession?.assistantError();
       const friendlyMessage = friendlySendError(error, Boolean(userMessage.files?.length));
       options.onFailure?.(error);
       const errorMessage = messageProtocol.createAssistantMessage(
@@ -868,18 +878,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const handleSend = async () => {
     if (api.loading) {
       api.stopStream();
-      return;
+      return false;
     }
 
     const content = input.value.trim();
-    if (!content && !pendingFiles.length && !pendingDocuments.length) return;
+    if (!content && !pendingFiles.length && !pendingDocuments.length) return false;
     if (pendingDocuments.some(file => file.uploadState === "uploading")) {
       if (uploadStatus) uploadStatus.textContent = "文件仍在上传，请稍候";
-      return;
+      return false;
     }
     if (pendingDocuments.some(file => file.uploadState === "error")) {
       if (uploadStatus) uploadStatus.textContent = "请重试或移除上传失败的文件";
-      return;
+      return false;
     }
 
     if (pendingFiles.length && !supportsImages()) {
@@ -887,7 +897,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (uploadStatus) uploadStatus.textContent = message;
       showToast(message);
       input.focus();
-      return;
+      return false;
     }
 
     let attachments = [];
@@ -895,9 +905,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const draftDocuments = pendingDocuments.map(file => ({ ...file }));
     if (pendingFiles.length) {
       try { attachments = await media.uploadImages(pendingFiles, sessionApiAvailable ? activeSessionId : "", text => { if (uploadStatus) uploadStatus.textContent = text; }); }
-      catch { if (uploadStatus) uploadStatus.textContent = "图片上传失败，请稍后重试"; input.focus(); return; }
+      catch { if (uploadStatus) uploadStatus.textContent = "图片上传失败，请稍后重试"; input.focus(); return false; }
     }
 
+    voiceSession?.sending();
     const fallbackContent = attachments.length ? "[图片]" : pendingDocuments.length
       ? `[文件：${pendingDocuments.map(file => file.name).join("、")}]`
       : "";
@@ -938,6 +949,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (uploadStatus) uploadStatus.textContent = "文件已经上传，但这次发送失败了，稍后再试。";
       }
     });
+    return true;
   };
 
   const findMessageContext = (messageId) => {
@@ -1026,6 +1038,7 @@ document.addEventListener("DOMContentLoaded", () => {
     input, micButton: document.querySelector(".composer__voice"),
     statusNode: document.querySelector("[data-voice-recognition-status]"), notify: showToast
   });
+  const voiceSession = window.CompanionVoiceSession?.mount({windowRef: window, documentRef: document, voiceUI, input, send: handleSend, getBusy: () => api.loading || pendingFiles.length > 0 || pendingDocuments.length > 0, getSessionId: () => activeSessionId || localHistorySessionId});
   const initialState = store.saveState(store.getState());
   legacyMessages = initialState.messages.map(message => ({ ...message }));
   renderMessages(initialState.messages);

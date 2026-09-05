@@ -19,6 +19,8 @@ test("theme Gateway fallback uses API in production and current origin locally",
 
 test("workshop resolves both theme routes before fetch", () => {
   const source=fs.readFileSync(path.join(__dirname,"..","frontend-p4b/assets/js/theme-workshop.js"),"utf8");
-  assert.match(source,/gateway\.resolveGatewayUrl\(path/u); assert.doesNotMatch(source,/fetch\(\s*path/u);
+  assert.match(source,/gateway\.request\(path/u); assert.match(fs.readFileSync(path.join(__dirname,"..","frontend-p4b/assets/js/theme-gateway.js"),"utf8"),/resolveGatewayUrl\(path/u); assert.doesNotMatch(source,/fetch\(\s*path/u);
   assert.match(source,/gatewayRequest\("\/api\/theme\/import\/extract"/u); assert.match(source,/gatewayRequest\("\/api\/theme\/assets\/localize"/u);
 });
+
+test("shared theme request keeps authentication in headers and handles failure",async()=>{const {request}=require('../frontend-p4b/assets/js/theme-gateway.js');let captured;const w={location:{hostname:'localhost',origin:'http://localhost'},AppConfig:{getProviderConfig:()=>({auth:{token:'fake-adapter-token'}})},fetch:async(url,options)=>{captured={url,options};return {ok:true,json:async()=>({data:{items:[]}})};}};assert.deepEqual(await request('/api/theme/assets/library',{},w),{data:{items:[]}});assert.equal(captured.options.headers.Authorization,'Bearer fake-adapter-token');assert.equal(captured.url,'http://localhost/api/theme/assets/library');w.fetch=async()=>({ok:false,status:401,json:async()=>({})});await assert.rejects(request('/api/theme/assets/library',{},w),error=>error.status===401);});

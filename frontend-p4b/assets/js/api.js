@@ -88,6 +88,7 @@
         if ((typeof chunk === "string" && chunk) || (chunk && typeof chunk.content === "string")) yield chunk;
       }
     } catch (error) {
+      options.onStreamFailure?.();
       if (error?.code !== "ABORTED") throw error;
     } finally {
       if (activeStreamController === controller) activeStreamController = null;

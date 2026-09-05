@@ -20,5 +20,6 @@
     if (hostname === "chat.xiaowo.homes") return `https://api.xiaowo.homes${path}`;
     return `${String(locationRef?.origin || "").replace(/\/+$/u, "")}${path}`;
   };
-  return { resolveGatewayUrl };
+  const request = async (path, options = {}, windowRef = window) => { const config = windowRef.AppConfig?.getProviderConfig?.() || {}; const url = resolveGatewayUrl(path, { baseUrl: config.baseUrl, locationRef: windowRef.location }); const response = await windowRef.fetch(url, { ...options, headers: { ...(config.auth?.token ? { Authorization: `Bearer ${config.auth.token}` } : {}), ...(options.headers || {}) } }); const payload = await response.json().catch(() => ({})); if (!response.ok) { const error=new Error(response.status===401?"主题素材接口认证失败，请检查当前 Gateway 配置。":payload.error?.message||`请求失败（${response.status}）`);error.status=response.status;error.code=payload.error?.code;throw error; } return payload; };
+  return { resolveGatewayUrl, request };
 });

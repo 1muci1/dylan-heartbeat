@@ -107,7 +107,7 @@ test("chat blocks unsupported image sending and preserves previews on request fa
   const unsupported = chat.slice(unsupportedStart, unsupportedEnd);
   assert.match(unsupported, /模型设置 → 支持图片理解 开启后再发送图片/);
   assert.match(unsupported, /showToast\(message\)/);
-  assert.match(unsupported, /return;/);
+  assert.match(unsupported, /return false;/);
   assert.doesNotMatch(unsupported, /clearPendingFiles|uploadImages|requestAssistantReply/);
   assert.match(chat, /图片上传失败，请稍后重试/);
   const assistantCatch = chat.slice(chat.indexOf("const requestAssistantReply"), chat.indexOf("const picker"));

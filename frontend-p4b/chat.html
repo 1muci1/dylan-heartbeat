@@ -7,12 +7,14 @@
   <meta name="description" content="与私人 AI 陪伴者沉聊天">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="assets/css/common.css?v=v77-p4b">
-  <link rel="stylesheet" href="assets/css/chat.css?v=v77-p4b">
-  <link rel="stylesheet" href="assets/css/voice-v77.css?v=v77-p4b">
-  <link rel="stylesheet" href="assets/css/theme.css?v=v77-p4b">
-  <script src="assets/js/theme-store.js?v=v77-p4b"></script>
-  <script src="assets/js/common.js?v=v77-p4b"></script>
+  <link rel="stylesheet" href="assets/css/common.css?v=v78-p4b">
+  <link rel="stylesheet" href="assets/css/chat.css?v=v78-p4b-entry1">
+  <link rel="stylesheet" href="assets/css/voice-v77.css?v=v78-p4b">
+  <link rel="stylesheet" href="assets/css/voice-session-v78.css?v=v78-p4b-ui1">
+  <link rel="stylesheet" href="assets/css/theme.css?v=v78-p4b">
+  <script src="assets/js/theme-gateway.js?v=v78-p4b-bg1"></script>
+  <script src="assets/js/theme-store.js?v=v78-p4b"></script>
+  <script src="assets/js/common.js?v=v78-p4b"></script>
   <script src="assets/js/appearance.js"></script>
   <script src="/storage/user-preference-store.js"></script>
   <script src="storage/chat-history-store.js"></script>
@@ -36,6 +38,9 @@
         </div>
       </div>
 
+      <button class="voice-session-entry" type="button" data-open-voice-session aria-label="语音模式" title="语音模式">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 13a5 5 0 0 0 10 0V9a5 5 0 0 0-10 0v4Z"></path><path d="M4 12a8 8 0 0 0 16 0M12 20v2M9 22h6"></path></svg>
+      </button>
       <button class="chat-header__button" id="session-toggle" type="button" aria-label="打开会话列表" aria-controls="session-drawer" aria-expanded="false">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14M5 12h14M5 18h9"></path></svg>
       </button>
@@ -188,16 +193,63 @@
   <script src="assets/js/data.js"></script>
   <script src="assets/js/model-registry.js"></script>
   <script src="assets/js/model-switcher.js"></script>
-  <script src="assets/js/message.js?v=v77-p4b"></script>
+  <script src="assets/js/message.js?v=v78-p4b"></script>
   <script src="assets/js/provider.js"></script>
-  <script src="assets/js/api.js?v=v77-p4b"></script>
+  <script src="assets/js/api.js?v=v78-p4b-fix2"></script>
   <script src="assets/js/chat-preferences.js"></script>
   <script src="assets/js/avatar-chat.js"></script>
   <script src="assets/js/sessions.js"></script>
   <script src="assets/js/chat-sync.js"></script>
-  <script src="assets/js/stickers.js?v=v77-p4b"></script>
-  <script src="assets/js/voice-adapter.js?v=v77-p4b"></script>
-  <script src="assets/js/voice-ui.js?v=v77-p4b"></script>
-  <script src="assets/js/chat.js?v=v77-p4b"></script>
+  <script src="assets/js/stickers.js?v=v78-p4b"></script>
+  <script src="assets/js/voice-adapter.js?v=v78-p4b-bg1"></script>
+  <script src="assets/js/voice-ui.js?v=v78-p4b"></script>
+  <script src="assets/js/voice-background.js?v=v78-p4b-bg1"></script>
+  <script src="assets/js/voice-session.js?v=v78-p4b-ui1"></script>
+  <script src="assets/js/chat.js?v=v78-p4b-fix2"></script>
+  <dialog class="voice-session" data-voice-session aria-label="语音会话">
+    <header class="voice-session__top"><strong>与沉的语音会话</strong><div class="voice-session__header-controls">
+      <button class="voice-icon-button" type="button" data-vb-toggle aria-label="语音背景" title="语音背景" aria-expanded="false" aria-controls="voice-background-panel"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8" cy="8" r="1.5"/><path d="m4 17 5-5 4 4 3-4 5 5"/></svg></button>
+      <button class="voice-icon-button" type="button" data-vs-action="close" aria-label="退出语音模式" title="退出语音模式"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+    </div></header>
+    <section id="voice-background-panel" class="voice-background-panel" data-vb-panel hidden aria-label="语音背景">
+      <strong>语音背景</strong>
+      <label><input type="radio" name="voice-background-mode" data-vb-mode="follow-chat" checked> 跟随聊天背景</label>
+      <label><input type="radio" name="voice-background-mode" data-vb-mode="custom"> 单独设置</label>
+      <div data-vb-preview class="voice-background-preview" role="img" aria-label="当前语音背景缩略图"></div>
+      <button type="button" data-vb-choose>选择背景</button>
+      <button type="button" data-vb-restore>恢复跟随聊天背景</button>
+    </section>
+      <button type="button" data-vb-picker-close hidden>关闭素材选择</button>
+      <iframe data-vb-picker title="Theme 素材库" hidden></iframe>
+    <p data-vb-notice role="status"></p>
+    <div class="voice-session__stage">
+      <div class="voice-session__person">
+        <div class="voice-session__avatar" data-vs-avatar>沉</div>
+        <div class="voice-session__status-card">
+          <h2 role="status" aria-live="polite" data-vs-status>准备好了</h2>
+          <p data-vs-secondary>想说什么都可以</p>
+        </div>
+      </div>
+      <div class="voice-session__review" data-vs-review hidden><span>我听到的是</span><p class="voice-session__text" data-vs-transcript aria-label="识别结果"></p></div>
+      <p data-vs-summary hidden></p>
+      <div class="voice-session__actions">
+        <div class="voice-listening-indicator" data-vs-listening hidden aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg></div>
+        <button class="voice-control voice-control--primary" type="button" data-vs-action="listen" aria-label="点击说话"><span class="voice-control__disc"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg></span><span data-vs-listen-label>点击说话</span></button>
+        <button class="voice-control" type="button" data-vs-action="stop" hidden><span class="voice-control__disc"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/></svg></span><span>停止</span></button>
+        <button class="voice-control" type="button" data-vs-action="pause" hidden><span class="voice-control__disc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14" stroke-width="3"/></svg></span><span>暂停</span></button>
+        <button class="voice-control" type="button" data-vs-action="resume" hidden><span class="voice-control__disc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 10 7-10 7Z"/></svg></span><span>继续</span></button>
+        <button class="voice-control" type="button" data-vs-action="interrupt" hidden><span class="voice-control__disc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 3-8 10h6l-1 8 9-11h-7Z"/></svg></span><span>打断</span></button>
+        <button class="voice-review-button voice-review-button--primary" type="button" data-vs-action="send" hidden>发送</button>
+        <button class="voice-review-button" type="button" data-vs-action="retry" hidden>重新说</button>
+        <button type="button" data-vs-action="cancel" hidden>取消</button>
+        <button class="voice-control" type="button" data-vs-exit hidden><span class="voice-control__disc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></span><span>退出</span></button>
+      </div>
+    </div>
+    <footer class="voice-session__footer">
+      <label class="voice-continuous-card"><span><strong>连续对话</strong><small>回复结束后自动继续聆听</small></span><input type="checkbox" role="switch" aria-label="连续对话" data-vs-continuous><span class="voice-switch" aria-hidden="true"></span></label>
+      <div class="voice-confirm" data-vs-confirm hidden role="group" aria-label="确认开启连续对话"><p>开启连续对话后，识别出的最终文字会自动发送给沉。</p><button type="button" data-vs-confirm-yes>开启</button><button type="button" data-vs-confirm-no>取消</button></div>
+      <details class="voice-privacy"><summary>ⓘ 语音识别由浏览器提供</summary><p>根据浏览器实现，语音可能由浏览器厂商的在线识别服务处理。</p></details>
+    </footer>
+  </dialog>
 </body>
 </html>

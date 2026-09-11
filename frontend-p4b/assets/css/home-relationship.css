@@ -1,0 +1,54 @@
+/* Pair and bond adapted from the last relationship Home, e690569. */
+.home-page .relationship-hero {
+  min-height: 0;
+  padding: 30px 20px 26px;
+  color: var(--xb-card-text, var(--text, #292929));
+  background: var(--xb-card-bg, var(--surface, #fff));
+  border-color: var(--xb-card-border, var(--border, #ddd));
+  box-shadow: var(--xb-card-shadow, 0 12px 32px rgb(0 0 0 / 8%));
+}
+.relationship-hero__pair {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 54px minmax(0, 1fr);
+  align-items: center;
+  max-width: 380px;
+  margin: 0 auto 26px;
+}
+.relationship-hero__person { display: grid; justify-items: center; gap: 7px; min-width: 0; }
+.relationship-hero__person > strong { font-size: 15px; }
+.relationship-hero__person > small { font-size: 11px; color: var(--xb-card-muted, #626262); }
+.relationship-hero__avatar {
+  display: grid;
+  place-items: center;
+  width: 82px;
+  height: 82px;
+  max-width: 100%;
+  margin: 0;
+  border: 1px solid var(--xb-avatar-ring, var(--xb-card-border, #ccc));
+  border-radius: 50%;
+  background-color: var(--xb-card-bg, #fff);
+  color: var(--xb-card-text, var(--text, #292929));
+  background-repeat: no-repeat;
+  background-position: center;
+  box-shadow: 0 8px 22px rgb(0 0 0 / 10%);
+  font-family: "Songti SC", "STSong", serif;
+  font-size: 28px;
+  overflow: hidden;
+}
+.relationship-hero__avatar--chen { width: 94px; height: 94px; }
+.relationship-hero__avatar.has-avatar-image > span { visibility: hidden; }
+.relationship-hero__bond { position: relative; display: grid; place-items: center; align-self: start; margin-top: 31px; color: var(--xb-color-accent, var(--accent, currentColor)); }
+.relationship-hero__bond::before { position: absolute; width: 100px; height: 1px; background: linear-gradient(90deg, transparent, currentColor, transparent); content: ""; }
+.relationship-hero__bond > span { z-index: 1; display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid currentColor; border-radius: 50%; background: var(--xb-card-bg, #fff); font-size: 12px; }
+.relationship-hero__days { position: relative; z-index: 1; text-align: center; }
+.relationship-hero__days > small { font-size: 10px; letter-spacing: .16em; color: var(--xb-card-muted, #626262); }
+.relationship-hero__days > [data-relationship-days] { margin: 10px 0; font-size: 19px; line-height: 1.6; font-family: "Songti SC", "STSong", serif; }
+.relationship-hero__caption { margin: 0; font-size: 12px; line-height: 1.8; color: var(--xb-card-muted, #626262); overflow-wrap: anywhere; }
+html.has-xinban-theme[data-xb-design-regions~="home-hero"] .relationship-hero :is(.relationship-hero__person > small, .relationship-hero__days > small, .relationship-hero__caption) { color: inherit; }
+@media (min-width: 521px) {
+  .relationship-hero__avatar { width: 94px; height: 94px; }
+  .relationship-hero__avatar--chen { width: 108px; height: 108px; }
+  .relationship-hero__bond { margin-top: 38px; }
+}

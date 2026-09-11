@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/assets/css/common.css?v=v78-p4b">
   <link rel="stylesheet" href="/assets/css/home.css">
   <link rel="stylesheet" href="/assets/css/theme.css?v=v78-p4b">
+  <link rel="stylesheet" href="/assets/css/home-relationship.css?v=home-hotfix-1">
   <script src="/assets/js/theme-store.js?v=v78-p4b"></script>
   <script src="/assets/js/appearance.js"></script>
   <title>心伴 · 首页</title>
@@ -29,19 +30,24 @@
       </a>
     </header>
 
-    <section class="companion-hero" aria-labelledby="companion-name">
-      <div class="companion-hero__glow companion-hero__glow--one"></div>
-      <div class="companion-hero__glow companion-hero__glow--two"></div>
-      <div class="companion-portrait" aria-hidden="true">
-        <span class="companion-portrait__orbit"></span>
-        <span class="companion-portrait__moon"></span>
-        <span class="companion-portrait__name">沉</span>
+    <section class="companion-hero relationship-hero" aria-label="你和沉沉的陪伴时光">
+      <div class="relationship-hero__pair">
+        <div class="relationship-hero__person">
+          <div class="companion-portrait relationship-hero__avatar" data-relationship-avatar="user" role="img" aria-label="你的头像"><span>你</span></div>
+          <strong>你</strong>
+          <small>回到小窝</small>
+        </div>
+        <div class="relationship-hero__bond" aria-hidden="true"><span>♥</span></div>
+        <div class="relationship-hero__person">
+          <div class="companion-portrait relationship-hero__avatar relationship-hero__avatar--chen" data-relationship-avatar="chen" role="img" aria-label="沉沉的头像"><span>沉</span></div>
+          <strong>沉沉</strong>
+          <small>沉正在这里</small>
+        </div>
       </div>
-
-      <div class="companion-hero__identity">
-        <div class="online-pill"><span></span>在线 · 正在陪伴你</div>
-        <h2 id="companion-name">沉</h2>
-        <p>“不用急着说什么，我会安静地陪着你。”</p>
+      <div class="relationship-hero__days">
+        <small>DAYS TOGETHER</small>
+        <p data-relationship-days aria-live="polite">从相遇那天起</p>
+        <p class="relationship-hero__caption">从相遇那天起，日子有了共同的名字。</p>
       </div>
     </section>
 
@@ -140,5 +146,7 @@
   <script src="/assets/js/data.js"></script>
   <script src="/assets/js/common.js?v=v78-p4b"></script>
   <script src="/assets/js/home.js"></script>
+  <script src="/storage/user-preference-store.js"></script>
+  <script src="/assets/js/home-relationship.js?v=home-hotfix-1"></script>
 </body>
 </html>

@@ -66,8 +66,14 @@ document.addEventListener("DOMContentLoaded", () => {
     voiceNodes.rate.value = String(currentVoiceSettings.rate); voiceNodes.pitch.value = String(currentVoiceSettings.pitch); voiceNodes.volume.value = String(currentVoiceSettings.volume);
     voiceNodes.language.value = currentVoiceSettings.recognitionLanguage; voiceNodes.interim.checked = currentVoiceSettings.showInterimTranscript;
     const updateOutputs = () => ["rate","pitch","volume"].forEach(key => { const output = document.querySelector(`[data-voice-${key}-output]`); if (output) output.textContent = Number(voiceNodes[key].value).toFixed(1); });
-    const saveVoiceSettings = () => { const option = voiceNodes.voice.selectedOptions?.[0]; voiceStore.save({autoRead:voiceNodes.autoRead.checked,voiceURI:voiceNodes.voice.value,voiceName:option?.dataset.name||"",voiceLang:option?.dataset.lang||"",rate:voiceNodes.rate.value,pitch:voiceNodes.pitch.value,volume:voiceNodes.volume.value,recognitionLanguage:voiceNodes.language.value,showInterimTranscript:voiceNodes.interim.checked});updateOutputs();if(voiceNodes.status)voiceNodes.status.textContent="语音设置已保存到本设备"; };
+    const saveVoiceSettings = () => { const option = voiceNodes.voice.selectedOptions?.[0]; voiceStore.save({...voiceStore.load(),autoRead:voiceNodes.autoRead.checked,voiceURI:voiceNodes.voice.value,voiceName:option?.dataset.name||"",voiceLang:option?.dataset.lang||"",rate:voiceNodes.rate.value,pitch:voiceNodes.pitch.value,volume:voiceNodes.volume.value,recognitionLanguage:voiceNodes.language.value,showInterimTranscript:voiceNodes.interim.checked});updateOutputs();if(voiceNodes.status)voiceNodes.status.textContent="语音设置已保存；跨设备状态见同步面板"; };
     Object.values(voiceNodes).filter(node=>node?.matches?.("input,select")).forEach(node=>node.addEventListener("change",saveVoiceSettings));
+    window.addEventListener("xinban:voice-settings", () => {
+      const next=voiceStore.load();
+      voiceNodes.autoRead.checked=next.autoRead;
+      for(const key of ["rate","pitch","volume"])voiceNodes[key].value=String(next[key]);
+      voiceNodes.language.value=next.recognitionLanguage;voiceNodes.interim.checked=next.showInterimTranscript;updateOutputs();
+    });
     updateOutputs();
     const caps=voiceAdapter.capabilities();if(voiceNodes.capability)voiceNodes.capability.textContent=`朗读：${caps.tts?"支持":"当前浏览器不支持"} · 语音识别：${caps.stt?"支持":"当前浏览器不支持"}`;
   }
@@ -223,7 +229,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const preferences = preferenceStore?.loadSync?.();
     return {
       appVersion: window.CompanionP4BShell?.APP_VERSION || "v44",
-      swCacheName: window.CompanionP4BShell?.SW_CACHE_NAME || "xinban-shell-v78-p4b",
+      swCacheName: window.CompanionP4BShell?.SW_CACHE_NAME || "xinban-shell-v79-p4b",
       providerConfigured: Boolean(config.type && config.baseUrl),
       modelConfigured: Boolean(config.model),
       displayNameConfigured: Boolean(config.displayName),
@@ -247,6 +253,72 @@ document.addEventListener("DOMContentLoaded", () => {
       if (diagnosticResult) diagnosticResult.textContent = "无法自动复制，请检查浏览器剪贴板权限";
     }
   });
+  const gatewayDialog = document.querySelector("[data-gateway-dialog]");
+  const gatewayForm = gatewayDialog.querySelector("form");
+  const gatewayToken = gatewayForm.elements.credential;
+  const gatewayStatus = gatewayDialog.querySelector("[data-gateway-status]");
+  const gatewaySave = gatewayDialog.querySelector("[type=submit]");
+  let connecting = false;
+  const resizeGateway = () => {
+    const viewport = window.visualViewport;
+    gatewayDialog.style.setProperty("--gateway-height", `${viewport?.height || window.innerHeight}px`);
+    gatewayDialog.style.setProperty("--gateway-top", `${viewport?.offsetTop || 0}px`);
+  };
+  window.visualViewport?.addEventListener("resize", resizeGateway);
+  window.visualViewport?.addEventListener("scroll", resizeGateway);
+  const closeGateway = () => { if (!connecting) { gatewayToken.value = ""; gatewayDialog.close(); } };
+  gatewayDialog.addEventListener("cancel", event => { event.preventDefault(); closeGateway(); });
+  gatewayDialog.querySelector("[data-gateway-close]").addEventListener("click", closeGateway);
+  const openGateway = () => {
+    gatewayToken.value = configStore.getGatewayConnection()?.auth?.token || "";
+    gatewayStatus.textContent = "请输入映我 Gateway 凭据；仅保存在本设备，不会上传到个性化配置。";
+    gatewayForm.elements.origin.value = new URL(window.XinbanThemeGateway.resolveGatewayUrl("/api/personalization", {locationRef:window.location})).origin;
+    resizeGateway();
+    gatewayDialog.showModal();
+  };
+  document.querySelector("[data-open-gateway]")?.addEventListener("click", openGateway);
+  document.querySelector("[data-sync-connect]")?.addEventListener("click", event => { event.preventDefault(); openGateway(); });
+  gatewayDialog.querySelector("[data-disconnect-gateway]").addEventListener("click", () => {
+    if (connecting) return;
+    window.XinbanThemeGateway.disconnect(window);
+    gatewayToken.value = "";
+    gatewayStatus.textContent = "已断开本设备的映我 Gateway 连接。";
+  });
+  gatewayForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    if (connecting) return;
+    const token = gatewayToken.value.trim();
+    if (!token) {
+      gatewayStatus.textContent = "请填写映我 Gateway 连接凭据（GATEWAY_NOT_CONNECTED）。聊天 Provider 的凭据不会代替此凭据。";
+      gatewayToken.focus();
+      return;
+    }
+    connecting = true;
+    gatewaySave.disabled = true;
+    gatewaySave.textContent = "验证中…";
+    gatewayStatus.textContent = "正在验证映我 Gateway 连接…";
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
+    try {
+      await window.XinbanThemeGateway.connect({baseUrl:gatewayForm.elements.origin.value, auth:{type:"bearer",token}}, {
+        location:window.location, AppConfig:configStore,
+        fetch:(url, options) => window.fetch(url, {...options, signal:controller.signal})
+      });
+      gatewayStatus.textContent = "映我 Gateway 已连接，本设备连接已保存。";
+      connecting = false;
+      closeGateway();
+    } catch (error) {
+      const code = error.status === 401 ? "GATEWAY_AUTH_FAILED" : error.status === 403 ? "GATEWAY_FORBIDDEN" : error.code === "STORAGE_QUOTA_EXCEEDED" ? "STORAGE_QUOTA_EXCEEDED" : "GATEWAY_CONNECTION_FAILED";
+      const message = error.status === 401 ? "认证失败，请检查映我 Gateway 凭据。" : error.status === 403 ? "当前凭据无权访问同步服务。" : "连接验证或本地保存失败，请检查网络后重试。";
+      gatewayStatus.textContent = `${message}（${code}）原有连接未被替换。`;
+    } finally {
+      window.clearTimeout(timeout);
+      connecting = false;
+      gatewaySave.disabled = false;
+      gatewaySave.textContent = "保存并连接";
+    }
+  });
+  if(new URLSearchParams(location.search).get("connection")==="gateway")openGateway();
   document.querySelector("[data-open-global-provider]")?.addEventListener("click", () => {
     const config = configStore.getProviderConfig();
     providerPanel.open({
@@ -259,17 +331,21 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
     try {
-      const config = configStore.saveProviderConfig(readFormConfig());
+      const candidate = readFormConfig(), gateway = window.XinbanThemeGateway;
+      // Preserve the old validated Gateway connection before saving a different AI provider.
+      await gateway?.ensureConnection(window);
+      if (gateway?.isGatewayConfig(candidate,window)) await gateway.connect(candidate,window);
+      const config = configStore.saveProviderConfig(candidate);
       try { preferenceStore?.saveModel(config.model); } catch { /* selectedModelId 仅为镜像 */ }
       updateCurrentSummary(config);
       updateModeLabel();
       showResult("模型配置已保存", "success");
       window.setTimeout(() => providerPanel.close(), 700);
     } catch (error) {
-      showResult(error.message || "模型配置保存失败，请重试", "error");
+      showResult(error.code?.startsWith("STORAGE_") ? error.message : "连接验证或保存失败，请检查配置后重试。", "error");
     }
   });
 

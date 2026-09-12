@@ -315,13 +315,27 @@
   window.AppConfig = {
     key: PROVIDER_STORAGE_KEY,
 
+    // Device-local connection slot in the existing provider configuration record.
+    getGatewayConnection() {
+      try { return JSON.parse(localStorage.getItem(PROVIDER_STORAGE_KEY) || "null")?.gatewayConnection || null; } catch { return null; }
+    },
+    isGatewayDisconnected() {
+      try { return JSON.parse(localStorage.getItem(PROVIDER_STORAGE_KEY) || "null")?.gatewayDisconnected === true; } catch { return false; }
+    },
+    saveGatewayConnection(connection) {
+      try {
+        const raw = JSON.parse(localStorage.getItem(PROVIDER_STORAGE_KEY) || "null") || {};
+        localStorage.setItem(PROVIDER_STORAGE_KEY, JSON.stringify({ ...raw, gatewayConnection: connection, gatewayDisconnected: !connection }));
+      } catch (cause) { throw providerStorageError(cause); }
+      window.dispatchEvent(new CustomEvent("gateway-connection-change"));
+    },
     getProviderConfig() {
       try {
         const rawConfig = localStorage.getItem(PROVIDER_STORAGE_KEY);
         const storedConfig = JSON.parse(rawConfig);
         const normalizedConfig = normalizeProviderConfig(storedConfig);
         if (rawConfig && typeof storedConfig?.supportsImages !== "boolean") {
-          localStorage.setItem(PROVIDER_STORAGE_KEY, JSON.stringify(normalizedConfig));
+          localStorage.setItem(PROVIDER_STORAGE_KEY, JSON.stringify({ ...storedConfig, ...normalizedConfig }));
         }
         return normalizedConfig;
       } catch {
@@ -331,10 +345,11 @@
 
     saveProviderConfig(config) {
       const normalizedConfig = normalizeProviderConfig(config);
-      const serialized = JSON.stringify(normalizedConfig);
       let previous = null;
       try {
         previous = localStorage.getItem(PROVIDER_STORAGE_KEY);
+        let stored;try { stored=JSON.parse(previous || "null") || {}; } catch { stored={}; }
+        const serialized = JSON.stringify({ ...normalizedConfig, gatewayConnection: stored.gatewayConnection || null, gatewayDisconnected: stored.gatewayDisconnected === true });
         localStorage.setItem(PROVIDER_STORAGE_KEY, serialized);
         const verified = normalizeProviderConfig(JSON.parse(localStorage.getItem(PROVIDER_STORAGE_KEY)));
         if (!sameProviderSummary(normalizedConfig, verified)) throw providerStorageError();

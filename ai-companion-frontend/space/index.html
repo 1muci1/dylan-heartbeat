@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#09090d">
   <meta name="description" content="沉的小世界 · Space Studio">
-  <meta name="xinban-build" content="v78-p4b">
+  <meta name="xinban-build" content="v79-p4b">
   <link rel="stylesheet" href="../theme/theme.css">
   <link rel="stylesheet" href="../theme/app-nav.css">
   <link rel="stylesheet" href="../avatar/avatar.css">
   <link rel="stylesheet" href="space.css">
-  <link rel="stylesheet" href="/assets/css/theme.css?v=v78-p4b">
-  <script src="/assets/js/theme-store.js?v=v78-p4b"></script>
+  <link rel="stylesheet" href="/assets/css/theme.css?v=v79-p4b">
+  <script src="/assets/js/theme-store.js?v=v79-p4b-sync3"></script>
+  <link rel="stylesheet" href="/assets/css/personalization-sync.css?v=v79-p4b-sync3">
   <title>沉的小世界 · Space Studio</title>
 </head>
 <body class="companion-themed-page space-page">
@@ -32,6 +33,20 @@
         <h2 id="preview-title">欢迎回来</h2>
         <p>这里的主题、头像、字体和背景只属于当前页面会话。</p>
       </div>
+    </section>
+
+    <section class="studio-card companion-themed-surface personalization-sync" data-personalization-sync aria-labelledby="personalization-title">
+      <h2 id="personalization-title">跨设备同步</h2>
+      <p role="status" aria-live="polite" data-sync-status>正在连接…</p>
+      <p>最近同步：<span data-sync-time>尚未同步</span></p>
+      <p data-sync-device>本设备尚未连接</p>
+      <p>将头像、聊天背景、主题及部分个性化设置同步到其他设备。</p>
+      <p data-sync-connect-note hidden>跨设备同步需要连接映我 Gateway。</p>
+      <a href="/settings.html?returnTo=%2Fspace%2F&amp;connection=gateway#model" data-sync-connect hidden>连接同步服务</a>
+      <button type="button" data-sync-bootstrap hidden>使用此设备作为初始配置</button>
+      <button type="button" data-sync-now>立即同步</button>
+      <button type="button" data-sync-conflicts hidden>查看冲突</button>
+      <div data-sync-conflict-list hidden></div>
     </section>
 
     <section class="studio-card companion-themed-surface" aria-labelledby="studio-title">
@@ -115,11 +130,12 @@
     <a href="/space/" aria-current="page"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1a8 8 0 0 0-1.8-1L14.4 3h-4L10 6a8 8 0 0 0-1.8 1l-2.4-1-2 3.4L5.8 11a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 1.8 1l.4 3h4l.4-3a8 8 0 0 0 1.8-1l2.4 1 2-3.4-2-1.5a7 7 0 0 0 .1-1Z"></path></svg><span>设置</span></a>
   </nav>
 
-  <script src="theme-adapter.js?v=v78-p4b"></script>
-  <script src="../storage/user-preference-store.js"></script>
-  <script src="../avatar/avatar-studio.js"></script>
+  <script src="theme-adapter.js?v=v79-p4b"></script>
+  <script src="../storage/user-preference-store.js?v=v79-p4b"></script>
+  <script src="../avatar/avatar-studio.js?v=v79-p4b-sync7"></script>
   <script src="presets.js"></script>
   <script src="space-profile.js"></script>
   <script src="space.js"></script>
+  <script src="/assets/js/personalization-boot.js?v=v79-p4b-sync8"></script>
 </body>
 </html>

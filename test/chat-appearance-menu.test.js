@@ -94,7 +94,7 @@ test("global model settings use the shared Provider configuration dialog", () =>
   assert.match(html, />取消</);
   assert.match(html, />保存</);
   assert.match(js, /data-open-global-provider[\s\S]*providerPanel\.open/);
-  assert.match(js, /saveProviderConfig\(readFormConfig\(\)\)/);
+  assert.match(js, /saveProviderConfig\(candidate\)/);
   assert.doesNotMatch(js, /console\.(?:log|debug|info)\s*\(/);
 });
 

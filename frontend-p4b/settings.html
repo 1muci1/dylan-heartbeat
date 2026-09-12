@@ -7,17 +7,18 @@
   <meta name="description" content="Dylan Gateway Provider 设置">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="assets/css/common.css?v=v78-p4b">
-  <link rel="stylesheet" href="assets/css/settings.css?v=v78-p4b">
-  <link rel="stylesheet" href="assets/css/voice-v77.css?v=v78-p4b">
-  <link rel="stylesheet" href="assets/css/theme.css?v=v78-p4b">
+  <link rel="stylesheet" href="assets/css/common.css?v=v79-p4b">
+  <link rel="stylesheet" href="assets/css/settings.css?v=v79-p4b-sync9">
+  <link rel="stylesheet" href="assets/css/voice-v77.css?v=v79-p4b">
+  <link rel="stylesheet" href="assets/css/theme.css?v=v79-p4b">
   <link rel="stylesheet" href="/shared/provider-config-panel.css">
-  <script src="assets/js/theme-store.js?v=v78-p4b"></script>
-  <script src="assets/js/common.js?v=v78-p4b"></script>
-  <script src="assets/js/appearance.js"></script>
+  <script src="assets/js/theme-store.js?v=v79-p4b-sync3"></script>
+  <script src="assets/js/common.js?v=v79-p4b"></script>
+  <script src="assets/js/appearance.js?v=v79-p4b"></script>
   <script src="assets/js/settings-section.js"></script>
-  <script src="/storage/user-preference-store.js"></script>
+  <script src="/storage/user-preference-store.js?v=v79-p4b"></script>
   <title>心伴 · Provider 设置</title>
+  <link rel="stylesheet" href="/assets/css/personalization-sync.css?v=v79-p4b-sync3">
 </head>
 <body class="settings-page" data-page="settings">
   <script>window.CompanionSettingsSection?.apply(document, window.location.hash);</script>
@@ -34,6 +35,19 @@
     </header>
 
     <div class="settings-zone settings-zone--appearance" id="appearance">
+    <section class="appearance-settings personalization-sync" data-personalization-sync aria-labelledby="personalization-title">
+      <h2 id="personalization-title">跨设备同步</h2>
+      <p role="status" aria-live="polite" data-sync-status>正在连接…</p>
+      <p>最近同步：<span data-sync-time>尚未同步</span></p>
+      <p data-sync-device>本设备尚未连接</p>
+      <p>首次请在配置完整的电脑上初始化。声音名称和浏览器权限仅保存在本设备。</p>
+      <p data-sync-connect-note hidden>跨设备同步需要连接映我 Gateway。</p>
+      <a href="/settings.html?returnTo=%2Fspace%2F&amp;connection=gateway#model" data-sync-connect hidden>连接同步服务</a>
+      <button type="button" data-sync-bootstrap hidden>使用此设备作为初始配置</button>
+      <button type="button" data-sync-now>立即同步</button>
+      <button type="button" data-sync-conflicts hidden>查看冲突</button>
+      <div data-sync-conflict-list hidden></div>
+    </section>
     <section class="appearance-settings" aria-labelledby="appearance-title">
       <div class="appearance-settings__heading">
         <span>SPACE APPEARANCE</span>
@@ -118,6 +132,22 @@
       <p class="provider-diagnostic-result" role="status" data-provider-diagnostic-result></p>
     </section>
 
+    <button type="button" data-open-gateway>映我 Gateway 连接</button>
+    <dialog class="gateway-dialog" data-gateway-dialog aria-labelledby="gateway-title">
+      <form novalidate>
+        <header><h2 id="gateway-title">连接映我 Gateway</h2><p>跨设备同步 · 本设备连接</p></header>
+        <div class="gateway-fields">
+          <label>同步服务地址<input name="origin" type="url" readonly></label>
+          <label>Gateway 连接凭据（必填）<input name="credential" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="gateway-status"></label>
+          <p>使用映我 Gateway 的独立凭据，不需要修改聊天模型或第三方 Provider 配置。</p>
+          <button type="button" data-disconnect-gateway>断开本设备连接</button>
+        </div>
+        <footer>
+          <p id="gateway-status" data-gateway-status role="status" aria-live="polite"></p>
+          <div><button type="button" data-gateway-close>取消</button><button type="submit">保存并连接</button></div>
+        </footer>
+      </form>
+    </dialog>
     <dialog class="provider-config-dialog" data-global-provider-dialog>
     <form class="provider-form" data-provider-config-form novalidate>
       <header>
@@ -257,7 +287,7 @@
     <a href="/space/" data-nav="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1a8 8 0 0 0-1.8-1L14.4 3h-4L10 6a8 8 0 0 0-1.8 1l-2.4-1-2 3.4L5.8 11a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 1.8 1l.4 3h4l.4-3a8 8 0 0 0 1.8-1l2.4 1 2-3.4-2-1.5a7 7 0 0 0 .1-1Z"></path></svg>设置</a>
   </nav>
 
-  <script src="assets/js/data.js"></script>
+  <script src="assets/js/data.js?v=v79-p4b-sync3"></script>
   <script src="assets/js/model-registry.js"></script>
   <script src="assets/js/model-switcher.js"></script>
   <script src="assets/js/provider.js"></script>
@@ -265,7 +295,9 @@
   <script src="assets/js/avatar-chat.js"></script>
   <script src="assets/js/settings-return.js"></script>
   <script src="/shared/provider-config-panel.js"></script>
-  <script src="assets/js/voice-adapter.js?v=v78-p4b-bg1"></script>
-  <script src="assets/js/settings.js?v=v78-p4b"></script>
+  <script src="assets/js/voice-adapter.js?v=v79-p4b-bg1"></script>
+  <script src="assets/js/theme-gateway.js?v=v79-p4b-sync6"></script>
+  <script src="assets/js/settings.js?v=v79-p4b-sync9"></script>
+  <script src="/assets/js/personalization-boot.js?v=v79-p4b-sync8"></script>
 </body>
 </html>

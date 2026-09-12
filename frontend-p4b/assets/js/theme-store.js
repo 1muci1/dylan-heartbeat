@@ -134,7 +134,7 @@
     const text = typeof value === "string" ? value.trim() : "";
     return LOCAL_THEME_ASSET.test(text) ? text : "";
   };
-  const resolveThemeAssetUrl = (value, { baseUrl = root?.AppConfig?.getProviderConfig?.().baseUrl || "", locationRef = root?.location || null } = {}) => {
+  const resolveThemeAssetUrl = (value, { baseUrl = "", locationRef = root?.location || null } = {}) => {
     const text = typeof value === "string" ? value.trim() : "";
     let path = text;
     if (!text.startsWith("/")) {
@@ -154,6 +154,7 @@
     try { const input = new URL(text); return input.origin === gatewayOrigin && `${gatewayPrefix}${path}` === input.pathname && !input.search && !input.hash ? resolved : ""; }
     catch { return ""; }
   };
+  const displayAssetUrl = value => root && LOCAL_THEME_ASSET.test(value) ? resolveThemeAssetUrl(value) : value;
   const boundedNumber = (value, fallback, min, max) => Number.isFinite(Number(value)) ? Math.max(min, Math.min(max, Number(value))) : fallback;
   const normalizeCustomDesign = input => {
     const regions = {};
@@ -412,11 +413,11 @@
     ,"--theme-background": `linear-gradient(180deg, ${theme.tokens.colorBg}, color-mix(in srgb, ${theme.tokens.colorBg} 92%, ${effectivePrimary}))`
     ,"--avatar-border-color": effectivePrimary, "--avatar-ring-color": `color-mix(in srgb, ${effectivePrimary} 24%, transparent)`
     ,"--avatar-surface": `linear-gradient(145deg, ${effectiveAccent}, ${effectivePrimary})`
-    ,"--theme-bubble-texture": theme.assets.bubbleTexture ? `url(${JSON.stringify(theme.assets.bubbleTexture)})` : "none"
-    ,"--theme-nav-texture": theme.assets.bottomNavTexture ? `url(${JSON.stringify(theme.assets.bottomNavTexture)})` : "none"
-    ,"--theme-input-decoration": theme.assets.inputDecoration ? `url(${JSON.stringify(theme.assets.inputDecoration)})` : "none"
-    ,"--theme-header-decoration": theme.assets.headerDecoration ? `url(${JSON.stringify(theme.assets.headerDecoration)})` : "none"
-    ,"--theme-avatar-frame": theme.assets.avatarFrame ? `url(${JSON.stringify(theme.assets.avatarFrame)})` : "none"
+    ,"--theme-bubble-texture": theme.assets.bubbleTexture ? `url(${JSON.stringify(displayAssetUrl(theme.assets.bubbleTexture))})` : "none"
+    ,"--theme-nav-texture": theme.assets.bottomNavTexture ? `url(${JSON.stringify(displayAssetUrl(theme.assets.bottomNavTexture))})` : "none"
+    ,"--theme-input-decoration": theme.assets.inputDecoration ? `url(${JSON.stringify(displayAssetUrl(theme.assets.inputDecoration))})` : "none"
+    ,"--theme-header-decoration": theme.assets.headerDecoration ? `url(${JSON.stringify(displayAssetUrl(theme.assets.headerDecoration))})` : "none"
+    ,"--theme-avatar-frame": theme.assets.avatarFrame ? `url(${JSON.stringify(displayAssetUrl(theme.assets.avatarFrame))})` : "none"
     ,"--xb-color-bg": theme.tokens.colorBg, "--xb-color-text": theme.tokens.colorText
     ,"--xb-color-surface": theme.tokens.cardBg, "--xb-color-surface-soft": `color-mix(in srgb, ${theme.tokens.cardBg} 76%, ${theme.tokens.colorBg})`
     ,"--xb-color-text-muted": theme.tokens.colorMuted, "--xb-color-accent": accent, "--xb-color-accent-soft": transparentAccent ? "rgba(80,110,130,.10)" : `color-mix(in srgb, ${accent} 15%, ${theme.tokens.cardBg})`
@@ -439,15 +440,15 @@
     ,"--xb-chat-user-bubble-bg": theme.tokens.chatUserBubbleBg, "--xb-chat-user-bubble-text": theme.tokens.chatUserBubbleText
     ,"--xb-chat-assistant-bubble-bg": theme.tokens.chatAssistantBubbleBg, "--xb-chat-assistant-bubble-text": theme.tokens.chatAssistantBubbleText
     ,"--xb-border-color": theme.tokens.borderColor, "--xb-radius-bubble": theme.tokens.radiusBubble, "--xb-radius-card": theme.tokens.radiusCard, "--xb-radius-button": `calc(${theme.tokens.radiusCard} * .48)`
-    ,"--xb-bg-image": mode === "performance" || !theme.visualSlots.pageBackground.enabled || !theme.visualSlots.pageBackground.url ? "none" : `url(${JSON.stringify(theme.visualSlots.pageBackground.url)})`
+    ,"--xb-bg-image": mode === "performance" || !theme.visualSlots.pageBackground.enabled || !theme.visualSlots.pageBackground.url ? "none" : `url(${JSON.stringify(displayAssetUrl(theme.visualSlots.pageBackground.url))})`
     ,"--xb-bg-image-opacity": String(theme.visualSlots.pageBackground.opacity)
-    ,"--xb-header-decor": mode === "performance" || !theme.visualSlots.chatHeaderDecor.enabled || !theme.visualSlots.chatHeaderDecor.url ? "none" : `url(${JSON.stringify(theme.visualSlots.chatHeaderDecor.url)})`
-    ,"--xb-user-bubble-decor": mode === "performance" || !theme.visualSlots.userBubbleDecor.enabled || !theme.visualSlots.userBubbleDecor.url ? "none" : `url(${JSON.stringify(theme.visualSlots.userBubbleDecor.url)})`
-    ,"--xb-assistant-bubble-decor": mode === "performance" || !theme.visualSlots.assistantBubbleDecor.enabled || !theme.visualSlots.assistantBubbleDecor.url ? "none" : `url(${JSON.stringify(theme.visualSlots.assistantBubbleDecor.url)})`
-    ,"--xb-avatar-frame": mode === "performance" || !theme.visualSlots.avatarFrame.enabled || !theme.visualSlots.avatarFrame.url ? "none" : `url(${JSON.stringify(theme.visualSlots.avatarFrame.url)})`
-    ,"--xb-input-decor": mode === "performance" || !theme.visualSlots.inputDecor.enabled || !theme.visualSlots.inputDecor.url ? "none" : `url(${JSON.stringify(theme.visualSlots.inputDecor.url)})`
-    ,"--xb-home-card-decor": mode === "performance" || !theme.visualSlots.homeCardDecor.enabled || !theme.visualSlots.homeCardDecor.url ? "none" : `url(${JSON.stringify(theme.visualSlots.homeCardDecor.url)})`
-    ,"--xb-nav-accent": mode === "performance" || !theme.visualSlots.navAccent.enabled || !theme.visualSlots.navAccent.url ? "none" : `url(${JSON.stringify(theme.visualSlots.navAccent.url)})`
+    ,"--xb-header-decor": mode === "performance" || !theme.visualSlots.chatHeaderDecor.enabled || !theme.visualSlots.chatHeaderDecor.url ? "none" : `url(${JSON.stringify(displayAssetUrl(theme.visualSlots.chatHeaderDecor.url))})`
+    ,"--xb-user-bubble-decor": mode === "performance" || !theme.visualSlots.userBubbleDecor.enabled || !theme.visualSlots.userBubbleDecor.url ? "none" : `url(${JSON.stringify(displayAssetUrl(theme.visualSlots.userBubbleDecor.url))})`
+    ,"--xb-assistant-bubble-decor": mode === "performance" || !theme.visualSlots.assistantBubbleDecor.enabled || !theme.visualSlots.assistantBubbleDecor.url ? "none" : `url(${JSON.stringify(displayAssetUrl(theme.visualSlots.assistantBubbleDecor.url))})`
+    ,"--xb-avatar-frame": mode === "performance" || !theme.visualSlots.avatarFrame.enabled || !theme.visualSlots.avatarFrame.url ? "none" : `url(${JSON.stringify(displayAssetUrl(theme.visualSlots.avatarFrame.url))})`
+    ,"--xb-input-decor": mode === "performance" || !theme.visualSlots.inputDecor.enabled || !theme.visualSlots.inputDecor.url ? "none" : `url(${JSON.stringify(displayAssetUrl(theme.visualSlots.inputDecor.url))})`
+    ,"--xb-home-card-decor": mode === "performance" || !theme.visualSlots.homeCardDecor.enabled || !theme.visualSlots.homeCardDecor.url ? "none" : `url(${JSON.stringify(displayAssetUrl(theme.visualSlots.homeCardDecor.url))})`
+    ,"--xb-nav-accent": mode === "performance" || !theme.visualSlots.navAccent.enabled || !theme.visualSlots.navAccent.url ? "none" : `url(${JSON.stringify(displayAssetUrl(theme.visualSlots.navAccent.url))})`
     ,...Object.fromEntries(VISUAL_SLOT_FIELDS.flatMap(key => { const slot=theme.visualSlots[key]; const prefix=`--xb-slot-${key.replace(/[A-Z]/gu, match=>`-${match.toLowerCase()}`)}`; return [[`${prefix}-opacity`,String(slot.opacity)],[`${prefix}-x`,`${slot.x}px`],[`${prefix}-y`,`${slot.y}px`],[`${prefix}-scale`,String(slot.scale)],[`${prefix}-rotation`,`${slot.rotation}deg`],[`${prefix}-radius`,`${slot.radius}%`],[`${prefix}-border-width`,`${slot.borderWidth}px`],[`${prefix}-border-color`,slot.borderColor],[`${prefix}-shadow`,slot.shadow]]; }))
     ,...customDesignVariables(theme.customDesign)
   }); };
@@ -501,7 +502,7 @@
       applyBodyClasses();
       if (!this.document?.body) this.document?.addEventListener?.("DOMContentLoaded", applyBodyClasses, { once: true });
       const background = theme.assets.chatBackgroundImage || theme.assets.backgroundImage || theme.assets.homeBackgroundImage;
-      if (applyBackground && background) rootNode.style.setProperty("--theme-background-image", `url(${JSON.stringify(background)})`);
+      if (applyBackground && background) rootNode.style.setProperty("--theme-background-image", `url(${JSON.stringify(displayAssetUrl(background))})`);
       else rootNode.style.removeProperty("--theme-background-image");
       let style = this.document?.getElementById?.("xinban-theme-custom-css");
       if (this.document && !style) { style = this.document.createElement("style"); style.id = "xinban-theme-custom-css"; this.document.head.append(style); }

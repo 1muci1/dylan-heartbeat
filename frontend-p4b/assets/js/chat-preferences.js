@@ -6,7 +6,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const store = new Store();
   const shell = document.querySelector(".chat-shell");
   if (!shell) return;
+  let generation = 0;
   const apply = preferences => {
+    const current = ++generation;
     const background = store.getChatBackground(preferences || store.loadSync());
     if (background.image || background.color) {
       shell.style.setProperty(
@@ -20,6 +22,11 @@ document.addEventListener("DOMContentLoaded", () => {
       shell.style.setProperty("--chat-bg-opacity", String(background.opacity));
       shell.style.setProperty("--chat-bg-color", background.color || "transparent");
       shell.classList.add("has-chat-background");
+      if (background.image?.includes("/api/theme/assets/")) {
+        const image = new window.Image();
+        image.onerror = () => { if (current === generation) { shell.style.setProperty("--chat-bg-image", "none"); shell.classList.remove("has-chat-background"); } };
+        image.src = background.image;
+      }
       return;
     }
     [

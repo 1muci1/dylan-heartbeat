@@ -6,11 +6,9 @@
   const $=selector=>document.querySelector(selector),grid=$("[data-community-grid]"),status=$("[data-community-status]"),more=$("[data-community-more]"),search=$("[data-community-search]"),tagSelect=$("[data-community-tag]"),sortSelect=$("[data-community-sort]"),detail=$("[data-community-detail]"),preview=$("[data-community-preview]"),stage=$("[data-community-preview-stage]");
   const pages=["home","chat","space","collaboration"],localCover=/^\/api\/theme\/assets\/[0-9a-f-]{36}$/iu;
   let items=[],cursor=null,requestId=0,searchTimer=null,previewItem=null,previewPage=0;
-  const provider=()=>window.AppConfig?.getProviderConfig?.()||{};
-  const headers=()=>{const token=provider().auth?.token;return token?{Authorization:`Bearer ${token}`}:{}};
-  const request=async(path,options={})=>{const response=await fetch(gateway.resolveGatewayUrl(path,{baseUrl:provider().baseUrl,locationRef:location}),{...options,headers:{...headers(),...(options.headers||{})}}),payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error?.message||`请求失败（${response.status}）`);return payload;};
+  const request=(path,options={})=>gateway.request(path,options,window);
   const node=(tag,className,text)=>{const element=document.createElement(tag);if(className)element.className=className;if(text!=null)element.textContent=text;return element;};
-  const coverUrl=item=>{const path=`/api/theme/assets/${item.coverAssetId||""}`;return localCover.test(path)?gateway.resolveGatewayUrl(path,{baseUrl:provider().baseUrl,locationRef:location}):"";};
+  const coverUrl=item=>{const path=`/api/theme/assets/${item.coverAssetId||""}`;return localCover.test(path)?gateway.resolveGatewayUrl(path,{locationRef:location}):"";};
   const addCover=(container,item)=>{const url=coverUrl(item);if(!url){container.append(node("span","","玻璃主题封面"));return;}const image=node("img");image.src=url;image.alt=`${item.name} 主题封面`;image.loading="lazy";image.addEventListener("error",()=>container.replaceChildren(node("span","","玻璃主题封面")));container.append(image);};
   const addTags=(container,tags=[])=>{for(const tag of tags)container.append(node("span","",tag));};
   const date=value=>new Intl.DateTimeFormat("zh-CN",{dateStyle:"medium",timeStyle:"short"}).format(new Date(value));

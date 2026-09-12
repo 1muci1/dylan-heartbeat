@@ -109,6 +109,8 @@ const EVENT_DEFINITIONS = Object.freeze({
     category: "tool",
     allowedSources: Object.freeze(["tool-audit-store"])
   }),
+  "personalization.initialized": Object.freeze({ category:"personalization", allowedSources:Object.freeze(["personalization-store"]) }),
+  "personalization.updated": Object.freeze({ category:"personalization", allowedSources:Object.freeze(["personalization-store"]) }),
   "theme_asset.uploaded": Object.freeze({
     category: "theme_asset",
     allowedSources: Object.freeze(["theme-asset-store"])

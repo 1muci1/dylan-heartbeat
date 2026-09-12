@@ -35,7 +35,11 @@
     const image = String(value || "").trim();
     return /^data:image\//iu.test(image) || image.startsWith("https://") || image.startsWith("/");
   };
-  const firstPersistentImage = candidates => candidates.find(isPersistentAvatarImage) || null;
+  const firstPersistentImage = candidates => {
+    const image = candidates.find(isPersistentAvatarImage) || null;
+    if (image?.startsWith("/api/theme/assets/") && typeof window !== "undefined") return window.XinbanThemes?.resolveThemeAssetUrl(image) || image;
+    return image;
+  };
   const getChenAvatarImage = preferences => {
     const avatar = isObject(preferences?.avatar) ? preferences.avatar : {};
     const chen = isObject(avatar.chenAvatar) ? avatar.chenAvatar : {};

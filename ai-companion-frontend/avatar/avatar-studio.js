@@ -110,7 +110,7 @@
         ...cloneConfig(DEFAULT_CHEN_AVATAR),
         imageUrl,
         source: stored.source === "upload" ? "upload" : "default",
-        crop: normalizeCrop({ ...DEFAULT_CHEN_AVATAR.crop, ...(stored.crop || {}) }),
+        crop: normalizeCrop({ ...DEFAULT_CHEN_AVATAR.crop, ...(stored.crop || {}), zoom: stored.scale ?? stored.crop?.zoom ?? DEFAULT_CHEN_AVATAR.crop.zoom }),
         frame: normalizeFrame({
           ...DEFAULT_CHEN_AVATAR.frame,
           border: stored.border || DEFAULT_CHEN_AVATAR.frame.border,

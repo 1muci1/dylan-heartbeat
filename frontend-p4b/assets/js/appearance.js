@@ -19,6 +19,7 @@
     save(value) {
       const settings = apply({ ...read(), ...value });
       localStorage.setItem(KEY, JSON.stringify(settings));
+      window.dispatchEvent(new CustomEvent("xinban:appearance-settings"));
       return settings;
     },
     clearBackground() {

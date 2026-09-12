@@ -10,7 +10,7 @@
   class VoiceSettingsStore{
     constructor(storage){this.storage=storage||null;}
     load(){try{return sanitizeSettings(JSON.parse(this.storage?.getItem(SETTINGS_KEY)||"null"));}catch{return{...DEFAULT_SETTINGS};}}
-    save(value){const next=sanitizeSettings(value);this.storage?.setItem(SETTINGS_KEY,JSON.stringify(next));return next;}
+    save(value){const next=sanitizeSettings(value);this.storage?.setItem(SETTINGS_KEY,JSON.stringify(next));if(typeof window!=="undefined")window.dispatchEvent(new window.CustomEvent("xinban:voice-settings"));return next;}
   }
   const normalizeSpeechText=(text,preserveLines=false)=>String(text||"")
     .replace(/```[\s\S]*?```/gu," ").replace(/`[^`]*`/gu," ")

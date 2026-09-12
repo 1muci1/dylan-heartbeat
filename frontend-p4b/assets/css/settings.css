@@ -165,3 +165,21 @@
 .avatar-editor__actions { display:flex; gap:8px; margin-top:12px; }
 .avatar-editor__actions button { flex:1; padding:10px; border:1px solid var(--line); border-radius:11px; color:var(--text); background:var(--surface-soft); }
 .avatar-editor__actions button:last-child { color:#fff; background:linear-gradient(145deg,var(--primary),#8b5cf6); }
+
+/* Independent Gateway form: fixed feedback/actions, scrollable fields, keyboard viewport. */
+.gateway-dialog { box-sizing:border-box; width:min(430px,calc(100% - 24px)); max-height:calc(var(--gateway-height,100dvh) - 24px); position:fixed; top:calc(var(--gateway-top,0px) + 12px); bottom:auto; margin:0 auto; padding:0; overflow:hidden; border:1px solid #ddd3e4; border-radius:20px; color:#51475a; background:#fbf9fc; }
+.gateway-dialog::backdrop { background:rgba(35,26,42,.48); }
+.gateway-dialog form { display:flex; flex-direction:column; max-height:calc(var(--gateway-height,100dvh) - 26px); }
+.gateway-dialog header { padding:16px 18px 8px; flex-shrink:0; }
+.gateway-dialog h2 { margin:0; font-size:20px; }
+.gateway-dialog p { font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+.gateway-fields { padding:0 18px; overflow-y:auto; min-height:0; -webkit-overflow-scrolling:touch; }
+.gateway-dialog label { display:grid; gap:6px; margin:12px 0; font-size:14px; }
+.gateway-dialog input { box-sizing:border-box; width:100%; min-height:44px; font-size:16px; border:1px solid #d9cfe0; border-radius:10px; padding:10px; }
+.gateway-dialog footer { flex-shrink:0; padding:8px 18px max(12px,env(safe-area-inset-bottom)); background:#fbf9fc; border-top:1px solid #e3dce8; }
+.gateway-dialog footer p { margin:0 0 10px; }
+.gateway-dialog footer div { display:flex; gap:10px; }
+.gateway-dialog button { min-height:44px; padding:8px 12px; border:1px solid #d9cfe0; border-radius:10px; background:#eee6f4; color:#51475a; }
+.gateway-dialog footer button { flex:1; }
+.gateway-dialog button[type=submit] { background:#705881; color:white; }
+.gateway-dialog button:disabled { opacity:.6; }

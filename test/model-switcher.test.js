@@ -90,7 +90,7 @@ test("settings and chat consume the registry without changing runtime code", () 
   assert.match(settings, /data-open-global-provider/);
   assert.match(settings, /data-global-provider-dialog/);
   assert.doesNotMatch(settings, /data-model-list/);
-  assert.match(settings, /src="\/storage\/user-preference-store\.js"/);
+  assert.match(settings, /src="\/storage\/user-preference-store\.js\?v=v79-p4b"/);
   assert.doesNotMatch(settings, /ai-companion-frontend\/storage\/user-preference-store\.js/);
   assert.match(chat, /data-model-badge/);
   assert.match(settings + chat, /model-registry\.js/);
@@ -241,7 +241,7 @@ test("settings keeps API keys masked and edits the same Provider config", () => 
   assert.match(html, /name="supportsImages" type="checkbox"/);
   assert.match(html, /支持图片理解/);
   assert.match(html, /data-provider-panel-token/);
-  assert.match(script, /configStore\.saveProviderConfig\(readFormConfig\(\)\)/);
+  assert.match(script, /configStore\.saveProviderConfig\(candidate\)/);
   assert.match(script, /模型配置已保存/);
   for (const marker of ["data-provider-configured", "data-model-configured", "data-token-configured", "data-images-configured"]) {
     assert.match(html, new RegExp(marker));

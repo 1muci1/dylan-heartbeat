@@ -4,13 +4,20 @@ document.addEventListener("DOMContentLoaded", () => {
   const Store = window.CompanionUserPreferences?.UserPreferenceStore;
   if (!Store) return;
   const store = new Store();
+  const generations = new WeakMap();
   const applyAvatar = (node, image, avatar = {}, fallback = "沉") => {
     if (!node) return false;
+    const current = (generations.get(node) || 0) + 1; generations.set(node, current);
     if (image) {
       node.style.backgroundImage = `url(${JSON.stringify(image)})`;
       node.style.backgroundPosition = `${avatar.crop?.x ?? 50}% ${avatar.crop?.y ?? 50}%`;
       node.style.backgroundSize = `${Math.max(1, Number(avatar.scale) || 1) * 100}%`;
       node.classList.add("has-avatar-image");
+      if (image.includes("/api/theme/assets/")) {
+        const probe = new window.Image();
+        probe.onerror = () => { if (generations.get(node) === current) applyAvatar(node, null, avatar, fallback); };
+        probe.src = image;
+      }
       return true;
     }
     node.style.removeProperty("background-image");

@@ -26,6 +26,8 @@ const { StickerImporter } = require("./sticker-importer");
 const { registerUploadRoutes } = require("./upload-routes");
 const { ThemeAssetLocalizer, ThemeAssetPreviewService, ThemeAssetPreviewStore, ThemeAssetStore } = require("./theme-asset-service");
 const { registerThemeAssetRoutes } = require("./theme-asset-routes");
+const { PersonalizationStore } = require("./personalization-store");
+const { registerPersonalizationRoutes } = require("./personalization-routes");
 const { ThemePresetStore } = require("./theme-preset-service");
 const { registerThemePresetRoutes } = require("./theme-preset-routes");
 const { AiMemoryStore } = require("./ai-memory-store");
@@ -187,6 +189,7 @@ const uploadStore = new UploadStore();
 const stickerImporter = new StickerImporter({ uploadStore });
 const themeAssetStore = new ThemeAssetStore({ eventStore });
 const themePresetStore = new ThemePresetStore({ assetStore:themeAssetStore, eventStore });
+const personalizationStore = new PersonalizationStore({ eventStore, assetStore:themeAssetStore });
 const themeAssetLocalizer = new ThemeAssetLocalizer({ store: themeAssetStore });
 const themeAssetPreviewStore = new ThemeAssetPreviewStore();
 const themeAssetPreviewService = new ThemeAssetPreviewService({ localizer: themeAssetLocalizer, store: themeAssetPreviewStore });
@@ -227,8 +230,9 @@ registerMemoryRoutes(app, {
 });
 registerMediaRoutes(app, { store: mediaStore, sessionStore });
 registerUploadRoutes(app, { uploadStore, stickerImporter });
-registerThemeAssetRoutes(app, { localizer: themeAssetLocalizer, store: themeAssetStore, previewService: themeAssetPreviewService, previewStore: themeAssetPreviewStore, presetStore:themePresetStore });
+registerThemeAssetRoutes(app, { localizer: themeAssetLocalizer, store: themeAssetStore, previewService: themeAssetPreviewService, previewStore: themeAssetPreviewStore, presetStore:themePresetStore, personalizationStore });
 registerThemePresetRoutes(app, { store:themePresetStore });
+registerPersonalizationRoutes(app, { store:personalizationStore });
 registerAiRoutes(app, { store: aiMemoryStore, runner: aiTaskRunner, config: aiConfig, adapter: aiAdapter });
 registerEventRoutes(app, { store: eventStore });
 registerGameEventRoutes(app, { service: gameEventService, suggestionStore: memorySuggestionStore });
@@ -1009,6 +1013,7 @@ const auth = req.headers.authorization || "";
   if (req.url.startsWith("/api/v1/ai-")) return done();
   if (req.url.startsWith("/api/memory/suggestions")) return done();
   if (req.url.startsWith("/api/theme/")) return done();
+  if (req.url.split("?")[0] === "/api/personalization" || req.url.split("?")[0] === "/api/personalization/bootstrap") return done();
   // 游戏 API 使用各自路由的 Bearer 鉴权与 JSON 错误封装。
   if (req.url.startsWith("/api/game/")) return done();
 
